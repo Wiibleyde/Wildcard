@@ -7,9 +7,17 @@
     "build": "next build",
     "start": "next start",
     "lint": "biome check",
-    "format": "biome format --write"
+    "format": "biome format --write",
+    "db:start": "docker compose --env-file .env.docker up -d",
+    "db:stop": "docker compose --env-file .env.docker down",
+    "db:reset": "supabase db reset",
+    "db:push": "supabase db push",
+    "db:types": "supabase gen types typescript --local > src/lib/supabase/types.ts",
+    "db:new-migration": "supabase migration new"
   },
   "dependencies": {
+    "@supabase/ssr": "0.10.3",
+    "@supabase/supabase-js": "2.106.2",
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4"

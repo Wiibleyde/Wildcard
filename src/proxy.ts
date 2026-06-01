@@ -1,4 +1,6 @@
+import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
+import type { Database } from "@/lib/supabase/types";
 
 const locales = ["fr", "en"] as const;
 const defaultLocale = "fr";
@@ -12,21 +14,54 @@ function getLocale(request: NextRequest): string {
   return defaultLocale;
 }
 
-export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+export async function proxy(request: NextRequest) {
+  // Build base response — Supabase may update it when refreshing tokens
+  let response = NextResponse.next({ request: { headers: request.headers } });
 
+  // Refresh session on every request so Server Components always get a valid user
+  const supabase = createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => request.cookies.getAll(),
+        setAll: (cookiesToSet) => {
+          cookiesToSet.forEach(({ name, value }) => {
+            request.cookies.set(name, value);
+          });
+          response = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
+          });
+        },
+      },
+    },
+  );
+  await supabase.auth.getUser();
+
+  // i18n: redirect paths without a locale prefix
+  const { pathname } = request.nextUrl;
   const pathnameHasLocale = locales.some(
     (locale) =>
       pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`,
   );
 
-  if (pathnameHasLocale) return;
+  if (!pathnameHasLocale) {
+    const locale = getLocale(request);
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = `/${locale}${pathname}`;
+    const redirectResponse = NextResponse.redirect(redirectUrl);
+    // Carry refreshed session cookies through the redirect
+    response.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value);
+    });
+    return redirectResponse;
+  }
 
-  const locale = getLocale(request);
-  request.nextUrl.pathname = `/${locale}${pathname}`;
-  return NextResponse.redirect(request.nextUrl);
+  return response;
 }
 
 export const config = {
-  matcher: ["/((?!_next|api|favicon.ico|.*\\..*).*)" ],
+  // Excludes: _next internals, API routes, OAuth callback, static files
+  matcher: ["/((?!_next|api|auth/callback|favicon\\.ico|.*\\..*).*)" ],
 };
