@@ -7,10 +7,44 @@
     "home": "Home",
     "login": "Login",
     "register": "Sign up",
-    "logout": "Logout"
+    "logout": "Logout",
+    "profile": "My profile"
   },
   "common": {
     "loading": "Loading...",
-    "error": "An error occurred"
+    "error": "An error occurred",
+    "save": "Save",
+    "saving": "Saving...",
+    "saved": "Saved!"
+  },
+  "auth": {
+    "login": {
+      "title": "Sign in",
+      "subtitle": "Sign in to join the game",
+      "with_google": "Continue with Google",
+      "with_discord": "Continue with Discord",
+      "with_apple": "Continue with Apple",
+      "divider": "or",
+      "no_account": "No account yet?",
+      "already_account": "Already have an account?",
+      "sign_in": "Sign in"
+    }
+  },
+  "profile": {
+    "title": "My profile",
+    "username_label": "Username",
+    "username_placeholder": "Choose a username",
+    "avatar_label": "Profile picture",
+    "avatar_upload": "Choose an image",
+    "avatar_uploading": "Uploading...",
+    "linked_accounts": "Linked accounts",
+    "link": "Link",
+    "linked": "Linked",
+    "member_since": "Member since",
+    "error_username_empty": "Username cannot be empty",
+    "error_username_taken": "This username is already taken",
+    "error_avatar": "Error uploading image",
+    "success": "Profile updated",
+    "sign_out": "Sign out"
   }
 }

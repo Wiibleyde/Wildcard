@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "docker compose --env-file .env.docker --profile studio up -d --scale app=0 && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "biome check",

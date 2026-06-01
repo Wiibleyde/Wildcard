@@ -7,10 +7,44 @@
     "home": "Accueil",
     "login": "Connexion",
     "register": "S'inscrire",
-    "logout": "Déconnexion"
+    "logout": "Déconnexion",
+    "profile": "Mon profil"
   },
   "common": {
     "loading": "Chargement...",
-    "error": "Une erreur est survenue"
+    "error": "Une erreur est survenue",
+    "save": "Enregistrer",
+    "saving": "Enregistrement...",
+    "saved": "Enregistré !"
+  },
+  "auth": {
+    "login": {
+      "title": "Connexion",
+      "subtitle": "Connecte-toi pour rejoindre la partie",
+      "with_google": "Continuer avec Google",
+      "with_discord": "Continuer avec Discord",
+      "with_apple": "Continuer avec Apple",
+      "divider": "ou",
+      "no_account": "Pas encore de compte ?",
+      "already_account": "Déjà un compte ?",
+      "sign_in": "Se connecter"
+    }
+  },
+  "profile": {
+    "title": "Mon profil",
+    "username_label": "Nom d'utilisateur",
+    "username_placeholder": "Choisis un pseudo",
+    "avatar_label": "Photo de profil",
+    "avatar_upload": "Choisir une image",
+    "avatar_uploading": "Envoi en cours...",
+    "linked_accounts": "Comptes liés",
+    "link": "Lier",
+    "linked": "Lié",
+    "member_since": "Membre depuis",
+    "error_username_empty": "Le nom d'utilisateur ne peut pas être vide",
+    "error_username_taken": "Ce nom d'utilisateur est déjà pris",
+    "error_avatar": "Erreur lors de l'envoi de l'image",
+    "success": "Profil mis à jour",
+    "sign_out": "Se déconnecter"
   }
 }

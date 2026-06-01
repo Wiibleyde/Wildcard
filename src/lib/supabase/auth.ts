@@ -18,6 +18,19 @@ export async function signInWithOAuth(
   });
 }
 
+export async function linkIdentity(
+  provider: OAuthProvider,
+  locale: string = "fr",
+) {
+  const supabase = createClient();
+  return supabase.auth.linkIdentity({
+    provider,
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback?next=/${locale}/profile`,
+    },
+  });
+}
+
 export async function signOut() {
   const supabase = createClient();
   return supabase.auth.signOut();
