@@ -1,0 +1,16 @@
+{
+  "home": {
+    "title": "Wildcard",
+    "subtitle": "Plateforme de jeux de cartes en ligne"
+  },
+  "navigation": {
+    "home": "Accueil",
+    "login": "Connexion",
+    "register": "S'inscrire",
+    "logout": "Déconnexion"
+  },
+  "common": {
+    "loading": "Chargement...",
+    "error": "Une erreur est survenue"
+  }
+}

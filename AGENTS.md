@@ -102,16 +102,62 @@ les modules officiels — c'est une séparation délibérée de conception.
 
 ---
 
+## Internationalisation (i18n)
+
+Locales supportées : **`fr`** (défaut), `en`.
+
+### Conventions
+- **`src/proxy.ts`** — détection de locale via `Accept-Language` + redirect. Convention Next.js 16 : `proxy.ts` (pas `middleware.ts`, déprécié).
+- **`src/app/[lang]/`** — segment dynamique racine. Toutes les pages vivent sous ce segment.
+- **`src/dictionaries/`** — fichiers JSON par locale (`fr.json`, `en.json`). `fr.json` est la source de vérité pour les types.
+- **`src/lib/i18n.ts`** — exports : `Locale`, `Dictionary`, `locales`, `defaultLocale`, `getDictionary`.
+
+### Ajouter une page traduite
+
+```ts
+// src/app/[lang]/ma-page/page.tsx
+import { getDictionary } from "@/lib/i18n";
+
+export default async function MaPage({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}) {
+  const { lang } = await params;
+  const dict = await getDictionary(lang);
+  // ...
+}
+```
+
+Ajouter la clé dans `fr.json` ET `en.json` — TypeScript l'exige (`Dictionary` est dérivé de `fr.json`).
+
+### Ajouter une locale
+
+1. Créer `src/dictionaries/<locale>.json` (même structure que `fr.json`)
+2. Ajouter la locale dans `src/lib/i18n.ts` (`locales` array + `dictionaries` map)
+3. Ajouter la locale dans `src/proxy.ts` (`locales` array)
+
+---
+
 ## Structure du projet (cible)
 
 ```
 wildcard/
 ├── app/
-│   ├── (auth)/              # Login, register
-│   ├── (lobby)/             # Accueil, liste des rooms
-│   ├── game/[roomId]/       # Interface de jeu
-│   └── studio/              # Game Studio (ECA editor)
+│   ├── [lang]/              # Segment i18n racine
+│   │   ├── (auth)/          # Login, register
+│   │   ├── (lobby)/         # Accueil, liste des rooms
+│   │   ├── game/[roomId]/   # Interface de jeu
+│   │   ├── studio/          # Game Studio (ECA editor)
+│   │   ├── layout.tsx       # RootLayout avec lang param
+│   │   └── page.tsx
+│   ├── favicon.ico
+│   └── globals.css
+├── dictionaries/
+│   ├── fr.json              # Source de vérité des types
+│   └── en.json
 ├── lib/
+│   ├── i18n.ts              # Locale, Dictionary, getDictionary
 │   ├── engine/              # Moteur de jeu générique
 │   │   ├── types.ts         # GameState, PlayerAction, GameModule...
 │   │   └── runner.ts        # Exécution des tours
@@ -127,6 +173,7 @@ wildcard/
 │   ├── card/                # Composants carte (GSAP)
 │   ├── lobby/
 │   └── studio/              # UI du Game Studio
+├── proxy.ts                 # Détection locale + redirect (Next.js 16)
 └── supabase/
     ├── migrations/          # Schémas SQL versionnés
     └── functions/           # Edge Functions
