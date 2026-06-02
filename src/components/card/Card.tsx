@@ -1,9 +1,9 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactElement } from "react";
 import { PIP_LAYOUTS, type PipPosition } from "@/lib/card/pips";
 import { freeTheme } from "@/lib/card/themes/free";
-import type { CardTheme, Rank, Suit } from "@/lib/card/types";
+import type { CardTheme, FaceRank, Rank, Suit } from "@/lib/card/types";
 
 export interface CardProps {
   suit: Suit;
@@ -82,6 +82,11 @@ export function Card({
     backgroundColor: theme.backgroundColor,
   };
 
+  const faceRank = isAce || isFaceCard ? (rank as FaceRank) : undefined;
+  const customFaceArtwork = faceRank
+    ? theme.faceArtwork?.[suit]?.[faceRank]
+    : undefined;
+
   const body = faceDown ? null : (
     <>
       <Corner rank={rank} symbol={suitStyle.symbol} color={suitStyle.color} />
@@ -91,6 +96,7 @@ export function Card({
         pipLayout={pipLayout}
         rank={rank}
         suitStyle={suitStyle}
+        customFaceArtwork={customFaceArtwork}
       />
       <Corner
         rank={rank}
@@ -125,7 +131,7 @@ export function Card({
 
 interface CornerProps {
   rank: Rank;
-  symbol: string;
+  symbol: string | ReactElement;
   color: string;
   flipped?: boolean;
 }
@@ -153,7 +159,8 @@ interface CardBodyProps {
   isFaceCard: boolean;
   pipLayout: PipPosition[] | undefined;
   rank: Rank;
-  suitStyle: { symbol: string; color: string };
+  suitStyle: { symbol: string | ReactElement; color: string };
+  customFaceArtwork?: string | ReactElement;
 }
 
 function CardBody({
@@ -162,13 +169,33 @@ function CardBody({
   pipLayout,
   rank,
   suitStyle,
+  customFaceArtwork,
 }: CardBodyProps) {
   return (
     <div
       className="absolute"
       style={{ top: "16%", bottom: "16%", left: "10%", right: "10%" }}
     >
-      {isAce && (
+      {/* Custom theme artwork takes priority over the default A/J/Q/K display */}
+      {customFaceArtwork !== undefined && (
+        <div className="w-full h-full flex items-center justify-center overflow-hidden">
+          {typeof customFaceArtwork === "string" ? (
+            <span
+              style={{
+                fontSize: "46cqi",
+                color: suitStyle.color,
+                lineHeight: 1,
+              }}
+            >
+              {customFaceArtwork}
+            </span>
+          ) : (
+            customFaceArtwork
+          )}
+        </div>
+      )}
+
+      {customFaceArtwork === undefined && isAce && (
         <div
           className="w-full h-full flex items-center justify-center"
           style={{ fontSize: "46cqi", color: suitStyle.color, lineHeight: 1 }}
@@ -177,7 +204,7 @@ function CardBody({
         </div>
       )}
 
-      {isFaceCard && (
+      {customFaceArtwork === undefined && isFaceCard && (
         <div
           className="w-full h-full flex flex-col items-center justify-center"
           style={{ color: suitStyle.color, gap: "5%" }}

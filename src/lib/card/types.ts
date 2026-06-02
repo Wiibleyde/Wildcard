@@ -16,6 +16,9 @@ export type Rank =
   | "Q"
   | "K";
 
+/** Ranks that have a center illustration slot */
+export type FaceRank = "A" | "J" | "Q" | "K";
+
 export const SUITS: Suit[] = ["spades", "hearts", "diamonds", "clubs"];
 export const RANKS: Rank[] = [
   "A",
@@ -69,4 +72,17 @@ export interface CardTheme {
   backColor: string;
   /** Optional CSS `background` shorthand for the card back pattern */
   backPattern?: string;
+  /**
+   * Custom center artwork for Ace and face cards, indexed by suit then rank.
+   * Omitted entries fall back to the default rank + symbol display.
+   *
+   * @example
+   * faceArtwork: {
+   *   spades: { K: <img src="/themes/gothic/king-spades.png" alt="" /> },
+   *   hearts: { Q: <img src="/themes/gothic/queen-hearts.png" alt="" /> },
+   * }
+   */
+  faceArtwork?: Partial<
+    Record<Suit, Partial<Record<FaceRank, string | ReactElement>>>
+  >;
 }
