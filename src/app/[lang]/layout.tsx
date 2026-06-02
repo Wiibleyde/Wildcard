@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "../globals.css";
-import { locales, getDictionary, defaultLocale, type Locale } from "@/lib/i18n";
+import { defaultLocale, getDictionary, type Locale, locales } from "@/lib/i18n";
 import { I18nProvider } from "@/lib/i18n/context";
 
 const geistSans = Geist({
@@ -31,7 +31,9 @@ export default async function RootLayout({
   params: Promise<{ lang: string }>;
 }>) {
   const { lang } = await params;
-  const locale = (locales.includes(lang as Locale) ? lang : defaultLocale) as Locale;
+  const locale = (
+    locales.includes(lang as Locale) ? lang : defaultLocale
+  ) as Locale;
   const dict = await getDictionary(locale);
 
   return (

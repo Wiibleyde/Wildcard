@@ -1,7 +1,7 @@
-import { getDictionary } from "@/lib/i18n";
-import { OAuthButton } from "@/components/auth/OAuthButton";
-import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { OAuthButton } from "@/components/auth/OAuthButton";
+import { getDictionary } from "@/lib/i18n";
+import { createClient } from "@/lib/supabase/server";
 
 export async function LoginPage({ lang }: { lang: string }) {
   const dict = await getDictionary(lang);
@@ -32,14 +32,27 @@ export async function LoginPage({ lang }: { lang: string }) {
               />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-white">{dict.auth.login.title}</h1>
-          <p className="text-gray-400 mt-2 text-sm">{dict.auth.login.subtitle}</p>
+          <h1 className="text-2xl font-bold text-white">
+            {dict.auth.login.title}
+          </h1>
+          <p className="text-gray-400 mt-2 text-sm">
+            {dict.auth.login.subtitle}
+          </p>
         </div>
 
         <div className="space-y-3">
-          <OAuthButton provider="google" labelOverride={dict.auth.login.with_google} />
-          <OAuthButton provider="discord" labelOverride={dict.auth.login.with_discord} />
-          <OAuthButton provider="apple" labelOverride={dict.auth.login.with_apple} />
+          <OAuthButton
+            provider="google"
+            labelOverride={dict.auth.login.with_google}
+          />
+          <OAuthButton
+            provider="discord"
+            labelOverride={dict.auth.login.with_discord}
+          />
+          <OAuthButton
+            provider="apple"
+            labelOverride={dict.auth.login.with_apple}
+          />
         </div>
 
         <p className="mt-8 text-center text-xs text-gray-500">
