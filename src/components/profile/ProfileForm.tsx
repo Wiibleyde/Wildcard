@@ -12,7 +12,10 @@ type Props = {
   dict: Dictionary;
 };
 
-function getAvatarDisplayUrl(
+type AvatarState = "idle" | "uploading" | "saved" | "error";
+type FormStatus = "idle" | "saving" | "saved" | "error";
+
+function buildAvatarUrl(
   supabase: ReturnType<typeof createClient>,
   path: string | null,
   bust?: number,
@@ -31,78 +34,98 @@ export function ProfileForm({
   const [username, setUsername] = useState(initialUsername);
   const [avatarPath, setAvatarPath] = useState(initialAvatarPath);
   const [avatarBust, setAvatarBust] = useState<number | undefined>(undefined);
-  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
-    "idle",
-  );
-  const [errorMsg, setErrorMsg] = useState("");
-  const [uploading, setUploading] = useState(false);
+  const [avatarState, setAvatarState] = useState<AvatarState>("idle");
+  const [avatarError, setAvatarError] = useState("");
+  const [formStatus, setFormStatus] = useState<FormStatus>("idle");
+  const [formError, setFormError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
-  const avatarDisplayUrl = getAvatarDisplayUrl(
-    supabase,
-    avatarPath,
-    avatarBust,
-  );
+  const avatarDisplayUrl = buildAvatarUrl(supabase, avatarPath, avatarBust);
+
+  function openFilePicker() {
+    if (fileRef.current) {
+      fileRef.current.value = "";
+      fileRef.current.click();
+    }
+  }
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploading(true);
-    const ext = file.name.split(".").pop();
+    setAvatarState("uploading");
+    setAvatarError("");
+
+    const ext = file.name.split(".").pop() ?? "jpg";
     const path = `${userId}/avatar.${ext}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from("avatars")
-      .upload(path, file, { upsert: true });
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true });
 
-    if (uploadError) {
-      setErrorMsg(dict.profile.error_avatar);
-      setStatus("error");
-      setUploading(false);
-      return;
+      if (uploadError) throw uploadError;
+
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avatar_url: path }),
+      });
+
+      if (!res.ok) throw new Error("save_failed");
+
+      setAvatarPath(path);
+      setAvatarBust(Date.now());
+      setAvatarState("saved");
+      setTimeout(() => setAvatarState("idle"), 2000);
+    } catch {
+      setAvatarError(dict.profile.error_avatar);
+      setAvatarState("error");
     }
-
-    setAvatarPath(path);
-    setAvatarBust(Date.now());
-    setUploading(false);
   }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!username.trim()) {
-      setErrorMsg(dict.profile.error_username_empty);
-      setStatus("error");
+      setFormError(dict.profile.error_username_empty);
+      setFormStatus("error");
       return;
     }
 
-    setStatus("saving");
-    setErrorMsg("");
+    setFormStatus("saving");
+    setFormError("");
 
-    const res = await fetch("/api/profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        username: username.trim(),
-        avatar_url: avatarPath,
-      }),
-    });
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: username.trim(),
+          avatar_url: avatarPath,
+        }),
+      });
 
-    if (!res.ok) {
-      const data = (await res.json()) as { error?: string };
-      if (data.error === "username_taken") {
-        setErrorMsg(dict.profile.error_username_taken);
-      } else {
-        setErrorMsg(dict.common.error);
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string };
+        if (data.error === "username_taken") {
+          setFormError(dict.profile.error_username_taken);
+        } else {
+          setFormError(dict.common.error);
+        }
+        setFormStatus("error");
+        return;
       }
-      setStatus("error");
-      return;
-    }
 
-    setStatus("saved");
-    setTimeout(() => setStatus("idle"), 2500);
+      setFormStatus("saved");
+      setTimeout(() => setFormStatus("idle"), 2500);
+    } catch {
+      setFormError(dict.common.error);
+      setFormStatus("error");
+    }
   }
+
+  const avatarBusy = avatarState === "uploading";
 
   return (
     <form onSubmit={handleSave} className="space-y-5">
@@ -130,16 +153,32 @@ export function ProfileForm({
               </div>
             )}
           </div>
+
           <button
             type="button"
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading}
+            onClick={openFilePicker}
+            disabled={avatarBusy}
             className="absolute inset-0 rounded-full bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
           >
-            {uploading ? (
+            {avatarBusy ? (
               <span className="text-[10px] text-white font-semibold text-center px-1 leading-tight">
                 {dict.profile.avatar_uploading}
               </span>
+            ) : avatarState === "saved" ? (
+              <svg
+                viewBox="0 0 24 24"
+                className="w-5 h-5 text-green-400"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4.5 12.75l6 6 9-13.5"
+                />
+              </svg>
             ) : (
               <svg
                 viewBox="0 0 24 24"
@@ -158,7 +197,13 @@ export function ProfileForm({
             )}
           </button>
         </div>
-        <p className="text-xs text-wc-sub">{dict.profile.avatar_upload}</p>
+
+        <div className="flex flex-col gap-1">
+          <p className="text-xs text-wc-sub">{dict.profile.avatar_upload}</p>
+          {avatarState === "error" && avatarError && (
+            <p className="text-red-400 text-xs font-medium">{avatarError}</p>
+          )}
+        </div>
       </div>
 
       <input
@@ -187,24 +232,25 @@ export function ProfileForm({
         />
       </div>
 
-      {status === "error" && errorMsg && (
-        <p className="text-red-400 text-xs font-medium">{errorMsg}</p>
+      {formStatus === "error" && formError && (
+        <p className="text-red-400 text-xs font-medium">{formError}</p>
       )}
 
       <button
         type="submit"
-        disabled={status === "saving"}
+        disabled={formStatus === "saving" || avatarBusy}
         className="w-full font-bold py-3 rounded-(--radius-wc-btn) text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         style={{
-          background: status === "saved" ? "rgba(52,211,153,0.2)" : "#6366f1",
-          color: status === "saved" ? "#34d399" : "#fff",
+          background:
+            formStatus === "saved" ? "rgba(52,211,153,0.2)" : "#6366f1",
+          color: formStatus === "saved" ? "#34d399" : "#fff",
           border:
-            status === "saved" ? "1px solid rgba(52,211,153,0.4)" : "none",
+            formStatus === "saved" ? "1px solid rgba(52,211,153,0.4)" : "none",
         }}
       >
-        {status === "saving"
+        {formStatus === "saving"
           ? dict.common.saving
-          : status === "saved"
+          : formStatus === "saved"
             ? dict.common.saved
             : dict.common.save}
       </button>
