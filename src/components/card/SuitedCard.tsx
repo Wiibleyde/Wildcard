@@ -6,7 +6,7 @@ import type {
   Rank,
   SuitStyle,
 } from "@/lib/card/types";
-import { rankToNumber } from "@/lib/card/utils";
+import { rankToPipIndex } from "@/lib/card/utils";
 import { ArtworkFill, CardBody, CenteredArtwork } from "./CardBody";
 import { Corner } from "./Corner";
 
@@ -47,7 +47,7 @@ export function SuitedContent({
             isFaceCard={isFaceCard}
             rank={rank}
             suitStyle={suitStyle}
-            pipLayout={PIP_LAYOUTS[rankToNumber(rank)]}
+            pipLayout={PIP_LAYOUTS[rankToPipIndex(rank)]}
             centerArtwork={artwork?.center}
           />
         </CardBody>
