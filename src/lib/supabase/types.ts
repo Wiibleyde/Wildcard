@@ -35,21 +35,42 @@ export type Database = {
         Row: {
           id: string;
           name: string;
-          tier: "common" | "uncommon" | "rare" | "epic" | "legendary" | "mystical" | "ethereal";
+          tier:
+            | "common"
+            | "uncommon"
+            | "rare"
+            | "epic"
+            | "legendary"
+            | "mystical"
+            | "ethereal";
           preview_css: Record<string, string> | null;
           created_at: string;
         };
         Insert: {
           id: string;
           name: string;
-          tier?: "common" | "uncommon" | "rare" | "epic" | "legendary" | "mystical" | "ethereal";
+          tier?:
+            | "common"
+            | "uncommon"
+            | "rare"
+            | "epic"
+            | "legendary"
+            | "mystical"
+            | "ethereal";
           preview_css?: Record<string, string> | null;
           created_at?: string;
         };
         Update: {
           id?: string;
           name?: string;
-          tier?: "common" | "uncommon" | "rare" | "epic" | "legendary" | "mystical" | "ethereal";
+          tier?:
+            | "common"
+            | "uncommon"
+            | "rare"
+            | "epic"
+            | "legendary"
+            | "mystical"
+            | "ethereal";
           preview_css?: Record<string, string> | null;
           created_at?: string;
         };
@@ -59,21 +80,42 @@ export type Database = {
         Row: {
           id: string;
           name: string;
-          tier: "common" | "uncommon" | "rare" | "epic" | "legendary" | "mystical" | "ethereal";
+          tier:
+            | "common"
+            | "uncommon"
+            | "rare"
+            | "epic"
+            | "legendary"
+            | "mystical"
+            | "ethereal";
           background_css: string;
           created_at: string;
         };
         Insert: {
           id: string;
           name: string;
-          tier?: "common" | "uncommon" | "rare" | "epic" | "legendary" | "mystical" | "ethereal";
+          tier?:
+            | "common"
+            | "uncommon"
+            | "rare"
+            | "epic"
+            | "legendary"
+            | "mystical"
+            | "ethereal";
           background_css: string;
           created_at?: string;
         };
         Update: {
           id?: string;
           name?: string;
-          tier?: "common" | "uncommon" | "rare" | "epic" | "legendary" | "mystical" | "ethereal";
+          tier?:
+            | "common"
+            | "uncommon"
+            | "rare"
+            | "epic"
+            | "legendary"
+            | "mystical"
+            | "ethereal";
           background_css?: string;
           created_at?: string;
         };
