@@ -45,6 +45,10 @@
     "error_username_taken": "Ce nom d'utilisateur est déjà pris",
     "error_avatar": "Erreur lors de l'envoi de l'image",
     "success": "Profil mis à jour",
-    "sign_out": "Se déconnecter"
+    "sign_out": "Se déconnecter",
+    "xp_title": "Expérience",
+    "level_short": "Niv.",
+    "xp_to_next": "XP vers le niveau suivant",
+    "edit_title": "Modifier le profil"
   }
 }

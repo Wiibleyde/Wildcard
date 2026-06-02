@@ -1,5 +1,31 @@
 @import "tailwindcss";
 
+/* ── Wildcard design tokens ───────────────────────────────────────────────── */
+
+@theme {
+  --color-wc-surface: #070b10;
+  --color-wc-panel: #10151f;
+  --color-wc-border: #1c2230;
+  --color-wc-text: #f3f6fc;
+  --color-wc-heading: #eef2f8;
+  --color-wc-muted: #8b95a7;
+  --color-wc-sub: #7c8699;
+  --color-wc-gold: #e8c468;
+  --color-wc-gold-dim: oklch(from #e8c468 l c h / 0.2);
+  --color-wc-xp: #a78bfa;
+  --color-wc-xp-dim: oklch(from #a78bfa l c h / 0.18);
+  --color-wc-green: #34d399;
+  --color-wc-indigo: #6366f1;
+
+  --font-size-wc-label: 0.6875rem;
+  --letter-spacing-wc-cap: 0.06em;
+
+  --radius-wc-panel: 18px;
+  --radius-wc-card: 22px;
+  --radius-wc-btn: 12px;
+  --radius-wc-icon: 14px;
+}
+
 /* ── Card visual effects ──────────────────────────────────────────────────── */
 
 @keyframes wildcard-shimmer {

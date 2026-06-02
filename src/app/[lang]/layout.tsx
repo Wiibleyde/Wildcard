@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "../globals.css";
+import { AppNav } from "@/components/nav/AppNav";
 import { defaultLocale, getDictionary, type Locale, locales } from "@/lib/i18n";
 import { I18nProvider } from "@/lib/i18n/context";
 
@@ -41,9 +42,10 @@ export default async function RootLayout({
       lang={locale}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-screen bg-wc-surface text-wc-text">
         <I18nProvider locale={locale} dict={dict}>
-          {children}
+          <AppNav lang={locale} />
+          <div className="md:pl-[220px] pb-[60px] md:pb-0">{children}</div>
         </I18nProvider>
       </body>
     </html>

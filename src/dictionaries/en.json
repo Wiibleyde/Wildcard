@@ -45,6 +45,10 @@
     "error_username_taken": "This username is already taken",
     "error_avatar": "Error uploading image",
     "success": "Profile updated",
-    "sign_out": "Sign out"
+    "sign_out": "Sign out",
+    "xp_title": "Experience",
+    "level_short": "Lv.",
+    "xp_to_next": "XP to next level",
+    "edit_title": "Edit profile"
   }
 }

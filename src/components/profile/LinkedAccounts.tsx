@@ -84,25 +84,25 @@ export function LinkedAccounts({ linkedProviders, dict }: Props) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-2.5">
       {PROVIDERS.map((provider) => {
         const isLinked = linkedProviders.includes(provider.id);
         return (
           <div
             key={provider.id}
-            className={`flex items-center justify-between p-4 rounded-xl border bg-gray-800/50 ${provider.color}`}
+            className="flex items-center justify-between px-4 py-3.5 rounded-[var(--radius-wc-btn)] border border-wc-border bg-white/[0.03]"
           >
             <div className="flex items-center gap-3">
               {provider.icon}
-              <span className="text-sm font-medium text-gray-200">
+              <span className="text-sm font-semibold text-wc-heading">
                 {provider.label}
               </span>
             </div>
             {isLinked ? (
-              <div className="flex items-center gap-2 text-green-400">
+              <div className="flex items-center gap-1.5 text-wc-green">
                 <svg
                   viewBox="0 0 20 20"
-                  className="w-4 h-4"
+                  className="w-3.5 h-3.5"
                   fill="currentColor"
                   aria-hidden="true"
                 >
@@ -112,18 +112,16 @@ export function LinkedAccounts({ linkedProviders, dict }: Props) {
                     clipRule="evenodd"
                   />
                 </svg>
-                <span className="text-xs font-medium">
-                  {dict.profile.linked}
-                </span>
+                <span className="text-xs font-bold">{dict.profile.linked}</span>
               </div>
             ) : (
               <button
                 type="button"
                 onClick={() => handleLink(provider.id)}
                 disabled={linking === provider.id}
-                className="text-xs font-medium text-indigo-400 hover:text-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                className="text-xs font-bold text-wc-indigo hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-opacity"
               >
-                {linking === provider.id ? "..." : dict.profile.link}
+                {linking === provider.id ? "…" : dict.profile.link}
               </button>
             )}
           </div>
