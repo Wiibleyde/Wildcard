@@ -172,7 +172,7 @@ export function ProfileForm({
       <div>
         <label
           htmlFor="username"
-          className="block text-xs font-semibold text-wc-muted mb-2 uppercase tracking-[0.05em]"
+          className="block text-xs font-semibold text-wc-muted mb-2 uppercase tracking-wider"
         >
           {dict.profile.username_label}
         </label>
@@ -183,7 +183,7 @@ export function ProfileForm({
           onChange={(e) => setUsername(e.target.value)}
           placeholder={dict.profile.username_placeholder}
           maxLength={30}
-          className="w-full bg-white/[0.05] border border-wc-border rounded-[var(--radius-wc-btn)] px-4 py-3 text-wc-text placeholder:text-wc-sub focus:outline-none focus:ring-2 focus:ring-wc-indigo/60 focus:border-transparent text-sm transition-colors"
+          className="w-full bg-white/5 border border-wc-border rounded-(--radius-wc-btn) px-4 py-3 text-wc-text placeholder:text-wc-sub focus:outline-none focus:ring-2 focus:ring-wc-indigo/60 focus:border-transparent text-sm transition-colors"
         />
       </div>
 
@@ -194,7 +194,7 @@ export function ProfileForm({
       <button
         type="submit"
         disabled={status === "saving"}
-        className="w-full font-bold py-3 rounded-[var(--radius-wc-btn)] text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        className="w-full font-bold py-3 rounded-(--radius-wc-btn) text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         style={{
           background: status === "saved" ? "rgba(52,211,153,0.2)" : "#6366f1",
           color: status === "saved" ? "#34d399" : "#fff",

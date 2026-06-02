@@ -83,14 +83,14 @@ export async function ProfilePage({ lang }: { lang: string }) {
       <div className="max-w-md mx-auto flex flex-col gap-4">
         {/* hero — avatar + name + level */}
         <div
-          className="rounded-[var(--radius-wc-card)] p-6 border"
+          className="rounded-wc-card p-6 border"
           style={{
             background: "linear-gradient(160deg, #1d1a0e, #0c1118 72%)",
             borderColor: "rgba(232,196,104,0.22)",
           }}
         >
           <div className="flex items-center justify-between mb-5">
-            <span className="text-[length:var(--font-size-wc-label)] font-bold text-wc-sub uppercase tracking-[var(--letter-spacing-wc-cap)]">
+            <span className="text-(length:--font-size-wc-label) font-bold text-wc-sub uppercase tracking-(--letter-spacing-wc-cap)">
               {dict.profile.title}
             </span>
             <SignOutButton label={dict.profile.sign_out} />
@@ -104,7 +104,7 @@ export async function ProfilePage({ lang }: { lang: string }) {
               </h1>
               <div className="flex items-center gap-2 mt-1.5">
                 <span
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-[0.05em]"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider"
                   style={{
                     background: "rgba(232,196,104,0.16)",
                     color: "#e8c468",
@@ -125,8 +125,8 @@ export async function ProfilePage({ lang }: { lang: string }) {
         <ProfileXPCard xp={xp} dict={dict} />
 
         {/* edit form */}
-        <div className="bg-wc-panel rounded-[var(--radius-wc-panel)] p-6 border border-wc-border">
-          <h2 className="text-sm font-bold text-wc-muted mb-5 uppercase tracking-[var(--letter-spacing-wc-cap)]">
+        <div className="bg-wc-panel rounded-wc-panel p-6 border border-wc-border">
+          <h2 className="text-sm font-bold text-wc-muted mb-5 uppercase tracking-(--letter-spacing-wc-cap)">
             {dict.profile.edit_title}
           </h2>
           {profile && (
@@ -140,8 +140,8 @@ export async function ProfilePage({ lang }: { lang: string }) {
         </div>
 
         {/* linked accounts */}
-        <div className="bg-wc-panel rounded-[var(--radius-wc-panel)] p-6 border border-wc-border">
-          <h2 className="text-sm font-bold text-wc-muted mb-5 uppercase tracking-[var(--letter-spacing-wc-cap)]">
+        <div className="bg-wc-panel rounded-wc-panel p-6 border border-wc-border">
+          <h2 className="text-sm font-bold text-wc-muted mb-5 uppercase tracking-(--letter-spacing-wc-cap)">
             {dict.profile.linked_accounts}
           </h2>
           <LinkedAccounts linkedProviders={linkedProviders} dict={dict} />
