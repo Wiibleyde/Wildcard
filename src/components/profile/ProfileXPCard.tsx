@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
+import { useRef } from "react";
 import type { Dictionary } from "@/lib/i18n";
 
 gsap.registerPlugin(useGSAP);
@@ -63,10 +63,10 @@ export function ProfileXPCard({ xp, dict }: Props) {
   return (
     <div
       ref={containerRef}
-      className="bg-wc-panel border border-wc-border rounded-[var(--radius-wc-panel)] p-5"
+      className="bg-wc-panel border border-wc-border rounded-wc-panel p-5"
     >
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-[var(--radius-wc-icon)] flex items-center justify-center bg-wc-xp-dim shrink-0">
+        <div className="w-10 h-10 rounded-wc-icon flex items-center justify-center bg-wc-xp-dim shrink-0">
           <svg
             viewBox="0 0 24 24"
             className="w-5 h-5 text-wc-xp"
@@ -81,7 +81,7 @@ export function ProfileXPCard({ xp, dict }: Props) {
           </svg>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[length:var(--font-size-wc-label)] font-bold text-wc-sub uppercase tracking-[var(--letter-spacing-wc-cap)]">
+          <p className="text-(length:--font-size-wc-label) font-bold text-wc-sub uppercase tracking-(--letter-spacing-wc-cap)">
             {dict.profile.xp_title}
           </p>
           <p className="text-wc-heading font-extrabold leading-none mt-0.5">
