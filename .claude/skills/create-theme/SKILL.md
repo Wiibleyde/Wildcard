@@ -1,5 +1,7 @@
 ---
+name: create-theme
 description: Scaffold a new CardTheme file in src/lib/card/themes/. Use when the user asks to create a card theme, a custom deck theme, a brand collab theme, or a new visual style for cards.
+argument-hint: `/create-theme [theme-id]` (kebab-case, e.g. `gothic-night`). If no theme-id is provided, the skill should ask the user for it before proceeding.
 ---
 
 # create-theme
