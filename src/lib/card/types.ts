@@ -13,14 +13,53 @@ export type Rank =
   | "9"
   | "10"
   | "J"
+  | "C" // Cavalier — French Tarot only
   | "Q"
   | "K";
 
-/** Ranks that have a center illustration slot */
-export type FaceRank = "A" | "J" | "Q" | "K";
+/** Ranks that have a center illustration slot (non-pip face cards + Ace) */
+export type FaceRank = "A" | "J" | "C" | "Q" | "K";
 
-export const SUITS: Suit[] = ["spades", "hearts", "diamonds", "clubs"];
-export const RANKS: Rank[] = [
+/** Tarot trump index — 1 (Petit) through 21 (Le Monde) */
+export type TrumpIndex =
+  | 1
+  | 2
+  | 3
+  | 4
+  | 5
+  | 6
+  | 7
+  | 8
+  | 9
+  | 10
+  | 11
+  | 12
+  | 13
+  | 14
+  | 15
+  | 16
+  | 17
+  | 18
+  | 19
+  | 20
+  | 21;
+
+export type JokerVariant = "red" | "black";
+
+/**
+ * Discriminated union covering every card across all supported deck types.
+ * Use this as the canonical card identity in game state and UI props.
+ */
+export type CardDescriptor =
+  | { type: "suited"; suit: Suit; rank: Rank }
+  | { type: "trump"; index: TrumpIndex } // Tarot atouts I–XXI
+  | { type: "fool" } // Tarot L'Excuse
+  | { type: "joker"; variant?: JokerVariant };
+
+export const SUITS: readonly Suit[] = ["spades", "hearts", "diamonds", "clubs"];
+
+/** Universe of all ranks across all supported deck types */
+export const RANKS: readonly Rank[] = [
   "A",
   "2",
   "3",
@@ -32,6 +71,7 @@ export const RANKS: Rank[] = [
   "9",
   "10",
   "J",
+  "C",
   "Q",
   "K",
 ];
@@ -65,7 +105,7 @@ export interface CardTheme {
   suits: Record<Suit, SuitStyle>;
   /** Card face background CSS color */
   backgroundColor: string;
-  /** Default text color (rank numbers) */
+  /** Default text color (rank and index labels) */
   textColor: string;
   border: CardBorder;
   /** Card back solid background CSS color */
@@ -79,10 +119,29 @@ export interface CardTheme {
    * @example
    * faceArtwork: {
    *   spades: { K: <img src="/themes/gothic/king-spades.png" alt="" /> },
-   *   hearts: { Q: <img src="/themes/gothic/queen-hearts.png" alt="" /> },
    * }
    */
   faceArtwork?: Partial<
     Record<Suit, Partial<Record<FaceRank, string | ReactElement>>>
   >;
+  /**
+   * Color applied to trump and fool corner labels.
+   * Falls back to `textColor` when omitted.
+   */
+  trumpColor?: string;
+  /**
+   * Custom center artwork for tarot trump cards (atouts), indexed by trump
+   * number (1–21). Omitted entries display the roman numeral centered.
+   */
+  trumpArtwork?: Partial<Record<TrumpIndex, string | ReactElement>>;
+  /**
+   * Custom center artwork for the Fool card (tarot L'Excuse).
+   * Defaults to a ★ symbol when omitted.
+   */
+  foolArtwork?: string | ReactElement;
+  /**
+   * Custom center artwork for joker cards, indexed by variant.
+   * Defaults to a ★ symbol when omitted.
+   */
+  jokerArtwork?: Partial<Record<JokerVariant, string | ReactElement>>;
 }

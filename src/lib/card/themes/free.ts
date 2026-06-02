@@ -19,4 +19,6 @@ export const freeTheme: CardTheme = {
   backColor: "#1e3a8a",
   backPattern:
     "repeating-linear-gradient(45deg, #1d4ed8 0px, #1d4ed8 6px, #1e3a8a 6px, #1e3a8a 14px)",
+  // Warm amber for tarot trumps — evokes gold ink on traditional tarot decks
+  trumpColor: "#92400e",
 };
