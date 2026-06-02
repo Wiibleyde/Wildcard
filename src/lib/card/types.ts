@@ -1,3 +1,5 @@
+import type { ReactElement } from "react";
+
 export type Suit = "spades" | "hearts" | "diamonds" | "clubs";
 export type Rank =
   | "A"
@@ -32,8 +34,12 @@ export const RANKS: Rank[] = [
 ];
 
 export interface SuitStyle {
-  /** Unicode symbol or short inline SVG string */
-  symbol: string;
+  /**
+   * Suit symbol rendered at various sizes across the card.
+   * - `string` — unicode char (e.g. `"♠"`) for the built-in Classic theme
+   * - `ReactElement` — inline `<svg>` or `<img>` for custom/paid themes
+   */
+  symbol: string | ReactElement;
   /** CSS color value */
   color: string;
 }

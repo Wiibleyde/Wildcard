@@ -4,5 +4,3 @@ import { freeTheme } from "./free";
 export const THEMES: Record<string, CardTheme> = {
   free: freeTheme,
 };
-
-export { freeTheme };
