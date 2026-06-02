@@ -1,8 +1,9 @@
 "use client";
 
-import { createClient } from "@/lib/supabase/client";
-import type { Dictionary } from "@/lib/i18n";
+import Image from "next/image";
 import { useRef, useState } from "react";
+import type { Dictionary } from "@/lib/i18n";
+import { createClient } from "@/lib/supabase/client";
 
 type Props = {
   userId: string;
@@ -11,23 +12,38 @@ type Props = {
   dict: Dictionary;
 };
 
-function getAvatarDisplayUrl(supabase: ReturnType<typeof createClient>, path: string | null, bust?: number): string | null {
+function getAvatarDisplayUrl(
+  supabase: ReturnType<typeof createClient>,
+  path: string | null,
+  bust?: number,
+): string | null {
   if (!path) return null;
   const { data } = supabase.storage.from("avatars").getPublicUrl(path);
   return bust ? `${data.publicUrl}?t=${bust}` : data.publicUrl;
 }
 
-export function ProfileForm({ userId, initialUsername, initialAvatarPath, dict }: Props) {
+export function ProfileForm({
+  userId,
+  initialUsername,
+  initialAvatarPath,
+  dict,
+}: Props) {
   const [username, setUsername] = useState(initialUsername);
   const [avatarPath, setAvatarPath] = useState(initialAvatarPath);
   const [avatarBust, setAvatarBust] = useState<number | undefined>(undefined);
-  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
+    "idle",
+  );
   const [errorMsg, setErrorMsg] = useState("");
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
-  const avatarDisplayUrl = getAvatarDisplayUrl(supabase, avatarPath, avatarBust);
+  const avatarDisplayUrl = getAvatarDisplayUrl(
+    supabase,
+    avatarPath,
+    avatarBust,
+  );
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -67,11 +83,14 @@ export function ProfileForm({ userId, initialUsername, initialAvatarPath, dict }
     const res = await fetch("/api/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: username.trim(), avatar_url: avatarPath }),
+      body: JSON.stringify({
+        username: username.trim(),
+        avatar_url: avatarPath,
+      }),
     });
 
     if (!res.ok) {
-      const data = await res.json() as { error?: string };
+      const data = (await res.json()) as { error?: string };
       if (data.error === "username_taken") {
         setErrorMsg(dict.profile.error_username_taken);
       } else {
@@ -89,10 +108,14 @@ export function ProfileForm({ userId, initialUsername, initialAvatarPath, dict }
     <form onSubmit={handleSave} className="space-y-6">
       <div className="flex flex-col items-center gap-4">
         <div className="relative group">
-          <div className="w-24 h-24 rounded-full bg-gray-800 overflow-hidden ring-2 ring-gray-700">
+          <div className="relative w-24 h-24 rounded-full bg-gray-800 overflow-hidden ring-2 ring-gray-700">
             {avatarDisplayUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarDisplayUrl} alt="Avatar" className="w-full h-full object-cover" />
+              <Image
+                src={avatarDisplayUrl}
+                alt="Avatar"
+                fill
+                className="object-cover"
+              />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-3xl font-bold text-gray-400">
                 {username?.[0]?.toUpperCase() ?? "?"}
@@ -106,10 +129,23 @@ export function ProfileForm({ userId, initialUsername, initialAvatarPath, dict }
             className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
           >
             {uploading ? (
-              <span className="text-xs text-white">{dict.profile.avatar_uploading}</span>
+              <span className="text-xs text-white">
+                {dict.profile.avatar_uploading}
+              </span>
             ) : (
-              <svg viewBox="0 0 24 24" className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+              <svg
+                viewBox="0 0 24 24"
+                className="w-6 h-6 text-white"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+                />
               </svg>
             )}
           </button>
@@ -125,7 +161,10 @@ export function ProfileForm({ userId, initialUsername, initialAvatarPath, dict }
       </div>
 
       <div>
-        <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-2">
+        <label
+          htmlFor="username"
+          className="block text-sm font-medium text-gray-300 mb-2"
+        >
           {dict.profile.username_label}
         </label>
         <input

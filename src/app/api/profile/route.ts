@@ -1,18 +1,24 @@
+import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
-import { NextResponse } from "next/server";
 
 type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 
 export async function PATCH(request: Request) {
   const supabase = await createClient();
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
   if (authError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json() as { username?: string; avatar_url?: string | null };
+  const body = (await request.json()) as {
+    username?: string;
+    avatar_url?: string | null;
+  };
   const updates: ProfileUpdate = {};
 
   if (body.username !== undefined) {

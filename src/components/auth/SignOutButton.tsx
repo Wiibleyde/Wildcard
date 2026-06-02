@@ -1,7 +1,7 @@
 "use client";
 
-import { signOut } from "@/lib/supabase/auth";
 import { useParams, useRouter } from "next/navigation";
+import { signOut } from "@/lib/supabase/auth";
 
 export function SignOutButton({ label }: { label: string }) {
   const params = useParams();

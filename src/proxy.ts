@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
+import { getSupabaseEnv } from "@/lib/supabase/env";
 import type { Database } from "@/lib/supabase/types";
 
 const locales = ["fr", "en"] as const;
@@ -19,31 +20,27 @@ export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request: { headers: request.headers } });
 
   // Refresh session on every request so Server Components always get a valid user
-  const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => request.cookies.getAll(),
-        setAll: (cookiesToSet) => {
-          cookiesToSet.forEach(({ name, value }) => {
-            request.cookies.set(name, value);
-          });
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
-          });
-        },
+  const { url, anonKey } = getSupabaseEnv();
+  const supabase = createServerClient<Database>(url, anonKey, {
+    cookies: {
+      getAll: () => request.cookies.getAll(),
+      setAll: (cookiesToSet) => {
+        cookiesToSet.forEach(({ name, value }) => {
+          request.cookies.set(name, value);
+        });
+        response = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) => {
+          response.cookies.set(name, value, options);
+        });
       },
     },
-  );
+  });
   await supabase.auth.getUser();
 
   // i18n: redirect paths without a locale prefix
   const { pathname } = request.nextUrl;
   const pathnameHasLocale = locales.some(
-    (locale) =>
-      pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`,
+    (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`,
   );
 
   if (!pathnameHasLocale) {
@@ -63,5 +60,5 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // Excludes: _next internals, API routes, OAuth callback, static files
-  matcher: ["/((?!_next|api|auth/callback|favicon\\.ico|.*\\..*).*)" ],
+  matcher: ["/((?!_next|api|auth/callback|favicon\\.ico|.*\\..*).*)"],
 };

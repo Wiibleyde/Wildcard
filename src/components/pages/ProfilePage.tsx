@@ -1,9 +1,9 @@
+import { redirect } from "next/navigation";
+import { SignOutButton } from "@/components/auth/SignOutButton";
+import { LinkedAccounts } from "@/components/profile/LinkedAccounts";
+import { ProfileForm } from "@/components/profile/ProfileForm";
 import { getDictionary } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
-import { ProfileForm } from "@/components/profile/ProfileForm";
-import { LinkedAccounts } from "@/components/profile/LinkedAccounts";
-import { SignOutButton } from "@/components/auth/SignOutButton";
 import type { Database } from "@/lib/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
