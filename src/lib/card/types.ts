@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { CSSProperties, ReactElement } from "react";
 
 export type Suit = "spades" | "hearts" | "diamonds" | "clubs";
 export type Rank =
@@ -76,72 +76,154 @@ export const RANKS: readonly Rank[] = [
   "K",
 ];
 
+// ── Theme building blocks ─────────────────────────────────────────────────────
+
 export interface SuitStyle {
   /**
    * Suit symbol rendered at various sizes across the card.
-   * - `string` — unicode char (e.g. `"♠"`) for the built-in Classic theme
-   * - `ReactElement` — inline `<svg>` or `<img>` for custom/paid themes
+   * - `string` — unicode char (e.g. `"♠"`) for simple themes
+   * - `ReactElement` — inline `<svg>` or `<img>` for brand/custom themes
    */
   symbol: string | ReactElement;
   /** CSS color value */
   color: string;
+  /** Extra CSS applied to every symbol span — useful for text-shadow glows */
+  symbolStyle?: CSSProperties;
 }
 
 export interface CardBorder {
-  /** CSS color value */
   color: string;
-  /** Visual effect — "glow" support planned */
   effect: "solid" | "glow";
-  /** CSS color for glow effect */
   glowColor?: string;
   /** Glow spread in pixels (default 8) */
   glowSize?: number;
+  /** Full CSS box-shadow string — overrides the computed glow when set */
+  boxShadow?: string;
 }
+
+/**
+ * Per-card artwork slot.
+ *
+ * Two independent layers:
+ * - `fill`   — full-bleed image/element covering the entire card face
+ * - `center` — custom center illustration (replaces pip layout / face rank+symbol)
+ *
+ * Corners are always shown by default so the card stays readable; set
+ * `showCorners: false` for artistic cards where the fill encodes rank/suit itself.
+ */
+export interface CardArtwork {
+  /** Full-bleed layer — image URL string, inline SVG, or any ReactElement */
+  fill?: string | ReactElement;
+  objectFit?: "cover" | "contain";
+  /** Keep rank+suit corners over the fill (default: true) */
+  showCorners?: boolean;
+  /**
+   * Keep the center pip/face illustration over the fill.
+   * Default: false when `fill` is set (artwork takes over), true otherwise.
+   */
+  showCenter?: boolean;
+  /** CSS color overlay painted on top of the fill, e.g. "rgba(0,0,0,0.25)" */
+  tint?: string;
+  /**
+   * Custom center illustration — replaces pip grid and face rank+symbol.
+   * Has no effect on corner labels.
+   */
+  center?: string | ReactElement;
+}
+
+/** Visual effect overlaid on a card via CSS animation */
+export type CardEffectType = "shimmer" | "foil" | "holographic" | "sparkle";
+
+export interface CardEffect {
+  type: CardEffectType;
+  /** Accent color fed into the effect as a CSS custom property */
+  color?: string;
+  /** Animation speed multiplier — 1 is the default */
+  speed?: number;
+}
+
+export interface ThemeFont {
+  /** CSS font-family string — caller is responsible for @font-face loading */
+  family: string;
+  rankWeight?: number | string;
+  rankItalic?: boolean;
+  /** Additional CSS applied to corner rank/index labels */
+  rankStyle?: CSSProperties;
+}
+
+export interface BrandInfo {
+  name: string;
+  /** Brand logo — image URL or ReactElement */
+  logo?: string | ReactElement;
+  /** Edition/season label displayed on the back, e.g. "2025 S1" */
+  edition?: string;
+  /** Short tagline shown on the back */
+  tagline?: string;
+}
+
+/**
+ * Monetization tier — drives UI badges and unlock flows.
+ * - free      — included for all users
+ * - premium   — one-time purchase
+ * - exclusive — subscription-only
+ * - collab    — brand partnership (limited edition)
+ */
+export type ThemeTier = "free" | "premium" | "exclusive" | "collab";
+
+// ── CardTheme ─────────────────────────────────────────────────────────────────
 
 export interface CardTheme {
   id: string;
   name: string;
-  isPaid: boolean;
+  /** Monetization tier */
+  tier: ThemeTier;
+
   suits: Record<Suit, SuitStyle>;
   /** Card face background CSS color */
   backgroundColor: string;
-  /** Default text color (rank and index labels) */
+  /** Default text color for labels that don't derive color from suit */
   textColor: string;
   border: CardBorder;
-  /** Card back solid background CSS color */
-  backColor: string;
-  /** Optional CSS `background` shorthand for the card back pattern */
-  backPattern?: string;
+
+  /** Card back design */
+  back: {
+    /** Base fill color */
+    color: string;
+    /** CSS `background` shorthand painted over `color` (pattern/gradient) */
+    pattern?: string;
+    /** Full-bleed artwork — highest priority, replaces color+pattern */
+    artwork?: string | ReactElement;
+    /** Central emblem rendered on the back */
+    emblem?: string | ReactElement;
+    effects?: CardEffect[];
+  };
+
   /**
-   * Custom center artwork for Ace and face cards, indexed by suit then rank.
-   * Omitted entries fall back to the default rank + symbol display.
+   * Per-card artwork overrides.
    *
-   * @example
-   * faceArtwork: {
-   *   spades: { K: <img src="/themes/gothic/king-spades.png" alt="" /> },
-   * }
+   * Resolution order for suited cards (first match wins):
+   *   artwork.suited[suit][rank]   ← most specific
+   *   artwork.suitDefault[suit]
+   *   (no match — render pips/face normally)
    */
-  faceArtwork?: Partial<
-    Record<Suit, Partial<Record<FaceRank, string | ReactElement>>>
-  >;
-  /**
-   * Color applied to trump and fool corner labels.
-   * Falls back to `textColor` when omitted.
-   */
+  artwork?: {
+    /** Indexed by suit → rank */
+    suited?: Partial<Record<Suit, Partial<Record<Rank, CardArtwork>>>>;
+    /** Default for every card of a suit — per-rank entries take precedence */
+    suitDefault?: Partial<Record<Suit, CardArtwork>>;
+    trump?: Partial<Record<TrumpIndex, CardArtwork>>;
+    fool?: CardArtwork;
+    joker?: Partial<Record<JokerVariant, CardArtwork>>;
+  };
+
+  /** Visual effects applied to all card faces */
+  effects?: CardEffect[];
+  /** Custom typography — caller must load the font */
+  font?: ThemeFont;
+
+  /** Accent color for tarot trump and fool labels (falls back to textColor) */
   trumpColor?: string;
-  /**
-   * Custom center artwork for tarot trump cards (atouts), indexed by trump
-   * number (1–21). Omitted entries display the roman numeral centered.
-   */
-  trumpArtwork?: Partial<Record<TrumpIndex, string | ReactElement>>;
-  /**
-   * Custom center artwork for the Fool card (tarot L'Excuse).
-   * Defaults to a ★ symbol when omitted.
-   */
-  foolArtwork?: string | ReactElement;
-  /**
-   * Custom center artwork for joker cards, indexed by variant.
-   * Defaults to a ★ symbol when omitted.
-   */
-  jokerArtwork?: Partial<Record<JokerVariant, string | ReactElement>>;
+
+  /** Brand/partner metadata — typically set only for tier: "collab" */
+  brand?: BrandInfo;
 }
