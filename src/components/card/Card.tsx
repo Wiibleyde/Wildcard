@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactElement } from "react";
+import type { CSSProperties, ReactElement, Ref } from "react";
 import { PIP_LAYOUTS, type PipPosition } from "@/lib/card/pips";
 import { freeTheme } from "@/lib/card/themes/free";
 import type { CardTheme, FaceRank, Rank, Suit } from "@/lib/card/types";
@@ -11,10 +11,21 @@ export interface CardProps {
   theme?: CardTheme;
   /** Render the card back instead of its face */
   faceDown?: boolean;
-  /** Lift the card upward (e.g. when selected in hand) */
+  /** Lift the card upward via CSS transform (only when disableTransitions is false) */
   selected?: boolean;
+  /**
+   * Strip all CSS transitions and transform classes from the root element.
+   * Set to true whenever GSAP (or a D&D library) will drive this card's
+   * position/transform — prevents CSS and JS animations from fighting.
+   */
+  disableTransitions?: boolean;
   onClick?: () => void;
   className?: string;
+  /**
+   * Ref forwarded to the root DOM element (div or button).
+   * Required for GSAP timeline targets: useRef<HTMLElement>(null)
+   */
+  ref?: Ref<HTMLElement>;
 }
 
 const RANK_TO_NUMBER: Partial<Record<string, number>> = {
@@ -45,8 +56,10 @@ export function Card({
   theme = freeTheme,
   faceDown = false,
   selected = false,
+  disableTransitions = false,
   onClick,
   className = "",
+  ref,
 }: CardProps) {
   const suitStyle = theme.suits[suit];
   const num = toNumber(rank);
@@ -63,9 +76,11 @@ export function Card({
   };
 
   const sharedClass = [
-    "relative select-none overflow-hidden transition-transform duration-150",
-    onClick ? "cursor-pointer hover:-translate-y-1 active:scale-95" : "",
-    selected ? "-translate-y-3" : "",
+    "relative select-none overflow-hidden",
+    !disableTransitions && "transition-transform duration-150",
+    !disableTransitions && onClick && "hover:-translate-y-1 active:scale-95",
+    !disableTransitions && selected && "-translate-y-3",
+    onClick ? "cursor-pointer" : "",
     className,
   ]
     .filter(Boolean)
@@ -110,6 +125,8 @@ export function Card({
   if (onClick) {
     return (
       <button
+        // HTMLButtonElement extends HTMLElement — safe cast
+        ref={ref as Ref<HTMLButtonElement>}
         type="button"
         className={sharedClass}
         style={faceDown ? backStyle : faceStyle}
@@ -121,7 +138,12 @@ export function Card({
   }
 
   return (
-    <div className={sharedClass} style={faceDown ? backStyle : faceStyle}>
+    <div
+      // HTMLDivElement extends HTMLElement — safe cast
+      ref={ref as Ref<HTMLDivElement>}
+      className={sharedClass}
+      style={faceDown ? backStyle : faceStyle}
+    >
       {body}
     </div>
   );
