@@ -14,7 +14,7 @@ export async function LoginPage({ lang }: { lang: string }) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-950 px-4">
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-sm lg:max-w-md xl:max-w-lg">
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 mb-5">
             <svg
@@ -32,7 +32,7 @@ export async function LoginPage({ lang }: { lang: string }) {
               />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-white">
+          <h1 className="text-2xl xl:text-3xl font-bold text-white">
             {dict.auth.login.title}
           </h1>
           <p className="text-gray-400 mt-2 text-sm">

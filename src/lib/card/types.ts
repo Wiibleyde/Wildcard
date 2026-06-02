@@ -163,12 +163,22 @@ export interface BrandInfo {
 
 /**
  * Monetization tier — drives UI badges and unlock flows.
- * - free      — included for all users
- * - premium   — one-time purchase
- * - exclusive — subscription-only
- * - collab    — brand partnership (limited edition)
+ * - common    — included for all users
+ * - uncommon  — slightly rare
+ * - rare      — rare
+ * - epic      — quite rare
+ * - legendary — very rare
+ * - mystical  — extremely rare
+ * - ethereal  — quasi-unique (top tier)
  */
-export type ThemeTier = "free" | "premium" | "exclusive" | "collab";
+export type ThemeTier =
+  | "common"
+  | "uncommon"
+  | "rare"
+  | "epic"
+  | "legendary"
+  | "mystical"
+  | "ethereal";
 
 // ── CardTheme ─────────────────────────────────────────────────────────────────
 

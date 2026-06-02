@@ -79,72 +79,80 @@ export async function ProfilePage({ lang }: { lang: string }) {
   const level = Math.floor(xp / 500) + 1;
 
   return (
-    <div className="min-h-screen bg-wc-surface px-4 pt-6 md:pt-10 pb-10">
-      <div className="max-w-md mx-auto flex flex-col gap-4">
-        {/* hero — avatar + name + level */}
-        <div
-          className="rounded-wc-card p-6 border"
-          style={{
-            background: "linear-gradient(160deg, #1d1a0e, #0c1118 72%)",
-            borderColor: "rgba(232,196,104,0.22)",
-          }}
-        >
-          <div className="flex items-center justify-between mb-5">
-            <span className="text-(length:--font-size-wc-label) font-bold text-wc-sub uppercase tracking-(--letter-spacing-wc-cap)">
-              {dict.profile.title}
-            </span>
-            <SignOutButton label={dict.profile.sign_out} />
-          </div>
+    <div className="min-h-screen bg-wc-surface px-4 xl:px-10 pt-6 md:pt-10 pb-10">
+      <div className="max-w-lg lg:max-w-4xl xl:max-w-6xl mx-auto flex flex-col gap-4">
+        <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
+          <div className="flex flex-col gap-4">
+            {/* hero — avatar + name + level */}
+            <div
+              className="rounded-wc-card p-6 border"
+              style={{
+                background: "linear-gradient(160deg, #1d1a0e, #0c1118 72%)",
+                borderColor: "rgba(232,196,104,0.22)",
+              }}
+            >
+              <div className="flex items-center justify-between mb-5">
+                <span className="text-(length:--font-size-wc-label) font-bold text-wc-sub uppercase tracking-(--letter-spacing-wc-cap)">
+                  {dict.profile.title}
+                </span>
+                <SignOutButton label={dict.profile.sign_out} />
+              </div>
 
-          <div className="flex items-center gap-4">
-            {profile && <AvatarHero profile={profile} avatarUrl={avatarUrl} />}
-            <div className="flex-1 min-w-0">
-              <h1 className="text-2xl font-extrabold text-wc-text truncate leading-tight tracking-tight">
-                {profile?.username ?? "—"}
-              </h1>
-              <div className="flex items-center gap-2 mt-1.5">
-                <span
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider"
-                  style={{
-                    background: "rgba(232,196,104,0.16)",
-                    color: "#e8c468",
-                    border: "1px solid rgba(232,196,104,0.35)",
-                  }}
-                >
-                  {dict.profile.level_short} {level}
-                </span>
-                <span className="text-wc-sub text-xs font-medium">
-                  {dict.profile.member_since} {memberSince}
-                </span>
+              <div className="flex items-center gap-4">
+                {profile && (
+                  <AvatarHero profile={profile} avatarUrl={avatarUrl} />
+                )}
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-2xl font-extrabold text-wc-text truncate leading-tight tracking-tight">
+                    {profile?.username ?? "—"}
+                  </h1>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <span
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider"
+                      style={{
+                        background: "rgba(232,196,104,0.16)",
+                        color: "#e8c468",
+                        border: "1px solid rgba(232,196,104,0.35)",
+                      }}
+                    >
+                      {dict.profile.level_short} {level}
+                    </span>
+                    <span className="text-wc-sub text-xs font-medium">
+                      {dict.profile.member_since} {memberSince}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
+
+            {/* XP progress — GSAP animated */}
+            <ProfileXPCard xp={xp} dict={dict} />
           </div>
-        </div>
 
-        {/* XP progress — GSAP animated */}
-        <ProfileXPCard xp={xp} dict={dict} />
+          <div className="flex flex-col gap-4">
+            {/* edit form */}
+            <div className="bg-wc-panel rounded-wc-panel p-6 border border-wc-border">
+              <h2 className="text-sm font-bold text-wc-muted mb-5 uppercase tracking-(--letter-spacing-wc-cap)">
+                {dict.profile.edit_title}
+              </h2>
+              {profile && (
+                <ProfileForm
+                  userId={user.id}
+                  initialUsername={profile.username}
+                  initialAvatarPath={profile.avatar_url ?? null}
+                  dict={dict}
+                />
+              )}
+            </div>
 
-        {/* edit form */}
-        <div className="bg-wc-panel rounded-wc-panel p-6 border border-wc-border">
-          <h2 className="text-sm font-bold text-wc-muted mb-5 uppercase tracking-(--letter-spacing-wc-cap)">
-            {dict.profile.edit_title}
-          </h2>
-          {profile && (
-            <ProfileForm
-              userId={user.id}
-              initialUsername={profile.username}
-              initialAvatarPath={profile.avatar_url ?? null}
-              dict={dict}
-            />
-          )}
-        </div>
-
-        {/* linked accounts */}
-        <div className="bg-wc-panel rounded-wc-panel p-6 border border-wc-border">
-          <h2 className="text-sm font-bold text-wc-muted mb-5 uppercase tracking-(--letter-spacing-wc-cap)">
-            {dict.profile.linked_accounts}
-          </h2>
-          <LinkedAccounts linkedProviders={linkedProviders} dict={dict} />
+            {/* linked accounts */}
+            <div className="bg-wc-panel rounded-wc-panel p-6 border border-wc-border">
+              <h2 className="text-sm font-bold text-wc-muted mb-5 uppercase tracking-(--letter-spacing-wc-cap)">
+                {dict.profile.linked_accounts}
+              </h2>
+              <LinkedAccounts linkedProviders={linkedProviders} dict={dict} />
+            </div>
+          </div>
         </div>
       </div>
     </div>

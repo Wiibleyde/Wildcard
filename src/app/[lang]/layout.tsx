@@ -45,7 +45,9 @@ export default async function RootLayout({
       <body className="min-h-screen bg-wc-surface text-wc-text">
         <I18nProvider locale={locale} dict={dict}>
           <AppNav lang={locale} />
-          <div className="md:pl-[220px] pb-[60px] md:pb-0">{children}</div>
+          <div className="md:pl-[220px] xl:pl-64 pb-[60px] md:pb-0">
+            {children}
+          </div>
         </I18nProvider>
       </body>
     </html>

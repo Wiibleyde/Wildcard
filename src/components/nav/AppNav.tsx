@@ -59,7 +59,7 @@ export async function AppNav({ lang }: Props) {
     <>
       {/* ── Desktop sidebar ──────────────────────────────────────────────── */}
       <aside
-        className="hidden md:flex flex-col fixed top-0 left-0 h-screen w-55 z-40"
+        className="hidden md:flex flex-col fixed top-0 left-0 h-screen w-55 xl:w-64 z-40"
         style={{
           background: "#0c1018",
           borderRight: "1px solid #1c2230",

@@ -30,6 +30,21 @@
       "sign_in": "Se connecter"
     }
   },
+  "customize": {
+    "title": "Personnalisation",
+    "deck_section": "Style de cartes",
+    "board_section": "Style de plateau",
+    "tier_common": "Commun",
+    "tier_uncommon": "Peu commun",
+    "tier_rare": "Rare",
+    "tier_epic": "Épique",
+    "tier_legendary": "Légendaire",
+    "tier_mystical": "Mystique",
+    "tier_ethereal": "Éthéré",
+    "selected": "Sélectionné",
+    "select": "Choisir",
+    "nav_label": "Style"
+  },
   "profile": {
     "title": "Mon profil",
     "username_label": "Nom d'utilisateur",

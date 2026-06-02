@@ -3,7 +3,7 @@ import type { CardTheme } from "@/lib/card/types";
 export const freeTheme: CardTheme = {
   id: "free",
   name: "Classic",
-  tier: "free",
+  tier: "common",
   suits: {
     spades: { symbol: "♠", color: "#111827" },
     hearts: { symbol: "♥", color: "#dc2626" },
