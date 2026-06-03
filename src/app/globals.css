@@ -3,117 +3,117 @@
 /* ── Wildcard design tokens ───────────────────────────────────────────────── */
 
 @theme {
-  --color-wc-surface: #070b10;
-  --color-wc-panel: #10151f;
-  --color-wc-border: #1c2230;
-  --color-wc-text: #f3f6fc;
-  --color-wc-heading: #eef2f8;
-  --color-wc-muted: #8b95a7;
-  --color-wc-sub: #7c8699;
-  --color-wc-gold: #6c68e8;
-  --color-wc-gold-dim: oklch(from #e8c468 l c h / 0.2);
-  --color-wc-xp: #a78bfa;
-  --color-wc-xp-dim: oklch(from #a78bfa l c h / 0.18);
-  --color-wc-green: #34d399;
-  --color-wc-indigo: #6366f1;
+    --color-wc-surface: #070b10;
+    --color-wc-panel: #10151f;
+    --color-wc-border: #1c2230;
+    --color-wc-text: #f3f6fc;
+    --color-wc-heading: #eef2f8;
+    --color-wc-muted: #8b95a7;
+    --color-wc-sub: #7c8699;
+    --color-wc-gold: #6c68e8;
+    --color-wc-gold-dim: oklch(from #e8c468 l c h / 0.2);
+    --color-wc-xp: #a78bfa;
+    --color-wc-xp-dim: oklch(from #a78bfa l c h / 0.18);
+    --color-wc-green: #34d399;
+    --color-wc-indigo: #6366f1;
 
-  --font-size-wc-label: 0.6875rem;
-  --letter-spacing-wc-cap: 0.06em;
+    --font-size-wc-label: 0.6875rem;
+    --letter-spacing-wc-cap: 0.06em;
 
-  --radius-wc-panel: 18px;
-  --radius-wc-card: 22px;
-  --radius-wc-btn: 12px;
-  --radius-wc-icon: 14px;
+    --radius-wc-panel: 18px;
+    --radius-wc-card: 22px;
+    --radius-wc-btn: 12px;
+    --radius-wc-icon: 14px;
 }
 
 /* ── Card visual effects ──────────────────────────────────────────────────── */
 
 @keyframes wildcard-shimmer {
-  0% {
-    transform: translateX(-160%) skewX(-20deg);
-  }
-  100% {
-    transform: translateX(160%) skewX(-20deg);
-  }
+    0% {
+        transform: translateX(-160%) skewX(-20deg);
+    }
+    100% {
+        transform: translateX(160%) skewX(-20deg);
+    }
 }
 
 @keyframes wildcard-holo {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
 }
 
 @keyframes wildcard-sparkle {
-  0%,
-  100% {
-    opacity: 0.2;
-    transform: scale(0.8) rotate(0deg);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.2) rotate(180deg);
-  }
+    0%,
+    100% {
+        opacity: 0.2;
+        transform: scale(0.8) rotate(0deg);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.2) rotate(180deg);
+    }
 }
 
 /* shimmer — white sweep */
 [data-card-effect~="shimmer"]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    105deg,
-    transparent 30%,
-    rgba(255, 255, 255, 0.45) 50%,
-    transparent 70%
-  );
-  animation: wildcard-shimmer 2.4s ease-in-out infinite;
-  pointer-events: none;
-  z-index: 20;
-  border-radius: inherit;
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        105deg,
+        transparent 30%,
+        rgba(255, 255, 255, 0.45) 50%,
+        transparent 70%
+    );
+    animation: wildcard-shimmer 2.4s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 20;
+    border-radius: inherit;
 }
 
 /* foil — colored shimmer sweep */
 [data-card-effect~="foil"]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    105deg,
-    transparent 30%,
-    var(--card-effect-color, rgba(200, 170, 110, 0.55)) 50%,
-    transparent 70%
-  );
-  animation: wildcard-shimmer 2s ease-in-out infinite;
-  pointer-events: none;
-  z-index: 20;
-  border-radius: inherit;
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        105deg,
+        transparent 30%,
+        var(--card-effect-color, rgba(200, 170, 110, 0.55)) 50%,
+        transparent 70%
+    );
+    animation: wildcard-shimmer 2s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 20;
+    border-radius: inherit;
 }
 
 /* holographic — animated rainbow overlay */
 [data-card-effect~="holographic"]::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    125deg,
-    #ff000033,
-    #ff7f0033,
-    #ffff0033,
-    #00ff0033,
-    #0000ff33,
-    #8b00ff33,
-    #ff000033
-  );
-  background-size: 400% 400%;
-  animation: wildcard-holo 3s linear infinite;
-  mix-blend-mode: screen;
-  pointer-events: none;
-  z-index: 15;
-  border-radius: inherit;
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        125deg,
+        #ff000033,
+        #ff7f0033,
+        #ffff0033,
+        #00ff0033,
+        #0000ff33,
+        #8b00ff33,
+        #ff000033
+    );
+    background-size: 400% 400%;
+    animation: wildcard-holo 3s linear infinite;
+    mix-blend-mode: screen;
+    pointer-events: none;
+    z-index: 15;
+    border-radius: inherit;
 }

@@ -1,10 +1,10 @@
 import { LoginPage } from "@/components/pages/LoginPage";
 
 export default async function Page({
-  params,
+    params,
 }: {
-  params: Promise<{ lang: string }>;
+    params: Promise<{ lang: string }>;
 }) {
-  const { lang } = await params;
-  return <LoginPage lang={lang} />;
+    const { lang } = await params;
+    return <LoginPage lang={lang} />;
 }

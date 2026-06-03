@@ -3,8 +3,8 @@ import { creatorTheme } from "./creator";
 import { freeTheme } from "./free";
 
 export const THEMES: Record<string, CardTheme> = {
-  free: freeTheme,
-  creator: creatorTheme,
+    free: freeTheme,
+    creator: creatorTheme,
 };
 
 export { creatorTheme, freeTheme };
