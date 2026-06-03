@@ -1,7 +1,7 @@
 import { hasLocale } from "next-intl";
 import { getRequestConfig } from "next-intl/server";
-import frMessages from "../dictionaries/fr.json";
 import enMessages from "../dictionaries/en.json";
+import frMessages from "../dictionaries/fr.json";
 import { routing } from "./routing";
 
 const messages = {
