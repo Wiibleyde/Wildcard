@@ -1,6 +1,6 @@
-import Image from "next/image";
 import { redirect } from "next/navigation";
 import { SignOutButton } from "@/components/auth/SignOutButton";
+import { AvatarHero } from "@/components/profile/AvatarHero";
 import { LinkedAccounts } from "@/components/profile/LinkedAccounts";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { ProfileXPCard } from "@/components/profile/ProfileXPCard";
@@ -10,40 +10,6 @@ import type { Database } from "@/lib/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type PlayerXP = Database["public"]["Tables"]["player_xp"]["Row"];
-
-function AvatarHero({
-  profile,
-  avatarUrl,
-}: {
-  profile: Profile;
-  avatarUrl: string | null;
-}) {
-  const initial = profile.username?.[0]?.toUpperCase() ?? "?";
-  return (
-    <div className="relative w-20 h-20 rounded-full overflow-hidden shrink-0">
-      {avatarUrl ? (
-        <Image
-          src={avatarUrl}
-          alt={profile.username}
-          fill
-          sizes="80px"
-          className="object-cover"
-          loading="eager"
-        />
-      ) : (
-        <div
-          className="w-full h-full flex items-center justify-center text-3xl font-black"
-          style={{
-            background: "linear-gradient(135deg, #e8c468, #c49b32)",
-            color: "#15110a",
-          }}
-        >
-          {initial}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export async function ProfilePage({ lang }: { lang: string }) {
   const dict = await getDictionary(lang);
@@ -62,6 +28,7 @@ export async function ProfilePage({ lang }: { lang: string }) {
   const profile = profileRes.data as Profile | null;
   const playerXP = xpRes.data as PlayerXP | null;
   const xp = playerXP?.xp ?? 0;
+  const level = Math.floor(xp / 500) + 1;
 
   const linkedProviders = (user.identities ?? []).map((i) => i.provider);
 
@@ -70,20 +37,16 @@ export async function ProfilePage({ lang }: { lang: string }) {
     { year: "numeric", month: "long" },
   );
 
-  const supabasePublic = await createClient();
   const avatarUrl = profile?.avatar_url
-    ? supabasePublic.storage.from("avatars").getPublicUrl(profile.avatar_url)
-        .data.publicUrl
+    ? supabase.storage.from("avatars").getPublicUrl(profile.avatar_url).data
+        .publicUrl
     : null;
-
-  const level = Math.floor(xp / 500) + 1;
 
   return (
     <div className="min-h-screen bg-wc-surface px-4 xl:px-10 pt-6 md:pt-10 pb-10">
       <div className="max-w-lg lg:max-w-4xl xl:max-w-6xl mx-auto flex flex-col gap-4">
         <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
           <div className="flex flex-col gap-4">
-            {/* hero — avatar + name + level */}
             <div
               className="rounded-wc-card p-6 border"
               style={{
@@ -125,12 +88,10 @@ export async function ProfilePage({ lang }: { lang: string }) {
               </div>
             </div>
 
-            {/* XP progress — GSAP animated */}
             <ProfileXPCard xp={xp} dict={dict} />
           </div>
 
           <div className="flex flex-col gap-4">
-            {/* edit form */}
             <div className="bg-wc-panel rounded-wc-panel p-6 border border-wc-border">
               <h2 className="text-sm font-bold text-wc-muted mb-5 uppercase tracking-(--letter-spacing-wc-cap)">
                 {dict.profile.edit_title}
@@ -145,7 +106,6 @@ export async function ProfilePage({ lang }: { lang: string }) {
               )}
             </div>
 
-            {/* linked accounts */}
             <div className="bg-wc-panel rounded-wc-panel p-6 border border-wc-border">
               <h2 className="text-sm font-bold text-wc-muted mb-5 uppercase tracking-(--letter-spacing-wc-cap)">
                 {dict.profile.linked_accounts}
