@@ -1,53 +1,57 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { notFound } from "next/navigation";
+import { hasLocale, NextIntlClientProvider } from "next-intl";
+import { getMessages, setRequestLocale } from "next-intl/server";
 import "../globals.css";
 import { AppNav } from "@/components/nav/AppNav";
-import { defaultLocale, getDictionary, type Locale, locales } from "@/lib/i18n";
-import { I18nProvider } from "@/lib/i18n/context";
+import { AppShell } from "@/components/nav/AppShell";
+import { routing } from "@/i18n/routing";
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+    variable: "--font-geist-sans",
+    subsets: ["latin"],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+    variable: "--font-geist-mono",
+    subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "Wildcard",
-  description: "Plateforme de jeux de carte en ligne",
+    title: "Wildcard",
+    description: "Plateforme de jeux de carte en ligne",
 };
 
 export function generateStaticParams() {
-  return locales.map((lang) => ({ lang }));
+    return routing.locales.map((lang) => ({ lang }));
 }
 
 export default async function RootLayout({
-  children,
-  params,
+    children,
+    params,
 }: Readonly<{
-  children: React.ReactNode;
-  params: Promise<{ lang: string }>;
+    children: React.ReactNode;
+    params: Promise<{ lang: string }>;
 }>) {
-  const { lang } = await params;
-  const locale = (
-    locales.includes(lang as Locale) ? lang : defaultLocale
-  ) as Locale;
-  const dict = await getDictionary(locale);
+    const { lang } = await params;
 
-  return (
-    <html
-      lang={locale}
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-screen bg-wc-surface text-wc-text">
-        <I18nProvider locale={locale} dict={dict}>
-          <AppNav lang={locale} />
-          <div className="md:pl-[220px] pb-[60px] md:pb-0">{children}</div>
-        </I18nProvider>
-      </body>
-    </html>
-  );
+    if (!hasLocale(routing.locales, lang)) notFound();
+
+    setRequestLocale(lang);
+
+    const messages = await getMessages();
+
+    return (
+        <html
+            lang={lang}
+            className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+        >
+            <body className="min-h-screen bg-wc-surface text-wc-text">
+                <NextIntlClientProvider locale={lang} messages={messages}>
+                    <AppShell appNav={<AppNav />}>{children}</AppShell>
+                </NextIntlClientProvider>
+            </body>
+        </html>
+    );
 }

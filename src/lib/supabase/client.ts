@@ -5,6 +5,6 @@ import { getSupabaseEnv } from "./env";
 import type { Database } from "./types";
 
 export function createClient() {
-  const { url, anonKey } = getSupabaseEnv();
-  return createBrowserClient<Database>(url, anonKey);
+    const { url, anonKey } = getSupabaseEnv();
+    return createBrowserClient<Database>(url, anonKey);
 }

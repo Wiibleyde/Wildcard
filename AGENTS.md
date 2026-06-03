@@ -100,6 +100,47 @@ les modules officiels — c'est une séparation délibérée de conception.
 - **Pas de Prisma** — utiliser uniquement `@supabase/supabase-js`
 - **API Routes** pour toute mutation d'état de jeu (jamais depuis le client direct)
 
+## Responsive & tailles d'écran
+
+Ce projet doit fonctionner correctement de **mobile** (375px) jusqu'aux **écrans 2K** (2560px).
+
+### Règles
+- **Jamais de `max-w-md` seul** sur une page entière — toujours escalader : `max-w-lg lg:max-w-3xl xl:max-w-5xl 2xl:max-w-7xl`
+- **Layouts 2 colonnes** à partir de `lg:` pour les pages avec plusieurs sections (profil, personnalisation, etc.)
+- **Grilles de cartes/tuiles** : `grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5` minimum
+- **Padding horizontal** : `px-4 xl:px-10` pour respirer sur grand écran
+- **Sidebar** : `w-55 xl:w-64` + layout offset `md:pl-[220px] xl:pl-64`
+- **Textes** : utiliser des variants responsive sur les titres (`text-2xl xl:text-3xl`)
+- Tester visuellement à **375px, 768px, 1280px, 1920px, 2560px** avant de valider
+
+### Breakpoints Tailwind utilisés
+| Préfixe | Largeur min |
+|---------|-------------|
+| `sm:`   | 640px       |
+| `md:`   | 768px       |
+| `lg:`   | 1024px      |
+| `xl:`   | 1280px      |
+| `2xl:`  | 1536px      |
+
+---
+
+## Qualité du code — Biome
+
+Ce projet utilise **Biome** comme linter et formateur. **Après chaque modification de fichier**, vérifier l'absence d'erreurs :
+
+```bash
+npx biome check --write <fichier>   # lint + format + auto-fix
+npx biome check <fichier>           # lint + format (lecture seule)
+```
+
+Règles fréquentes à respecter :
+- Pas d'index de tableau comme `key` React — utiliser un identifiant stable et unique
+- Pas de `console.log` en production — retirer avant de committer
+- Imports organisés (Biome les trie automatiquement via `--write`)
+- Pas de variables non utilisées
+
+En cas de diagnostic IDE (carré rouge/orange), corriger **avant** de passer à la suite.
+
 ---
 
 ## Internationalisation (i18n)

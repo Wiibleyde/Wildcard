@@ -1,11 +1,11 @@
 import type { Rank } from "./types";
 
 const PIP_INDEX: Partial<Record<string, number>> = {
-  A: 1,
-  J: 11,
-  C: 12, // Cavalier
-  Q: 13,
-  K: 14,
+    A: 1,
+    J: 11,
+    C: 12, // Cavalier
+    Q: 13,
+    K: 14,
 };
 
 /**
@@ -16,5 +16,5 @@ const PIP_INDEX: Partial<Record<string, number>> = {
  * highest in Bataille but context-dependent in Belote/Coinche).
  */
 export function rankToPipIndex(rank: Rank): number {
-  return PIP_INDEX[rank] ?? Number.parseInt(rank, 10);
+    return PIP_INDEX[rank] ?? Number.parseInt(rank, 10);
 }
