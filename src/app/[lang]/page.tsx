@@ -1,4 +1,4 @@
-import { getDictionary } from "@/lib/i18n";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 
 export default async function Home({
     params,
@@ -6,12 +6,13 @@ export default async function Home({
     params: Promise<{ lang: string }>;
 }) {
     const { lang } = await params;
-    const dict = await getDictionary(lang);
+    setRequestLocale(lang);
+    const t = await getTranslations("home");
 
     return (
         <div>
-            <h1>{dict.home.title}</h1>
-            <p>{dict.home.subtitle}</p>
+            <h1>{t("title")}</h1>
+            <p>{t("subtitle")}</p>
         </div>
     );
 }

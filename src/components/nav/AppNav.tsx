@@ -5,26 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 import { NavActions } from "./NavActions";
 import { NavLinks } from "./NavLinks";
+import { SidebarDesktop } from "./SidebarDesktop";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type PlayerXP = Database["public"]["Tables"]["player_xp"]["Row"];
-
-function CoinIcon() {
-    return (
-        <svg
-            viewBox="0 0 24 24"
-            className="w-3.5 h-3.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-        >
-            <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v10M9 9.5a3 1.5 0 0 1 3-1.5M9 14.5a3 1.5 0 0 0 3 1.5" />
-        </svg>
-    );
-}
 
 function xpLevel(xp: number) {
     return Math.floor(xp / 500) + 1;
@@ -60,90 +44,14 @@ export async function AppNav() {
     return (
         <>
             {/* ── Desktop sidebar ──────────────────────────────────────────────── */}
-            <aside
-                className="hidden md:flex flex-col fixed top-0 left-0 h-screen w-55 xl:w-64 z-40"
-                style={{
-                    background: "#0c1018",
-                    borderRight: "1px solid #1c2230",
-                    padding: "20px 14px 16px",
-                }}
-            >
-                {/* logo */}
-                <Link
-                    href="/"
-                    className="flex items-center gap-2.5 px-1 mb-1 shrink-0"
-                >
-                    <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black shrink-0"
-                        style={{
-                            background:
-                                "linear-gradient(135deg, #e8c468, #c49b32)",
-                            color: "#15110a",
-                        }}
-                    >
-                        W
-                    </div>
-                    <span className="text-wc-text font-extrabold text-base tracking-tight">
-                        Wildcard
-                    </span>
-                </Link>
-
-                <NavLinks variant="sidebar" />
-
-                {/* bottom: coins + user card */}
-                <div className="mt-auto flex flex-col gap-3">
-                    <div
-                        className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold"
-                        style={{
-                            background: "rgba(255,255,255,0.04)",
-                            border: "1px solid rgba(255,255,255,0.07)",
-                        }}
-                    >
-                        <CoinIcon />
-                        <span style={{ color: "#e8c468" }}>0</span>
-                        <span className="text-wc-sub ml-1">{t("coins")}</span>
-                    </div>
-
-                    <NavActions variant="sidebar" />
-
-                    <Link
-                        href="/profile"
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-white/5"
-                    >
-                        <div className="relative w-9 h-9 rounded-full overflow-hidden shrink-0">
-                            {avatarUrl ? (
-                                <Image
-                                    src={avatarUrl}
-                                    alt={profile?.username ?? ""}
-                                    fill
-                                    sizes="36px"
-                                    className="object-cover"
-                                    loading="eager"
-                                />
-                            ) : (
-                                <div
-                                    className="w-full h-full flex items-center justify-center text-sm font-black"
-                                    style={{
-                                        background:
-                                            "linear-gradient(135deg, #e8c468, #c49b32)",
-                                        color: "#15110a",
-                                    }}
-                                >
-                                    {initial}
-                                </div>
-                            )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-wc-heading truncate leading-none">
-                                {profile?.username ?? "—"}
-                            </p>
-                            <p className="text-xs text-wc-sub font-semibold mt-0.5">
-                                {tProfile("level_short")} {level}
-                            </p>
-                        </div>
-                    </Link>
-                </div>
-            </aside>
+            <SidebarDesktop
+                profile={profile}
+                avatarUrl={avatarUrl}
+                level={level}
+                initial={initial}
+                coins={t("coins")}
+                levelShort={tProfile("level_short")}
+            />
 
             {/* ── Mobile top bar ───────────────────────────────────────────────── */}
             <header

@@ -1,8 +1,8 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
-import type { Dictionary } from "@/lib/i18n";
 import { linkIdentity, type OAuthProvider } from "@/lib/supabase/auth";
 
 const PROVIDERS: {
@@ -70,10 +70,11 @@ const PROVIDERS: {
 
 type Props = {
     linkedProviders: string[];
-    dict: Dictionary;
 };
 
-export function LinkedAccounts({ linkedProviders, dict }: Props) {
+export function LinkedAccounts({ linkedProviders }: Props) {
+    "use no memo";
+    const t = useTranslations("profile");
     const params = useParams();
     const lang = (params?.lang as string) ?? "fr";
     const [linking, setLinking] = useState<OAuthProvider | null>(null);
@@ -90,7 +91,7 @@ export function LinkedAccounts({ linkedProviders, dict }: Props) {
                 return (
                     <div
                         key={provider.id}
-                        className="flex items-center justify-between px-4 py-3.5 rounded-[var(--radius-wc-btn)] border border-wc-border bg-white/[0.03]"
+                        className="flex items-center justify-between px-4 py-3.5 rounded-(--radius-wc-btn) border border-wc-border bg-white/3"
                     >
                         <div className="flex items-center gap-3">
                             {provider.icon}
@@ -113,7 +114,7 @@ export function LinkedAccounts({ linkedProviders, dict }: Props) {
                                     />
                                 </svg>
                                 <span className="text-xs font-bold">
-                                    {dict.profile.linked}
+                                    {t("linked")}
                                 </span>
                             </div>
                         ) : (
@@ -123,9 +124,7 @@ export function LinkedAccounts({ linkedProviders, dict }: Props) {
                                 disabled={linking === provider.id}
                                 className="text-xs font-bold text-wc-indigo hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-opacity"
                             >
-                                {linking === provider.id
-                                    ? "…"
-                                    : dict.profile.link}
+                                {linking === provider.id ? "…" : t("link")}
                             </button>
                         )}
                     </div>

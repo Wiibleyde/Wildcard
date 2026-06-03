@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { AvatarHero } from "@/components/profile/AvatarHero";
 import { LinkedAccounts } from "@/components/profile/LinkedAccounts";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { ProfileXPCard } from "@/components/profile/ProfileXPCard";
-import { getDictionary } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 
@@ -12,7 +12,7 @@ type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type PlayerXP = Database["public"]["Tables"]["player_xp"]["Row"];
 
 export async function ProfilePage({ lang }: { lang: string }) {
-    const dict = await getDictionary(lang);
+    const t = await getTranslations("profile");
 
     const supabase = await createClient();
     const {
@@ -57,9 +57,9 @@ export async function ProfilePage({ lang }: { lang: string }) {
                         >
                             <div className="flex items-center justify-between mb-5">
                                 <span className="text-(length:--font-size-wc-label) font-bold text-wc-sub uppercase tracking-(--letter-spacing-wc-cap)">
-                                    {dict.profile.title}
+                                    {t("title")}
                                 </span>
-                                <SignOutButton label={dict.profile.sign_out} />
+                                <SignOutButton />
                             </div>
 
                             <div className="flex items-center gap-4">
@@ -83,24 +83,23 @@ export async function ProfilePage({ lang }: { lang: string }) {
                                                 border: "1px solid rgba(232,196,104,0.35)",
                                             }}
                                         >
-                                            {dict.profile.level_short} {level}
+                                            {t("level_short")} {level}
                                         </span>
                                         <span className="text-wc-sub text-xs font-medium">
-                                            {dict.profile.member_since}{" "}
-                                            {memberSince}
+                                            {t("member_since")} {memberSince}
                                         </span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <ProfileXPCard xp={xp} dict={dict} />
+                        <ProfileXPCard xp={xp} />
                     </div>
 
                     <div className="flex flex-col gap-4">
                         <div className="bg-wc-panel rounded-wc-panel p-6 border border-wc-border">
                             <h2 className="text-sm font-bold text-wc-muted mb-5 uppercase tracking-(--letter-spacing-wc-cap)">
-                                {dict.profile.edit_title}
+                                {t("edit_title")}
                             </h2>
                             {profile && (
                                 <ProfileForm
@@ -109,19 +108,15 @@ export async function ProfilePage({ lang }: { lang: string }) {
                                     initialAvatarPath={
                                         profile.avatar_url ?? null
                                     }
-                                    dict={dict}
                                 />
                             )}
                         </div>
 
                         <div className="bg-wc-panel rounded-wc-panel p-6 border border-wc-border">
                             <h2 className="text-sm font-bold text-wc-muted mb-5 uppercase tracking-(--letter-spacing-wc-cap)">
-                                {dict.profile.linked_accounts}
+                                {t("linked_accounts")}
                             </h2>
-                            <LinkedAccounts
-                                linkedProviders={linkedProviders}
-                                dict={dict}
-                            />
+                            <LinkedAccounts linkedProviders={linkedProviders} />
                         </div>
                     </div>
                 </div>

@@ -16,12 +16,18 @@ type PatchResult =
     | { ok: true }
     | { ok: false; error: CustomizationPatchErrorCode; message?: string };
 
+const FREE_DEFAULTS: Record<"deck_style" | "board_style", string> = {
+    deck_style: "free",
+    board_style: "green_felt",
+};
+
 async function ownsStyle(
     supabase: SupabaseClient<Database>,
     userId: string,
     itemType: "deck_style" | "board_style",
     itemId: string,
 ): Promise<boolean> {
+    if (itemId === FREE_DEFAULTS[itemType]) return true;
     const { data } = await supabase
         .from("player_inventory")
         .select("item_id")

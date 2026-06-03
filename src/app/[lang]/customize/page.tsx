@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
+import { setRequestLocale } from "next-intl/server";
 import { CustomizePage } from "@/components/pages/CustomizePage";
-import { getDictionary } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function Page({
@@ -9,8 +9,7 @@ export default async function Page({
     params: Promise<{ lang: string }>;
 }) {
     const { lang } = await params;
-    const dict = await getDictionary(lang);
-
+    setRequestLocale(lang);
     const supabase = await createClient();
     const {
         data: { user },
@@ -32,22 +31,24 @@ export default async function Page({
     const customization = customizationRes.data;
     const inventory = inventoryRes.data ?? [];
 
-    const ownedDeckStyleIds = inventory
+    const rawDeckIds = inventory
         .filter((i) => i.item_type === "deck_style")
         .map((i) => i.item_id);
 
-    const ownedBoardStyleIds = inventory
+    const rawBoardIds = inventory
         .filter((i) => i.item_type === "board_style")
         .map((i) => i.item_id);
 
+    // Free defaults are always available regardless of inventory
+    const ownedDeckStyleIds = [...new Set(["free", ...rawDeckIds])];
+    const ownedBoardStyleIds = [...new Set(["green_felt", ...rawBoardIds])];
+
     return (
         <CustomizePage
-            lang={lang}
             ownedDeckStyleIds={ownedDeckStyleIds}
             ownedBoardStyleIds={ownedBoardStyleIds}
             currentDeckStyleId={customization?.deck_style_id ?? "free"}
             currentBoardStyleId={customization?.board_style_id ?? "green_felt"}
-            dict={dict}
         />
     );
 }

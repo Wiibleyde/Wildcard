@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import { useApiMutation } from "@/hooks/useApiMutation";
-import type { Dictionary } from "@/lib/i18n";
 import type { ProfilePatch, ProfilePatchErrorCode } from "@/lib/models/profile";
 import { createClient } from "@/lib/supabase/client";
 
@@ -11,7 +11,6 @@ type Props = {
     userId: string;
     initialUsername: string;
     initialAvatarPath: string | null;
-    dict: Dictionary;
 };
 
 type AvatarStatus = "idle" | "uploading" | "saved" | "error";
@@ -26,9 +25,7 @@ function buildAvatarUrl(
     return bust ? `${data.publicUrl}?t=${bust}` : data.publicUrl;
 }
 
-const ERROR_MESSAGES: Partial<
-    Record<ProfilePatchErrorCode, keyof Dictionary["profile"]>
-> = {
+const ERROR_KEYS: Partial<Record<ProfilePatchErrorCode, string>> = {
     username_taken: "error_username_taken",
     username_empty: "error_username_empty",
 };
@@ -37,8 +34,11 @@ export function ProfileForm({
     userId,
     initialUsername,
     initialAvatarPath,
-    dict,
 }: Props) {
+    "use no memo";
+    const t = useTranslations("profile");
+    const tCommon = useTranslations("common");
+
     const [username, setUsername] = useState(initialUsername);
     const [avatarPath, setAvatarPath] = useState(initialAvatarPath);
     const [avatarBust, setAvatarBust] = useState<number | undefined>(undefined);
@@ -79,7 +79,7 @@ export function ProfileForm({
             .upload(path, file, { upsert: true });
 
         if (uploadError) {
-            setAvatarError(dict.profile.error_avatar);
+            setAvatarError(t("error_avatar"));
             setAvatarStatus("error");
             return;
         }
@@ -91,7 +91,7 @@ export function ProfileForm({
             setAvatarStatus("saved");
             setTimeout(() => setAvatarStatus("idle"), 2000);
         } else {
-            setAvatarError(dict.profile.error_avatar);
+            setAvatarError(t("error_avatar"));
             setAvatarStatus("error");
         }
     }
@@ -101,7 +101,7 @@ export function ProfileForm({
         setLocalError(null);
 
         if (!username.trim()) {
-            setLocalError(dict.profile.error_username_empty);
+            setLocalError(t("error_username_empty"));
             return;
         }
 
@@ -114,8 +114,9 @@ export function ProfileForm({
     const formErrorMessage: string | null = (() => {
         if (localError) return localError;
         if (!formMutation.error) return null;
-        const key = ERROR_MESSAGES[formMutation.error as ProfilePatchErrorCode];
-        return key ? (dict.profile[key] as string) : dict.common.error;
+        const key = ERROR_KEYS[formMutation.error as ProfilePatchErrorCode];
+        // biome-ignore lint/suspicious/noExplicitAny: dynamic i18n key lookup
+        return key ? t(key as any) : tCommon("error");
     })();
 
     const avatarBusy = avatarStatus === "uploading";
@@ -158,7 +159,7 @@ export function ProfileForm({
                     >
                         {avatarBusy ? (
                             <span className="text-[10px] text-white font-semibold text-center px-1 leading-tight">
-                                {dict.profile.avatar_uploading}
+                                {t("avatar_uploading")}
                             </span>
                         ) : avatarStatus === "saved" ? (
                             <svg
@@ -195,9 +196,7 @@ export function ProfileForm({
                 </div>
 
                 <div className="flex flex-col gap-1">
-                    <p className="text-xs text-wc-sub">
-                        {dict.profile.avatar_upload}
-                    </p>
+                    <p className="text-xs text-wc-sub">{t("avatar_upload")}</p>
                     {avatarStatus === "error" && avatarError && (
                         <p className="text-red-400 text-xs font-medium">
                             {avatarError}
@@ -219,7 +218,7 @@ export function ProfileForm({
                     htmlFor="username"
                     className="block text-xs font-semibold text-wc-muted mb-2 uppercase tracking-wider"
                 >
-                    {dict.profile.username_label}
+                    {t("username_label")}
                 </label>
                 <input
                     id="username"
@@ -229,7 +228,7 @@ export function ProfileForm({
                         setUsername(e.target.value);
                         setLocalError(null);
                     }}
-                    placeholder={dict.profile.username_placeholder}
+                    placeholder={t("username_placeholder")}
                     maxLength={30}
                     className="w-full bg-white/5 border border-wc-border rounded-(--radius-wc-btn) px-4 py-3 text-wc-text placeholder:text-wc-sub focus:outline-none focus:ring-2 focus:ring-wc-indigo/60 focus:border-transparent text-sm transition-colors"
                 />
@@ -254,10 +253,10 @@ export function ProfileForm({
                 }}
             >
                 {formSaving
-                    ? dict.common.saving
+                    ? tCommon("saving")
                     : formSaved
-                      ? dict.common.saved
-                      : dict.common.save}
+                      ? tCommon("saved")
+                      : tCommon("save")}
             </button>
         </form>
     );

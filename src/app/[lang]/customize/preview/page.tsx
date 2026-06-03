@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { setRequestLocale } from "next-intl/server";
 import { PreviewPage } from "@/components/pages/PreviewPage";
 import { BOARD_THEMES } from "@/lib/board/themes";
 import { THEMES } from "@/lib/card/themes";
@@ -12,6 +13,7 @@ export default async function Page({
     searchParams: Promise<{ deck?: string; board?: string }>;
 }) {
     const { lang } = await params;
+    setRequestLocale(lang);
     const { deck, board } = await searchParams;
 
     const supabase = await createClient();
@@ -35,10 +37,6 @@ export default async function Page({
     }
 
     return (
-        <PreviewPage
-            deckId={deckId}
-            boardId={boardId}
-            backHref={`/${lang}/customize`}
-        />
+        <PreviewPage deckId={deckId} boardId={boardId} backHref="/customize" />
     );
 }

@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
-import { setRequestLocale } from "next-intl/server";
+import { getMessages, setRequestLocale } from "next-intl/server";
 import "../globals.css";
 import { AppNav } from "@/components/nav/AppNav";
+import { AppShell } from "@/components/nav/AppShell";
 import { routing } from "@/i18n/routing";
 
 const geistSans = Geist({
@@ -37,8 +38,9 @@ export default async function RootLayout({
 
     if (!hasLocale(routing.locales, lang)) notFound();
 
-    // Exposes locale to all Server Components in this tree via React cache
     setRequestLocale(lang);
+
+    const messages = await getMessages();
 
     return (
         <html
@@ -46,12 +48,8 @@ export default async function RootLayout({
             className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
         >
             <body className="min-h-screen bg-wc-surface text-wc-text">
-                {/* NextIntlClientProvider reads messages from getRequestConfig — no props needed */}
-                <NextIntlClientProvider>
-                    <AppNav />
-                    <div className="md:pl-55 xl:pl-64 pb-15 md:pb-0">
-                        {children}
-                    </div>
+                <NextIntlClientProvider locale={lang} messages={messages}>
+                    <AppShell appNav={<AppNav />}>{children}</AppShell>
                 </NextIntlClientProvider>
             </body>
         </html>

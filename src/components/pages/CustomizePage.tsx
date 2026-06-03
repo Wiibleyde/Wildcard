@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { BoardTile } from "@/components/customize/BoardTile";
 import { DeckTile } from "@/components/customize/DeckTile";
@@ -8,26 +9,25 @@ import { BOARD_THEMES } from "@/lib/board/themes";
 import type { BoardTheme } from "@/lib/board/types";
 import { THEMES } from "@/lib/card/themes";
 import type { CardTheme } from "@/lib/card/types";
-import type { Dictionary } from "@/lib/i18n";
 import type { CustomizationPatch } from "@/lib/models/customization";
 
 type Props = {
-    lang: string;
     ownedDeckStyleIds: string[];
     ownedBoardStyleIds: string[];
     currentDeckStyleId: string;
     currentBoardStyleId: string;
-    dict: Dictionary;
 };
 
 export function CustomizePage({
-    lang,
     ownedDeckStyleIds,
     ownedBoardStyleIds,
     currentDeckStyleId,
     currentBoardStyleId,
-    dict,
 }: Props) {
+    "use no memo";
+    const t = useTranslations("customize");
+    const tCommon = useTranslations("common");
+
     const [activeDeck, setActiveDeck] = useState(currentDeckStyleId);
     const [activeBoard, setActiveBoard] = useState(currentBoardStyleId);
 
@@ -72,20 +72,20 @@ export function CustomizePage({
                     }}
                 >
                     <h1 className="text-(length:--font-size-wc-label) font-bold text-wc-sub uppercase tracking-(--letter-spacing-wc-cap)">
-                        {dict.customize.title}
+                        {t("title")}
                     </h1>
                 </div>
 
                 <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start flex flex-col gap-4 lg:flex-none">
                     <div className="bg-wc-panel rounded-wc-panel p-6 border border-wc-border">
                         <h2 className="text-sm font-bold text-wc-muted mb-4 uppercase tracking-(--letter-spacing-wc-cap) flex items-center gap-2">
-                            {dict.customize.deck_section}
+                            {t("deck_section")}
                             {deckMutation.status === "pending" && (
                                 <span className="inline-block w-3 h-3 rounded-full border-2 border-t-transparent border-wc-muted animate-spin" />
                             )}
                             {deckMutation.status === "error" && (
                                 <span className="text-red-400 text-xs font-semibold normal-case tracking-normal">
-                                    {dict.common.error}
+                                    {tCommon("error")}
                                 </span>
                             )}
                         </h2>
@@ -96,8 +96,7 @@ export function CustomizePage({
                                     theme={theme}
                                     selected={theme.id === activeDeck}
                                     onClick={() => selectDeck(theme.id)}
-                                    previewHref={`/${lang}/customize/preview?deck=${theme.id}&board=${activeBoard}`}
-                                    dict={dict.customize}
+                                    previewHref={`/customize/preview?deck=${theme.id}&board=${activeBoard}`}
                                 />
                             ))}
                         </div>
@@ -105,13 +104,13 @@ export function CustomizePage({
 
                     <div className="bg-wc-panel rounded-wc-panel p-6 border border-wc-border">
                         <h2 className="text-sm font-bold text-wc-muted mb-4 uppercase tracking-(--letter-spacing-wc-cap) flex items-center gap-2">
-                            {dict.customize.board_section}
+                            {t("board_section")}
                             {boardMutation.status === "pending" && (
                                 <span className="inline-block w-3 h-3 rounded-full border-2 border-t-transparent border-wc-muted animate-spin" />
                             )}
                             {boardMutation.status === "error" && (
                                 <span className="text-red-400 text-xs font-semibold normal-case tracking-normal">
-                                    {dict.common.error}
+                                    {tCommon("error")}
                                 </span>
                             )}
                         </h2>
@@ -122,8 +121,7 @@ export function CustomizePage({
                                     theme={theme}
                                     selected={theme.id === activeBoard}
                                     onClick={() => selectBoard(theme.id)}
-                                    previewHref={`/${lang}/customize/preview?deck=${activeDeck}&board=${theme.id}`}
-                                    dict={dict.customize}
+                                    previewHref={`/customize/preview?deck=${activeDeck}&board=${theme.id}`}
                                 />
                             ))}
                         </div>

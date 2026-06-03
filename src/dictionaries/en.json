@@ -49,6 +49,11 @@
         "select": "Choose",
         "nav_label": "Style"
     },
+    "preview": {
+        "back": "Back",
+        "cards": "Cards",
+        "board": "Board"
+    },
     "profile": {
         "title": "My profile",
         "username_label": "Username",

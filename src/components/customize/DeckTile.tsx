@@ -1,11 +1,11 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { TierBadge } from "@/components/ui/TierBadge";
 import type { CardTheme } from "@/lib/card/types";
-import type { Dictionary } from "@/lib/i18n";
 import { TileShell } from "./TileShell";
 
-const TIER_LABELS: Record<string, keyof Dictionary["customize"]> = {
+const TIER_KEYS: Record<string, string> = {
     common: "tier_common",
     uncommon: "tier_uncommon",
     rare: "tier_rare",
@@ -20,19 +20,16 @@ type Props = {
     selected: boolean;
     onClick: () => void;
     previewHref: string;
-    dict: Dictionary["customize"];
 };
 
-export function DeckTile({
-    theme,
-    selected,
-    onClick,
-    previewHref,
-    dict,
-}: Props) {
+export function DeckTile({ theme, selected, onClick, previewHref }: Props) {
+    "use no memo";
+    const t = useTranslations("customize");
+    const tierKey = TIER_KEYS[theme.tier];
+    // biome-ignore lint/suspicious/noExplicitAny: dynamic i18n key lookup
+    const tierName = tierKey ? t(tierKey as any) : theme.tier;
+
     const backBg = theme.back.pattern ?? theme.back.color;
-    const tierKey = TIER_LABELS[theme.tier];
-    const tierName = tierKey ? (dict[tierKey] as string) : theme.tier;
 
     return (
         <TileShell

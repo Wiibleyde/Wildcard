@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { OAuthButton } from "@/components/auth/OAuthButton";
-import { getDictionary } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/server";
 
 export async function LoginPage({ lang }: { lang: string }) {
-    const dict = await getDictionary(lang);
+    const tAuth = await getTranslations("auth");
+    const tHome = await getTranslations("home");
 
     const supabase = await createClient();
     const {
@@ -33,30 +34,30 @@ export async function LoginPage({ lang }: { lang: string }) {
                         </svg>
                     </div>
                     <h1 className="text-2xl xl:text-3xl font-bold text-white">
-                        {dict.auth.login.title}
+                        {tAuth("login.title")}
                     </h1>
                     <p className="text-gray-400 mt-2 text-sm">
-                        {dict.auth.login.subtitle}
+                        {tAuth("login.subtitle")}
                     </p>
                 </div>
 
                 <div className="space-y-3">
                     <OAuthButton
                         provider="google"
-                        labelOverride={dict.auth.login.with_google}
+                        labelOverride={tAuth("login.with_google")}
                     />
                     <OAuthButton
                         provider="discord"
-                        labelOverride={dict.auth.login.with_discord}
+                        labelOverride={tAuth("login.with_discord")}
                     />
                     <OAuthButton
                         provider="apple"
-                        labelOverride={dict.auth.login.with_apple}
+                        labelOverride={tAuth("login.with_apple")}
                     />
                 </div>
 
                 <p className="mt-8 text-center text-xs text-gray-500">
-                    {dict.home.title} &mdash; {dict.home.subtitle}
+                    {tHome("title")} &mdash; {tHome("subtitle")}
                 </p>
             </div>
         </div>

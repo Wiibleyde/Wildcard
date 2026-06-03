@@ -12,9 +12,10 @@ type NavItem = {
 
 type Props = {
     variant: "sidebar" | "bottom";
+    shown?: boolean;
 };
 
-export function NavLinks({ variant }: Props) {
+export function NavLinks({ variant, shown = true }: Props) {
     const t = useTranslations("navigation");
     const pathname = usePathname();
 
@@ -39,7 +40,11 @@ export function NavLinks({ variant }: Props) {
                         <Link
                             key={item.href}
                             href={item.href}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+                            className={`flex items-center rounded-xl font-semibold transition-colors ${
+                                shown
+                                    ? "gap-3 px-3 py-2.5 text-sm"
+                                    : "justify-center py-2.5"
+                            }`}
                             style={
                                 active
                                     ? {
@@ -48,9 +53,10 @@ export function NavLinks({ variant }: Props) {
                                       }
                                     : { color: "#7c8699" }
                             }
+                            title={!shown ? item.label : undefined}
                         >
                             {item.icon}
-                            {item.label}
+                            {shown && item.label}
                         </Link>
                     );
                 })}

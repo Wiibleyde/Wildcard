@@ -1,9 +1,11 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { signOut } from "@/lib/supabase/auth";
 
-export function SignOutButton({ label }: { label: string }) {
+export function SignOutButton() {
+    const t = useTranslations("profile");
     const params = useParams();
     const lang = (params?.lang as string) ?? "fr";
     const router = useRouter();
@@ -20,7 +22,7 @@ export function SignOutButton({ label }: { label: string }) {
             onClick={handleSignOut}
             className="text-sm text-gray-500 hover:text-gray-300 transition-colors cursor-pointer"
         >
-            {label}
+            {t("sign_out")}
         </button>
     );
 }

@@ -2,8 +2,8 @@
 
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
+import { useTranslations } from "next-intl";
 import { useRef } from "react";
-import type { Dictionary } from "@/lib/i18n";
 
 gsap.registerPlugin(useGSAP);
 
@@ -19,10 +19,11 @@ function xpStats(xp: number) {
 
 type Props = {
     xp: number;
-    dict: Dictionary;
 };
 
-export function ProfileXPCard({ xp, dict }: Props) {
+export function ProfileXPCard({ xp }: Props) {
+    "use no memo";
+    const t = useTranslations("profile");
     const containerRef = useRef<HTMLDivElement>(null);
     const barRef = useRef<HTMLDivElement>(null);
     const xpNumRef = useRef<HTMLSpanElement>(null);
@@ -86,10 +87,10 @@ export function ProfileXPCard({ xp, dict }: Props) {
                 </div>
                 <div className="flex-1 min-w-0">
                     <p className="text-(length:--font-size-wc-label) font-bold text-wc-sub uppercase tracking-(--letter-spacing-wc-cap)">
-                        {dict.profile.xp_title}
+                        {t("xp_title")}
                     </p>
                     <p className="text-wc-heading font-extrabold leading-none mt-0.5">
-                        {dict.profile.level_short}{" "}
+                        {t("level_short")}{" "}
                         <span className="text-wc-xp">{level}</span>
                     </p>
                 </div>
@@ -118,7 +119,7 @@ export function ProfileXPCard({ xp, dict }: Props) {
             </div>
 
             <p className="text-wc-sub text-xs font-semibold mt-2 text-right">
-                {xpToNext.toLocaleString()} {dict.profile.xp_to_next}
+                {xpToNext.toLocaleString()} {t("xp_to_next")}
             </p>
         </div>
     );

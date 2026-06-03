@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { GameBoard } from "@/components/board/GameBoard";
 import { Card } from "@/components/card/Card";
 import { TierBadge } from "@/components/ui/TierBadge";
@@ -30,6 +31,8 @@ type Props = {
 };
 
 export function PreviewPage({ deckId, boardId, backHref }: Props) {
+    "use no memo";
+    const t = useTranslations("preview");
     const cardTheme = THEMES[deckId] ?? defaultDeck;
     const boardTheme = BOARD_THEMES[boardId] ?? defaultBoard;
 
@@ -98,13 +101,13 @@ export function PreviewPage({ deckId, boardId, backHref }: Props) {
                             clipRule="evenodd"
                         />
                     </svg>
-                    Retour
+                    {t("back")}
                 </Link>
 
                 <div className="flex items-center gap-3">
                     <div className="flex flex-col items-end gap-0.5">
                         <span className="text-[10px] text-wc-sub uppercase tracking-wider">
-                            Cartes
+                            {t("cards")}
                         </span>
                         <div className="flex items-center gap-1.5">
                             <span className="text-xs font-semibold text-wc-text">
@@ -122,7 +125,7 @@ export function PreviewPage({ deckId, boardId, backHref }: Props) {
                     />
                     <div className="flex flex-col items-end gap-0.5">
                         <span className="text-[10px] text-wc-sub uppercase tracking-wider">
-                            Plateau
+                            {t("board")}
                         </span>
                         <div className="flex items-center gap-1.5">
                             <span className="text-xs font-semibold text-wc-text">
