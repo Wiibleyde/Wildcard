@@ -5,6 +5,10 @@
   },
   "navigation": {
     "home": "Home",
+    "play": "Play",
+    "shop": "Shop",
+    "style": "Style",
+    "coins": "coins",
     "login": "Login",
     "register": "Sign up",
     "logout": "Logout",

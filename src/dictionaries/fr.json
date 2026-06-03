@@ -5,6 +5,10 @@
   },
   "navigation": {
     "home": "Accueil",
+    "play": "Jouer",
+    "shop": "Boutique",
+    "style": "Style",
+    "coins": "jetons",
     "login": "Connexion",
     "register": "S'inscrire",
     "logout": "Déconnexion",

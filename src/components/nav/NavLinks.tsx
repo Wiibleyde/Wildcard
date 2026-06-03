@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link, usePathname } from "@/i18n/navigation";
 import { HomeIcon, PaletteIcon, PlayIcon, ShopIcon } from "./NavIcons";
 
 type NavItem = {
@@ -11,35 +11,22 @@ type NavItem = {
 };
 
 type Props = {
-  lang: string;
   variant: "sidebar" | "bottom";
 };
 
-export function NavLinks({ lang, variant }: Props) {
+export function NavLinks({ variant }: Props) {
+  const t = useTranslations("navigation");
   const pathname = usePathname();
 
   const items: NavItem[] = [
-    {
-      href: `/${lang}`,
-      label: lang === "fr" ? "Accueil" : "Home",
-      icon: <HomeIcon />,
-    },
-    {
-      href: `/${lang}/lobby`,
-      label: lang === "fr" ? "Jouer" : "Play",
-      icon: <PlayIcon />,
-    },
-    {
-      href: `/${lang}/shop`,
-      label: lang === "fr" ? "Boutique" : "Shop",
-      icon: <ShopIcon />,
-    },
-    { href: `/${lang}/customize`, label: "Style", icon: <PaletteIcon /> },
+    { href: "/", label: t("home"), icon: <HomeIcon /> },
+    { href: "/lobby", label: t("play"), icon: <PlayIcon /> },
+    { href: "/shop", label: t("shop"), icon: <ShopIcon /> },
+    { href: "/customize", label: t("style"), icon: <PaletteIcon /> },
   ];
 
   function isActive(href: string) {
-    if (href === `/${lang}`)
-      return pathname === `/${lang}` || pathname === `/${lang}/`;
+    if (href === "/") return pathname === "/";
     return pathname.startsWith(href);
   }
 

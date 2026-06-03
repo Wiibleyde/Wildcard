@@ -1,7 +1,9 @@
 import Image from "next/image";
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
+import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
+import { NavActions } from "./NavActions";
 import { NavLinks } from "./NavLinks";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -28,9 +30,7 @@ function xpLevel(xp: number) {
   return Math.floor(xp / 500) + 1;
 }
 
-type Props = { lang: string };
-
-export async function AppNav({ lang }: Props) {
+export async function AppNav() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -41,6 +41,9 @@ export async function AppNav({ lang }: Props) {
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.from("player_xp").select("xp").eq("user_id", user.id).single(),
   ]);
+
+  const t = await getTranslations("navigation");
+  const tProfile = await getTranslations("profile");
 
   const profile = profileRes.data as Profile | null;
   const xpRow = xpRes.data as Pick<PlayerXP, "xp"> | null;
@@ -53,7 +56,6 @@ export async function AppNav({ lang }: Props) {
     : null;
 
   const initial = profile?.username?.[0]?.toUpperCase() ?? "?";
-  const levelLabel = lang === "fr" ? "Niv." : "Lv.";
 
   return (
     <>
@@ -67,10 +69,7 @@ export async function AppNav({ lang }: Props) {
         }}
       >
         {/* logo */}
-        <Link
-          href={`/${lang}`}
-          className="flex items-center gap-2.5 px-1 mb-1 shrink-0"
-        >
+        <Link href="/" className="flex items-center gap-2.5 px-1 mb-1 shrink-0">
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black shrink-0"
             style={{
@@ -85,7 +84,7 @@ export async function AppNav({ lang }: Props) {
           </span>
         </Link>
 
-        <NavLinks lang={lang} variant="sidebar" />
+        <NavLinks variant="sidebar" />
 
         {/* bottom: coins + user card */}
         <div className="mt-auto flex flex-col gap-3">
@@ -98,13 +97,13 @@ export async function AppNav({ lang }: Props) {
           >
             <CoinIcon />
             <span style={{ color: "#e8c468" }}>0</span>
-            <span className="text-wc-sub ml-1">
-              {lang === "fr" ? "jetons" : "coins"}
-            </span>
+            <span className="text-wc-sub ml-1">{t("coins")}</span>
           </div>
 
+          <NavActions variant="sidebar" />
+
           <Link
-            href={`/${lang}/profile`}
+            href="/profile"
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors hover:bg-white/5"
           >
             <div className="relative w-9 h-9 rounded-full overflow-hidden shrink-0">
@@ -134,7 +133,7 @@ export async function AppNav({ lang }: Props) {
                 {profile?.username ?? "—"}
               </p>
               <p className="text-xs text-wc-sub font-semibold mt-0.5">
-                {levelLabel} {level}
+                {tProfile("level_short")} {level}
               </p>
             </div>
           </Link>
@@ -146,7 +145,7 @@ export async function AppNav({ lang }: Props) {
         className="md:hidden flex items-center justify-between px-4 h-14 sticky top-0 z-40"
         style={{ background: "#0c1018", borderBottom: "1px solid #1c2230" }}
       >
-        <Link href={`/${lang}`} className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2">
           <div
             className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0"
             style={{
@@ -161,31 +160,34 @@ export async function AppNav({ lang }: Props) {
           </span>
         </Link>
 
-        <Link
-          href={`/${lang}/profile`}
-          className="relative w-8 h-8 rounded-full overflow-hidden"
-        >
-          {avatarUrl ? (
-            <Image
-              src={avatarUrl}
-              alt={profile?.username ?? ""}
-              fill
-              sizes="32px"
-              className="object-cover"
-              loading="eager"
-            />
-          ) : (
-            <div
-              className="w-full h-full flex items-center justify-center text-xs font-black"
-              style={{
-                background: "linear-gradient(135deg, #e8c468, #c49b32)",
-                color: "#15110a",
-              }}
-            >
-              {initial}
-            </div>
-          )}
-        </Link>
+        <div className="flex items-center gap-1">
+          <NavActions variant="mobile-header" />
+          <Link
+            href="/profile"
+            className="relative w-8 h-8 rounded-full overflow-hidden"
+          >
+            {avatarUrl ? (
+              <Image
+                src={avatarUrl}
+                alt={profile?.username ?? ""}
+                fill
+                sizes="32px"
+                className="object-cover"
+                loading="eager"
+              />
+            ) : (
+              <div
+                className="w-full h-full flex items-center justify-center text-xs font-black"
+                style={{
+                  background: "linear-gradient(135deg, #e8c468, #c49b32)",
+                  color: "#15110a",
+                }}
+              >
+                {initial}
+              </div>
+            )}
+          </Link>
+        </div>
       </header>
 
       {/* ── Mobile bottom nav ────────────────────────────────────────────── */}
@@ -197,7 +199,7 @@ export async function AppNav({ lang }: Props) {
           height: "60px",
         }}
       >
-        <NavLinks lang={lang} variant="bottom" />
+        <NavLinks variant="bottom" />
       </nav>
     </>
   );

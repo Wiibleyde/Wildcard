@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { notFound } from "next/navigation";
+import { hasLocale, NextIntlClientProvider } from "next-intl";
+import { setRequestLocale } from "next-intl/server";
 import "../globals.css";
 import { AppNav } from "@/components/nav/AppNav";
-import { defaultLocale, getDictionary, type Locale, locales } from "@/lib/i18n";
-import { I18nProvider } from "@/lib/i18n/context";
+import { routing } from "@/i18n/routing";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -21,7 +23,7 @@ export const metadata: Metadata = {
 };
 
 export function generateStaticParams() {
-  return locales.map((lang) => ({ lang }));
+  return routing.locales.map((lang) => ({ lang }));
 }
 
 export default async function RootLayout({
@@ -32,23 +34,25 @@ export default async function RootLayout({
   params: Promise<{ lang: string }>;
 }>) {
   const { lang } = await params;
-  const locale = (
-    locales.includes(lang as Locale) ? lang : defaultLocale
-  ) as Locale;
-  const dict = await getDictionary(locale);
+
+  if (!hasLocale(routing.locales, lang)) notFound();
+
+  // Exposes locale to all Server Components in this tree via React cache
+  setRequestLocale(lang);
 
   return (
     <html
-      lang={locale}
+      lang={lang}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-screen bg-wc-surface text-wc-text">
-        <I18nProvider locale={locale} dict={dict}>
-          <AppNav lang={locale} />
-          <div className="md:pl-[220px] xl:pl-64 pb-[60px] md:pb-0">
+        {/* NextIntlClientProvider reads messages from getRequestConfig — no props needed */}
+        <NextIntlClientProvider>
+          <AppNav />
+          <div className="md:pl-55 xl:pl-64 pb-15 md:pb-0">
             {children}
           </div>
-        </I18nProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

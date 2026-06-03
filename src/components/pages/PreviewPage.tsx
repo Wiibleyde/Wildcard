@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { GameBoard } from "@/components/board/GameBoard";
 import { Card } from "@/components/card/Card";
 import { TierBadge } from "@/components/ui/TierBadge";
+import { Link } from "@/i18n/navigation";
 import { BOARD_THEMES } from "@/lib/board/themes";
 import { greenFeltTheme as defaultBoard } from "@/lib/board/themes/green_felt";
 import { THEMES } from "@/lib/card/themes";
