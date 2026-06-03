@@ -49,9 +49,7 @@ export default async function RootLayout({
         {/* NextIntlClientProvider reads messages from getRequestConfig — no props needed */}
         <NextIntlClientProvider>
           <AppNav />
-          <div className="md:pl-55 xl:pl-64 pb-15 md:pb-0">
-            {children}
-          </div>
+          <div className="md:pl-55 xl:pl-64 pb-15 md:pb-0">{children}</div>
         </NextIntlClientProvider>
       </body>
     </html>
