@@ -127,3 +127,26 @@ export interface GameModule<S extends GameState, A extends GameAction, V = S> {
      */
     view(state: S, viewerId: string | null): V;
 }
+
+/**
+ * Type-erased game module, as stored in the registry and handled by the runner.
+ *
+ * Concrete modules are invariant in their own `State`/`Action` (a `BatailleState`
+ * reducer cannot accept an arbitrary `GameState`), so they are not structurally
+ * assignable to a single supertype. We erase to `unknown` at the registry
+ * boundary instead: the registry persists exactly the state each module
+ * produced, so feeding it back is sound. The unavoidable cast lives in one
+ * place — {@link registerGame} — and nowhere else.
+ */
+export type AnyGameModule = GameModule<GameState, GameAction, unknown>;
+
+/**
+ * Register a concrete module under the erased registry type. The single cast in
+ * the codebase: justified because a game only ever receives the state it itself
+ * created (round-tripped through `game_states`).
+ */
+export function registerGame<S extends GameState, A extends GameAction, V>(
+    module: GameModule<S, A, V>,
+): AnyGameModule {
+    return module as unknown as AnyGameModule;
+}

@@ -64,6 +64,18 @@ const play = (id: string, cards: CardDescriptor[]): PresidentAction => ({
 });
 const pass = (id: string): PresidentAction => ({ type: "pass", playerId: id });
 
+/** Compact, order-independent view of a legal-action set: ["7x2", "pass", …]. */
+function summary(actions: readonly PresidentAction[]): string[] {
+    return actions
+        .map((a) => {
+            if (a.type === "pass") return "pass";
+            const first = a.cards[0];
+            const rank = first.type === "suited" ? first.rank : "?";
+            return `${rank}x${a.cards.length}`;
+        })
+        .sort();
+}
+
 describe("president setup", () => {
     it("deals all 52 cards across the players with none shared", () => {
         const s = createGame(president, P4, 1234);
@@ -233,5 +245,98 @@ describe("president view (RLS in code)", () => {
         expect(self?.hand).toHaveLength(s.hands.a.length);
         expect(other?.hand).toBeUndefined(); // opponents redacted
         expect(other?.handCount).toBe(s.hands.b.length); // count still public
+    });
+});
+
+describe("president legal actions (which cards are playable)", () => {
+    it("leading offers every count of every rank, and never a pass", () => {
+        const s = state3({
+            a: [card("5"), card("5", "hearts"), card("7")],
+            b: [],
+            c: [],
+        });
+        // two 5s → play 1 or 2; one 7 → play 1. No pass when leading.
+        expect(summary(president.legalActions(s, "a"))).toEqual([
+            "5x1",
+            "5x2",
+            "7x1",
+        ]);
+    });
+
+    it("responding requires the same count AND a strictly higher rank", () => {
+        const s = state3(
+            {
+                a: [],
+                b: [card("8"), card("8", "hearts"), card("9"), card("K")],
+                c: [],
+            },
+            {
+                combo: { rank: "7", count: 2 },
+                lastPlayerId: "a",
+                currentPlayerId: "b",
+            },
+        );
+        // pair of 8 beats pair of 7; lone 9/K can't match count 2 → only 8x2 + pass.
+        expect(summary(president.legalActions(s, "b"))).toEqual([
+            "8x2",
+            "pass",
+        ]);
+    });
+
+    it("treats an equal rank as NOT playable (strictly higher only)", () => {
+        const s = state3(
+            { a: [], b: [card("8"), card("9")], c: [] },
+            {
+                combo: { rank: "8", count: 1 },
+                lastPlayerId: "a",
+                currentPlayerId: "b",
+            },
+        );
+        expect(summary(president.legalActions(s, "b"))).toEqual([
+            "9x1",
+            "pass",
+        ]);
+    });
+
+    it("offers nothing out of turn, when finished, or once the round is over", () => {
+        const base = state3({
+            a: [card("5")],
+            b: [card("9")],
+            c: [card("K")],
+        });
+        expect(president.legalActions(base, "b")).toHaveLength(0); // not b's turn
+        expect(
+            president.legalActions({ ...base, finished: ["a"] }, "a"),
+        ).toHaveLength(0); // already out
+        expect(
+            president.legalActions({ ...base, phase: "done" }, "a"),
+        ).toHaveLength(0); // round over
+    });
+
+    it("only offers moves that apply() actually accepts (hints never lie)", () => {
+        const lead = state3({
+            a: [card("5"), card("5", "hearts"), card("7")],
+            b: [card("9")],
+            c: [card("K")],
+        });
+        for (const action of president.legalActions(lead, "a")) {
+            expect(step(lead, action).ok).toBe(true);
+        }
+
+        const respond = state3(
+            {
+                a: [],
+                b: [card("8"), card("8", "hearts"), card("J")],
+                c: [],
+            },
+            {
+                combo: { rank: "7", count: 2 },
+                lastPlayerId: "a",
+                currentPlayerId: "b",
+            },
+        );
+        for (const action of president.legalActions(respond, "b")) {
+            expect(step(respond, action).ok).toBe(true);
+        }
     });
 });

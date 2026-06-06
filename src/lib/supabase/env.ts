@@ -12,3 +12,19 @@ export function getSupabaseEnv(): { url: string; anonKey: string } {
     }
     return { url, anonKey };
 }
+
+/**
+ * Returns the server-only service-role key, throwing early if missing.
+ *
+ * This key bypasses RLS and must never reach the browser — it is read only
+ * from server code (API routes / server models) via {@link createAdminClient}.
+ */
+export function getServiceRoleKey(): string {
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!key) {
+        throw new Error(
+            "SUPABASE_SERVICE_ROLE_KEY must be set (server-only — see .env.local)",
+        );
+    }
+    return key;
+}
