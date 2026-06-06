@@ -61,30 +61,59 @@ export function CustomizePage({
     }
 
     return (
-        <div className="min-h-screen bg-wc-surface px-4 xl:px-10 pt-6 md:pt-10 pb-10">
-            <div className="max-w-lg lg:max-w-5xl xl:max-w-7xl mx-auto flex flex-col gap-4">
+        <div
+            className="min-h-screen px-4 xl:px-10 pt-6 md:pt-10 pb-16"
+            style={{ background: "#0d0a05" }}
+        >
+            <div className="max-w-lg lg:max-w-5xl xl:max-w-7xl mx-auto flex flex-col gap-5">
+                {/* Header */}
                 <div
-                    className="rounded-wc-card p-6 border"
+                    className="rounded-2xl px-6 py-5"
                     style={{
                         background:
-                            "linear-gradient(160deg, #1d1a0e, #0c1118 72%)",
-                        borderColor: "rgba(232,196,104,0.22)",
+                            "linear-gradient(150deg, #211708 0%, #0d0a05 70%)",
+                        border: "2px solid rgba(245,197,22,0.18)",
                     }}
                 >
-                    <h1 className="text-(length:--font-size-wc-label) font-bold text-wc-sub uppercase tracking-(--letter-spacing-wc-cap)">
-                        {t("title")}
+                    <h1
+                        className="text-2xl xl:text-3xl font-black tracking-tight"
+                        style={{ color: "#faf2e2" }}
+                    >
+                        ♦ {t("title")}
                     </h1>
+                    <p
+                        className="text-sm font-semibold mt-1"
+                        style={{ color: "#7a6a50" }}
+                    >
+                        Personnalise ton style de jeu
+                    </p>
                 </div>
 
-                <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start flex flex-col gap-4 lg:flex-none">
-                    <div className="bg-wc-panel rounded-wc-panel p-6 border border-wc-border">
-                        <h2 className="text-sm font-bold text-wc-muted mb-4 uppercase tracking-(--letter-spacing-wc-cap) flex items-center gap-2">
-                            {t("deck_section")}
+                <div className="lg:grid lg:grid-cols-2 lg:gap-5 flex flex-col gap-5 lg:flex-none">
+                    {/* Deck section */}
+                    <div
+                        className="rounded-xl p-6 border"
+                        style={{
+                            background: "#1c1510",
+                            borderColor: "#3d2d18",
+                        }}
+                    >
+                        <h2
+                            className="text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2"
+                            style={{ color: "#7a6a50" }}
+                        >
+                            ♠ {t("deck_section")}
                             {deckMutation.status === "pending" && (
-                                <span className="inline-block w-3 h-3 rounded-full border-2 border-t-transparent border-wc-muted animate-spin" />
+                                <span
+                                    className="inline-block w-3 h-3 rounded-full border-2 border-t-transparent animate-spin"
+                                    style={{ borderColor: "#f5c516" }}
+                                />
                             )}
                             {deckMutation.status === "error" && (
-                                <span className="text-red-400 text-xs font-semibold normal-case tracking-normal">
+                                <span
+                                    className="text-xs font-bold normal-case tracking-normal"
+                                    style={{ color: "#e04040" }}
+                                >
                                     {tCommon("error")}
                                 </span>
                             )}
@@ -102,14 +131,30 @@ export function CustomizePage({
                         </div>
                     </div>
 
-                    <div className="bg-wc-panel rounded-wc-panel p-6 border border-wc-border">
-                        <h2 className="text-sm font-bold text-wc-muted mb-4 uppercase tracking-(--letter-spacing-wc-cap) flex items-center gap-2">
-                            {t("board_section")}
+                    {/* Board section */}
+                    <div
+                        className="rounded-xl p-6 border"
+                        style={{
+                            background: "#1c1510",
+                            borderColor: "#3d2d18",
+                        }}
+                    >
+                        <h2
+                            className="text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2"
+                            style={{ color: "#7a6a50" }}
+                        >
+                            ♣ {t("board_section")}
                             {boardMutation.status === "pending" && (
-                                <span className="inline-block w-3 h-3 rounded-full border-2 border-t-transparent border-wc-muted animate-spin" />
+                                <span
+                                    className="inline-block w-3 h-3 rounded-full border-2 border-t-transparent animate-spin"
+                                    style={{ borderColor: "#f5c516" }}
+                                />
                             )}
                             {boardMutation.status === "error" && (
-                                <span className="text-red-400 text-xs font-semibold normal-case tracking-normal">
+                                <span
+                                    className="text-xs font-bold normal-case tracking-normal"
+                                    style={{ color: "#e04040" }}
+                                >
                                     {tCommon("error")}
                                 </span>
                             )}

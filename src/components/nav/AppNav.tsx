@@ -43,7 +43,7 @@ export async function AppNav() {
 
     return (
         <>
-            {/* ── Desktop sidebar ──────────────────────────────────────────────── */}
+            {/* ── Desktop sidebar ──────────────────────────────────────────── */}
             <SidebarDesktop
                 profile={profile}
                 avatarUrl={avatarUrl}
@@ -53,68 +53,104 @@ export async function AppNav() {
                 levelShort={tProfile("level_short")}
             />
 
-            {/* ── Mobile top bar ───────────────────────────────────────────────── */}
+            {/* ── Mobile top bar ───────────────────────────────────────────── */}
             <header
-                className="md:hidden flex items-center justify-between px-4 h-14 sticky top-0 z-40"
+                className="md:hidden sticky top-0 z-40"
                 style={{
-                    background: "#0c1018",
-                    borderBottom: "1px solid #1c2230",
+                    background: "#0f0b07",
+                    borderBottom: "2px solid #3d2d18",
                 }}
             >
-                <Link href="/" className="flex items-center gap-2">
-                    <div
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0"
-                        style={{
-                            background:
-                                "linear-gradient(135deg, #e8c468, #c49b32)",
-                            color: "#15110a",
-                        }}
-                    >
-                        W
-                    </div>
-                    <span className="text-wc-text font-extrabold text-sm tracking-tight">
-                        Wildcard
-                    </span>
-                </Link>
+                <div className="flex items-center justify-between px-4 h-14">
+                    <Link href="/" className="flex items-center gap-2.5">
+                        <div
+                            className="w-8 h-8 rounded-xl flex items-center justify-center text-sm font-black shrink-0"
+                            style={{
+                                background:
+                                    "linear-gradient(135deg, #f5c516, #c49010)",
+                                color: "#0d0a05",
+                                boxShadow: "0 0 12px rgba(245,197,22,0.25)",
+                            }}
+                        >
+                            W
+                        </div>
+                        <div>
+                            <p
+                                className="font-black text-sm leading-none tracking-tight"
+                                style={{ color: "#faf2e2" }}
+                            >
+                                Wildcard
+                            </p>
+                            <p
+                                className="text-[9px] font-bold tracking-[0.2em] uppercase"
+                                style={{ color: "#7a6a50" }}
+                            >
+                                ♠ ♥ ♦ ♣
+                            </p>
+                        </div>
+                    </Link>
 
-                <div className="flex items-center gap-1">
-                    <NavActions variant="mobile-header" />
-                    <Link
-                        href="/profile"
-                        className="relative w-8 h-8 rounded-full overflow-hidden"
-                    >
-                        {avatarUrl ? (
-                            <Image
-                                src={avatarUrl}
-                                alt={profile?.username ?? ""}
-                                fill
-                                sizes="32px"
-                                className="object-cover"
-                                loading="eager"
-                            />
-                        ) : (
+                    <div className="flex items-center gap-2">
+                        <NavActions variant="mobile-header" />
+
+                        {/* Avatar */}
+                        <Link href="/profile">
                             <div
-                                className="w-full h-full flex items-center justify-center text-xs font-black"
+                                className="relative w-8 h-8 rounded-full p-[2px] shrink-0"
                                 style={{
                                     background:
-                                        "linear-gradient(135deg, #e8c468, #c49b32)",
-                                    color: "#15110a",
+                                        "linear-gradient(135deg, #f5c516, #e04040)",
                                 }}
                             >
-                                {initial}
+                                <div className="relative w-full h-full rounded-full overflow-hidden">
+                                    {avatarUrl ? (
+                                        <Image
+                                            src={avatarUrl}
+                                            alt={profile?.username ?? ""}
+                                            fill
+                                            sizes="32px"
+                                            className="object-cover"
+                                            loading="eager"
+                                        />
+                                    ) : (
+                                        <div
+                                            className="w-full h-full flex items-center justify-center text-xs font-black"
+                                            style={{
+                                                background:
+                                                    "linear-gradient(135deg, #f5c516, #c49010)",
+                                                color: "#0d0a05",
+                                            }}
+                                        >
+                                            {initial}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        )}
-                    </Link>
+                        </Link>
+
+                        {/* Level badge */}
+                        <span
+                            className="text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-wider"
+                            style={{
+                                background: "rgba(167,139,250,0.15)",
+                                color: "#a78bfa",
+                                border: "1px solid rgba(167,139,250,0.25)",
+                            }}
+                        >
+                            {tProfile("level_short")} {level}
+                        </span>
+                    </div>
                 </div>
             </header>
 
-            {/* ── Mobile bottom nav ────────────────────────────────────────────── */}
+            {/* ── Mobile bottom nav ────────────────────────────────────────── */}
             <nav
-                className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center"
+                className="md:hidden fixed bottom-0 left-0 right-0 z-40"
                 style={{
-                    background: "#0c1018",
-                    borderTop: "1px solid #1c2230",
-                    height: "60px",
+                    background: "#0f0b07",
+                    borderTop: "2px solid #3d2d18",
+                    height: "68px",
+                    boxShadow: "0 -4px 20px rgba(0,0,0,0.4)",
                 }}
             >
                 <NavLinks variant="bottom" />

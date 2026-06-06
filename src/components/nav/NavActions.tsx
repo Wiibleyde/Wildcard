@@ -72,7 +72,7 @@ export function NavActions({ variant, shown = true }: Props) {
                         type="button"
                         onClick={switchLang}
                         className="flex items-center justify-center w-9 h-9 rounded-xl transition-colors hover:bg-white/5"
-                        style={{ color: "#7c8699" }}
+                        style={{ color: "#7a6a50" }}
                         title={`Switch to ${otherLang.toUpperCase()}`}
                     >
                         <GlobeIcon />
@@ -81,7 +81,7 @@ export function NavActions({ variant, shown = true }: Props) {
                         type="button"
                         onClick={handleSignOut}
                         className="flex items-center justify-center w-9 h-9 rounded-xl transition-colors hover:bg-white/5"
-                        style={{ color: "#7c8699" }}
+                        style={{ color: "#7a6a50" }}
                         title={t("logout")}
                     >
                         <LogoutIcon />
@@ -95,7 +95,7 @@ export function NavActions({ variant, shown = true }: Props) {
                 {/* Language switcher: FR | EN segmented */}
                 <div
                     className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold w-full"
-                    style={{ color: "#7c8699" }}
+                    style={{ color: "#7a6a50" }}
                 >
                     <GlobeIcon />
                     <div className="flex items-center gap-0.5 ml-1">
@@ -109,11 +109,11 @@ export function NavActions({ variant, shown = true }: Props) {
                                 style={
                                     l === lang
                                         ? {
-                                              color: "#f3f6fc",
+                                              color: "#f5c516",
                                               background:
-                                                  "rgba(255,255,255,0.1)",
+                                                  "rgba(245,197,22,0.12)",
                                           }
-                                        : { color: "#7c8699" }
+                                        : { color: "#7a6a50" }
                                 }
                             >
                                 {l}
@@ -125,7 +125,7 @@ export function NavActions({ variant, shown = true }: Props) {
                     type="button"
                     onClick={handleSignOut}
                     className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-colors hover:bg-white/5 w-full"
-                    style={{ color: "#7c8699" }}
+                    style={{ color: "#7a6a50" }}
                 >
                     <LogoutIcon />
                     {t("logout")}
@@ -140,7 +140,7 @@ export function NavActions({ variant, shown = true }: Props) {
                 type="button"
                 onClick={switchLang}
                 className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors hover:bg-white/5"
-                style={{ color: "#7c8699" }}
+                style={{ color: "#7a6a50" }}
                 aria-label={`Switch to ${otherLang}`}
             >
                 <GlobeIcon />
@@ -149,7 +149,7 @@ export function NavActions({ variant, shown = true }: Props) {
                 type="button"
                 onClick={handleSignOut}
                 className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors hover:bg-white/5"
-                style={{ color: "#7c8699" }}
+                style={{ color: "#7a6a50" }}
                 aria-label={t("logout")}
             >
                 <LogoutIcon />

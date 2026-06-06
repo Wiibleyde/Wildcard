@@ -4,16 +4,28 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { type OAuthProvider, signInWithOAuth } from "@/lib/supabase/auth";
 
-const providers: Record<
-    OAuthProvider,
-    { label: string; icon: React.ReactNode; className: string }
-> = {
+type ProviderConfig = {
+    label: string;
+    icon: React.ReactNode;
+    bg: string;
+    text: string;
+    border: string;
+    shadow: string;
+};
+
+const providers: Record<OAuthProvider, ProviderConfig> = {
     google: {
         label: "Google",
-        className:
-            "bg-white text-gray-900 border border-gray-200 hover:bg-gray-50 active:bg-gray-100",
+        bg: "#ffffff",
+        text: "#1a1a1a",
+        border: "#d0d0d0",
+        shadow: "#a0a0a0",
         icon: (
-            <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
+            <svg
+                viewBox="0 0 24 24"
+                className="w-5 h-5 shrink-0"
+                aria-hidden="true"
+            >
                 <path
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                     fill="#4285F4"
@@ -35,12 +47,14 @@ const providers: Record<
     },
     discord: {
         label: "Discord",
-        className:
-            "bg-[#5865F2] text-white hover:bg-[#4752C4] active:bg-[#3c45a5]",
+        bg: "#5865F2",
+        text: "#ffffff",
+        border: "#4555e8",
+        shadow: "#3040c0",
         icon: (
             <svg
                 viewBox="0 0 24 24"
-                className="w-5 h-5"
+                className="w-5 h-5 shrink-0"
                 fill="currentColor"
                 aria-hidden="true"
             >
@@ -50,11 +64,14 @@ const providers: Record<
     },
     apple: {
         label: "Apple",
-        className: "bg-black text-white hover:bg-gray-900 active:bg-gray-800",
+        bg: "#1a1a1a",
+        text: "#ffffff",
+        border: "#333333",
+        shadow: "#000000",
         icon: (
             <svg
                 viewBox="0 0 24 24"
-                className="w-5 h-5"
+                className="w-5 h-5 shrink-0"
                 fill="currentColor"
                 aria-hidden="true"
             >
@@ -74,7 +91,8 @@ export function OAuthButton({
     const params = useParams();
     const lang = (params?.lang as string) ?? "fr";
     const [loading, setLoading] = useState(false);
-    const config = providers[provider];
+    const [pressed, setPressed] = useState(false);
+    const cfg = providers[provider];
 
     async function handleClick() {
         setLoading(true);
@@ -86,10 +104,23 @@ export function OAuthButton({
             type="button"
             onClick={handleClick}
             disabled={loading}
-            className={`w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-all duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${config.className}`}
+            onMouseDown={() => setPressed(true)}
+            onMouseUp={() => setPressed(false)}
+            onMouseLeave={() => setPressed(false)}
+            className="w-full flex items-center justify-center gap-3 px-5 py-4 rounded-xl font-bold text-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            style={{
+                background: cfg.bg,
+                color: cfg.text,
+                border: `2px solid ${cfg.border}`,
+                transform:
+                    pressed && !loading ? "translateY(3px)" : "translateY(0)",
+                boxShadow:
+                    pressed || loading ? "none" : `0 4px 0 0 ${cfg.shadow}`,
+                transition: "transform 80ms ease, box-shadow 80ms ease",
+            }}
         >
-            {config.icon}
-            <span>{labelOverride ?? config.label}</span>
+            {cfg.icon}
+            <span>{labelOverride ?? cfg.label}</span>
         </button>
     );
 }

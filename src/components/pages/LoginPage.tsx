@@ -14,33 +14,146 @@ export async function LoginPage({ lang }: { lang: string }) {
     if (user) redirect(`/${lang}`);
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-950 px-4">
-            <div className="w-full max-w-sm lg:max-w-md xl:max-w-lg">
+        <div
+            className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden"
+            style={{ background: "#0d0a05" }}
+        >
+            {/* Atmospheric card suit decorations */}
+            <div
+                className="absolute inset-0 pointer-events-none select-none overflow-hidden"
+                aria-hidden="true"
+            >
+                <span
+                    className="absolute font-black leading-none"
+                    style={{
+                        fontSize: "22rem",
+                        opacity: 0.025,
+                        color: "#f0e8d4",
+                        top: "-4rem",
+                        left: "-5rem",
+                        transform: "rotate(-15deg)",
+                    }}
+                >
+                    ♠
+                </span>
+                <span
+                    className="absolute font-black leading-none"
+                    style={{
+                        fontSize: "22rem",
+                        opacity: 0.025,
+                        color: "#e04040",
+                        bottom: "-4rem",
+                        right: "-5rem",
+                        transform: "rotate(12deg)",
+                    }}
+                >
+                    ♥
+                </span>
+                <span
+                    className="absolute font-black leading-none"
+                    style={{
+                        fontSize: "10rem",
+                        opacity: 0.02,
+                        color: "#e04040",
+                        top: "30%",
+                        right: "-2rem",
+                        transform: "rotate(6deg)",
+                    }}
+                >
+                    ♦
+                </span>
+                <span
+                    className="absolute font-black leading-none"
+                    style={{
+                        fontSize: "10rem",
+                        opacity: 0.02,
+                        color: "#f0e8d4",
+                        bottom: "25%",
+                        left: "-2rem",
+                        transform: "rotate(-6deg)",
+                    }}
+                >
+                    ♣
+                </span>
+            </div>
+
+            <div className="relative w-full max-w-sm lg:max-w-md xl:max-w-lg">
+                {/* Header / branding */}
                 <div className="text-center mb-10">
-                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 mb-5">
-                        <svg
-                            viewBox="0 0 24 24"
-                            className="w-8 h-8 text-white"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            aria-hidden="true"
+                    {/* Logo card */}
+                    <div className="relative inline-flex items-center justify-center mb-6">
+                        <div
+                            className="w-20 h-20 rounded-2xl flex items-center justify-center font-black text-4xl"
+                            style={{
+                                background:
+                                    "linear-gradient(135deg, #f5c516, #c49010)",
+                                color: "#0d0a05",
+                                boxShadow:
+                                    "0 0 48px rgba(245,197,22,0.28), 0 6px 24px rgba(0,0,0,0.55)",
+                            }}
                         >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"
-                            />
-                        </svg>
+                            W
+                        </div>
+                        {/* Corner suit pips */}
+                        <span
+                            className="absolute -top-2 -left-1.5 text-sm font-black"
+                            style={{ color: "#f5c516", opacity: 0.7 }}
+                        >
+                            ♠
+                        </span>
+                        <span
+                            className="absolute -top-2 -right-1.5 text-sm font-black"
+                            style={{ color: "#e04040", opacity: 0.7 }}
+                        >
+                            ♥
+                        </span>
+                        <span
+                            className="absolute -bottom-2 -right-1.5 text-sm font-black"
+                            style={{ color: "#e04040", opacity: 0.7 }}
+                        >
+                            ♦
+                        </span>
+                        <span
+                            className="absolute -bottom-2 -left-1.5 text-sm font-black"
+                            style={{ color: "#f5c516", opacity: 0.7 }}
+                        >
+                            ♣
+                        </span>
                     </div>
-                    <h1 className="text-2xl xl:text-3xl font-bold text-white">
-                        {tAuth("login.title")}
+
+                    <h1
+                        className="text-4xl xl:text-5xl font-black tracking-tight"
+                        style={{ color: "#faf2e2" }}
+                    >
+                        Wildcard
                     </h1>
-                    <p className="text-gray-400 mt-2 text-sm">
-                        {tAuth("login.subtitle")}
+                    <p
+                        className="mt-2 text-sm font-semibold"
+                        style={{ color: "#9a8870" }}
+                    >
+                        {tHome("subtitle")}
                     </p>
                 </div>
 
+                {/* Divider */}
+                <div className="flex items-center gap-3 mb-6">
+                    <div
+                        className="h-px flex-1"
+                        style={{ background: "#3d2d18" }}
+                    />
+                    <span
+                        className="text-xs font-bold uppercase tracking-widest"
+                        style={{ color: "#7a6a50" }}
+                    >
+                        {tAuth("login.title")}
+                    </span>
+                    <div
+                        className="h-px flex-1"
+                        style={{ background: "#3d2d18" }}
+                    />
+                </div>
+
+                {/* OAuth buttons */}
                 <div className="space-y-3">
                     <OAuthButton
                         provider="google"
@@ -56,8 +169,12 @@ export async function LoginPage({ lang }: { lang: string }) {
                     />
                 </div>
 
-                <p className="mt-8 text-center text-xs text-gray-500">
-                    {tHome("title")} &mdash; {tHome("subtitle")}
+                {/* Footer */}
+                <p
+                    className="mt-10 text-center text-xs font-semibold"
+                    style={{ color: "#7a6a50" }}
+                >
+                    ♠ {tHome("title")} ♠
                 </p>
             </div>
         </div>

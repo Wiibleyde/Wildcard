@@ -28,7 +28,7 @@ function CheckIcon() {
         >
             <path
                 d="M2 6l3 3 5-5"
-                stroke="#15110a"
+                stroke="#0d0a05"
                 strokeWidth="1.8"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -47,29 +47,28 @@ type Props = {
 export function TileShell({ selected, onClick, previewHref, children }: Props) {
     return (
         <div
-            className="relative rounded-xl border transition-all overflow-hidden"
+            className="relative rounded-xl overflow-hidden transition-all"
             style={{
-                background: selected
-                    ? "rgba(232,196,104,0.08)"
-                    : "rgba(255,255,255,0.04)",
-                borderColor: selected
-                    ? "rgba(232,196,104,0.60)"
-                    : "rgba(255,255,255,0.08)",
+                background: selected ? "rgba(245,197,22,0.07)" : "#1c1510",
+                border: `2px solid ${selected ? "rgba(245,197,22,0.55)" : "#3d2d18"}`,
                 boxShadow: selected
-                    ? "0 0 0 1px rgba(232,196,104,0.30)"
-                    : undefined,
+                    ? "0 0 16px rgba(245,197,22,0.15), 0 4px 0 0 rgba(245,197,22,0.2)"
+                    : "0 3px 0 0 rgba(0,0,0,0.4)",
             }}
         >
             <button
                 type="button"
                 onClick={onClick}
-                className="w-full flex flex-col items-center gap-2 p-3 pb-6 cursor-pointer"
+                className="w-full flex flex-col items-center gap-2 p-3 pb-7 cursor-pointer"
             >
                 {children}
                 {selected && (
                     <div
-                        className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center"
-                        style={{ background: "#e8c468" }}
+                        className="absolute top-1.5 right-1.5 w-4.5 h-4.5 rounded-full flex items-center justify-center"
+                        style={{
+                            background: "#f5c516",
+                            boxShadow: "0 0 8px rgba(245,197,22,0.4)",
+                        }}
                     >
                         <CheckIcon />
                     </div>
@@ -77,10 +76,15 @@ export function TileShell({ selected, onClick, previewHref, children }: Props) {
             </button>
             <Link
                 href={previewHref}
-                className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-1 py-1 text-[10px] font-semibold transition-colors"
-                style={{ background: "rgba(0,0,0,0.35)", color: "#7c8699" }}
+                className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors"
+                style={{
+                    background: "rgba(0,0,0,0.4)",
+                    color: "#7a6a50",
+                    borderTop: "1px solid #3d2d18",
+                }}
             >
                 <EyeIcon />
+                <span>Aperçu</span>
             </Link>
         </div>
     );

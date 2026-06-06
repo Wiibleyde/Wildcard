@@ -43,81 +43,130 @@ export async function ProfilePage({ lang }: { lang: string }) {
         : null;
 
     return (
-        <div className="min-h-screen bg-wc-surface px-4 xl:px-10 pt-6 md:pt-10 pb-10">
-            <div className="max-w-lg lg:max-w-4xl xl:max-w-6xl mx-auto flex flex-col gap-4">
-                <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
-                    <div className="flex flex-col gap-4">
-                        <div
-                            className="rounded-wc-card p-6 border"
-                            style={{
-                                background:
-                                    "linear-gradient(160deg, #1d1a0e, #0c1118 72%)",
-                                borderColor: "rgba(232,196,104,0.22)",
-                            }}
-                        >
-                            <div className="flex items-center justify-between mb-5">
-                                <span className="text-(length:--font-size-wc-label) font-bold text-wc-sub uppercase tracking-(--letter-spacing-wc-cap)">
-                                    {t("title")}
-                                </span>
-                                <SignOutButton />
-                            </div>
+        <div
+            className="min-h-screen px-4 xl:px-10 pt-6 md:pt-10 pb-16"
+            style={{ background: "#0d0a05" }}
+        >
+            <div className="max-w-lg lg:max-w-4xl xl:max-w-6xl mx-auto flex flex-col gap-5">
+                {/* ── Player card header ────────────────────────────────────── */}
+                <div
+                    className="relative rounded-2xl overflow-hidden"
+                    style={{
+                        background:
+                            "linear-gradient(150deg, #231808 0%, #0d0a05 65%)",
+                        border: "2px solid rgba(245,197,22,0.2)",
+                        boxShadow: "0 8px 40px rgba(0,0,0,0.4)",
+                    }}
+                >
+                    {/* Decorative suit */}
+                    <span
+                        className="absolute font-black select-none pointer-events-none leading-none"
+                        style={{
+                            fontSize: "18rem",
+                            opacity: 0.03,
+                            color: "#f5c516",
+                            top: "-3rem",
+                            right: "-2rem",
+                            transform: "rotate(8deg)",
+                        }}
+                        aria-hidden="true"
+                    >
+                        ♠
+                    </span>
 
-                            <div className="flex items-center gap-4">
-                                {profile && (
-                                    <AvatarHero
-                                        profile={profile}
-                                        avatarUrl={avatarUrl}
-                                    />
-                                )}
-                                <div className="flex-1 min-w-0">
-                                    <h1 className="text-2xl font-extrabold text-wc-text truncate leading-tight tracking-tight">
-                                        {profile?.username ?? "—"}
-                                    </h1>
-                                    <div className="flex items-center gap-2 mt-1.5">
-                                        <span
-                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider"
-                                            style={{
-                                                background:
-                                                    "rgba(232,196,104,0.16)",
-                                                color: "#e8c468",
-                                                border: "1px solid rgba(232,196,104,0.35)",
-                                            }}
-                                        >
-                                            {t("level_short")} {level}
-                                        </span>
-                                        <span className="text-wc-sub text-xs font-medium">
-                                            {t("member_since")} {memberSince}
-                                        </span>
-                                    </div>
+                    <div className="relative z-10 p-6 xl:p-8">
+                        <div className="flex items-start justify-between mb-6">
+                            <span
+                                className="text-xs font-bold uppercase tracking-widest"
+                                style={{ color: "#7a6a50" }}
+                            >
+                                {t("title")}
+                            </span>
+                            <SignOutButton />
+                        </div>
+
+                        <div className="flex items-center gap-5 xl:gap-6">
+                            {profile && (
+                                <AvatarHero
+                                    profile={profile}
+                                    avatarUrl={avatarUrl}
+                                />
+                            )}
+                            <div className="flex-1 min-w-0">
+                                <h1
+                                    className="text-3xl xl:text-4xl font-black truncate leading-tight tracking-tight"
+                                    style={{ color: "#faf2e2" }}
+                                >
+                                    {profile?.username ?? "—"}
+                                </h1>
+                                <div className="flex flex-wrap items-center gap-2 mt-2">
+                                    <span
+                                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-black uppercase tracking-wider"
+                                        style={{
+                                            background: "rgba(245,197,22,0.12)",
+                                            color: "#f5c516",
+                                            border: "2px solid rgba(245,197,22,0.3)",
+                                        }}
+                                    >
+                                        ♟ {t("level_short")} {level}
+                                    </span>
+                                    <span
+                                        className="text-xs font-semibold"
+                                        style={{ color: "#7a6a50" }}
+                                    >
+                                        {t("member_since")} {memberSince}
+                                    </span>
                                 </div>
                             </div>
                         </div>
 
-                        <ProfileXPCard xp={xp} />
+                        {/* Quick XP inline */}
+                        <div className="mt-5">
+                            <ProfileXPCard xp={xp} />
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── Settings columns ──────────────────────────────────────── */}
+                <div className="lg:grid lg:grid-cols-2 lg:gap-5 flex flex-col gap-5 lg:flex-none">
+                    {/* Edit profile */}
+                    <div
+                        className="rounded-xl p-6 border"
+                        style={{
+                            background: "#1c1510",
+                            borderColor: "#3d2d18",
+                        }}
+                    >
+                        <h2
+                            className="text-xs font-bold uppercase tracking-widest mb-5"
+                            style={{ color: "#7a6a50" }}
+                        >
+                            {t("edit_title")}
+                        </h2>
+                        {profile && (
+                            <ProfileForm
+                                userId={user.id}
+                                initialUsername={profile.username}
+                                initialAvatarPath={profile.avatar_url ?? null}
+                            />
+                        )}
                     </div>
 
-                    <div className="flex flex-col gap-4">
-                        <div className="bg-wc-panel rounded-wc-panel p-6 border border-wc-border">
-                            <h2 className="text-sm font-bold text-wc-muted mb-5 uppercase tracking-(--letter-spacing-wc-cap)">
-                                {t("edit_title")}
-                            </h2>
-                            {profile && (
-                                <ProfileForm
-                                    userId={user.id}
-                                    initialUsername={profile.username}
-                                    initialAvatarPath={
-                                        profile.avatar_url ?? null
-                                    }
-                                />
-                            )}
-                        </div>
-
-                        <div className="bg-wc-panel rounded-wc-panel p-6 border border-wc-border">
-                            <h2 className="text-sm font-bold text-wc-muted mb-5 uppercase tracking-(--letter-spacing-wc-cap)">
-                                {t("linked_accounts")}
-                            </h2>
-                            <LinkedAccounts linkedProviders={linkedProviders} />
-                        </div>
+                    {/* Linked accounts */}
+                    <div
+                        className="rounded-xl p-6 border"
+                        style={{
+                            background: "#1c1510",
+                            borderColor: "#3d2d18",
+                        }}
+                    >
+                        <h2
+                            className="text-xs font-bold uppercase tracking-widest mb-5"
+                            style={{ color: "#7a6a50" }}
+                        >
+                            {t("linked_accounts")}
+                        </h2>
+                        <LinkedAccounts linkedProviders={linkedProviders} />
                     </div>
                 </div>
             </div>

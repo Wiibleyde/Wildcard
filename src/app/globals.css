@@ -3,27 +3,69 @@
 /* ── Wildcard design tokens ───────────────────────────────────────────────── */
 
 @theme {
-    --color-wc-surface: #070b10;
-    --color-wc-panel: #10151f;
-    --color-wc-border: #1c2230;
-    --color-wc-text: #f3f6fc;
-    --color-wc-heading: #eef2f8;
-    --color-wc-muted: #8b95a7;
-    --color-wc-sub: #7c8699;
-    --color-wc-gold: #6c68e8;
-    --color-wc-gold-dim: oklch(from #e8c468 l c h / 0.2);
+    --color-wc-surface: #0d0a05;
+    --color-wc-panel: #1c1510;
+    --color-wc-border: #3d2d18;
+    --color-wc-text: #f0e8d4;
+    --color-wc-heading: #faf2e2;
+    --color-wc-muted: #9a8870;
+    --color-wc-sub: #7a6a50;
+    --color-wc-gold: #f5c516;
+    --color-wc-gold-dim: oklch(from #f5c516 l c h / 0.12);
     --color-wc-xp: #a78bfa;
     --color-wc-xp-dim: oklch(from #a78bfa l c h / 0.18);
-    --color-wc-green: #34d399;
+    --color-wc-red: #e04040;
+    --color-wc-green: #48c97a;
     --color-wc-indigo: #6366f1;
 
     --font-size-wc-label: 0.6875rem;
-    --letter-spacing-wc-cap: 0.06em;
+    --letter-spacing-wc-cap: 0.07em;
 
-    --radius-wc-panel: 18px;
-    --radius-wc-card: 22px;
+    --radius-wc-panel: 16px;
+    --radius-wc-card: 20px;
     --radius-wc-btn: 12px;
-    --radius-wc-icon: 14px;
+    --radius-wc-icon: 12px;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+
+@layer base {
+    body {
+        font-family: var(--font-nunito), system-ui, sans-serif;
+    }
+}
+
+/* ── Game button 3D press effect ─────────────────────────────────────────── */
+
+.btn-game {
+    --btn-depth: 4px;
+    --btn-shadow: #000;
+    box-shadow: 0 var(--btn-depth) 0 0 var(--btn-shadow);
+    transition: transform 80ms ease, box-shadow 80ms ease;
+    cursor: pointer;
+    user-select: none;
+}
+.btn-game:active:not(:disabled):not([aria-disabled="true"]) {
+    transform: translateY(var(--btn-depth));
+    box-shadow: 0 0 0 0 var(--btn-shadow);
+}
+.btn-game:disabled,
+.btn-game[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ── Grain overlay (Balatro-style texture) ───────────────────────────────── */
+
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+    opacity: 0.028;
+    pointer-events: none;
+    z-index: 9999;
+    mix-blend-mode: overlay;
 }
 
 /* ── Card visual effects ──────────────────────────────────────────────────── */

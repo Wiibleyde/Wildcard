@@ -66,59 +66,75 @@ export function ProfileXPCard({ xp }: Props) {
     );
 
     return (
-        <div
-            ref={containerRef}
-            className="bg-wc-panel border border-wc-border rounded-wc-panel p-5"
-        >
-            <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-wc-icon flex items-center justify-center bg-wc-xp-dim shrink-0">
-                    <svg
-                        viewBox="0 0 24 24"
-                        className="w-5 h-5 text-wc-xp"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
+        <div ref={containerRef}>
+            <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                    <span
+                        className="text-xs font-black uppercase tracking-widest"
+                        style={{ color: "#7a6a50" }}
                     >
-                        <path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8 6.8 19.2l1-5.8L3.5 9.2l5.9-.9z" />
-                    </svg>
-                </div>
-                <div className="flex-1 min-w-0">
-                    <p className="text-(length:--font-size-wc-label) font-bold text-wc-sub uppercase tracking-(--letter-spacing-wc-cap)">
                         {t("xp_title")}
-                    </p>
-                    <p className="text-wc-heading font-extrabold leading-none mt-0.5">
-                        {t("level_short")}{" "}
-                        <span className="text-wc-xp">{level}</span>
-                    </p>
+                    </span>
+                    <span
+                        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-black"
+                        style={{
+                            background: "rgba(167,139,250,0.15)",
+                            color: "#a78bfa",
+                            border: "1px solid rgba(167,139,250,0.3)",
+                        }}
+                    >
+                        {t("level_short")} {level}
+                    </span>
                 </div>
-                <div className="text-right shrink-0">
+                <div className="text-right">
                     <span
                         ref={xpNumRef}
-                        className="text-2xl font-extrabold text-wc-text tabular-nums"
+                        className="text-xl font-black tabular-nums"
+                        style={{ color: "#faf2e2" }}
                     >
                         {xp}
                     </span>
-                    <span className="text-wc-sub text-sm font-semibold ml-1">
+                    <span
+                        className="text-xs font-bold ml-1"
+                        style={{ color: "#7a6a50" }}
+                    >
                         XP
                     </span>
                 </div>
             </div>
 
-            <div className="h-2 rounded-full bg-white/[0.07] overflow-hidden">
+            {/* XP bar — game health bar style */}
+            <div
+                className="relative h-3 rounded-full overflow-hidden"
+                style={{
+                    background: "rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                }}
+            >
                 <div
                     ref={barRef}
-                    className="h-full rounded-full"
+                    className="h-full rounded-full relative overflow-hidden"
                     style={{
-                        background: "linear-gradient(90deg, #a78bfa, #c4b5fd)",
+                        background:
+                            "linear-gradient(90deg, #7c5ce8, #a78bfa, #c4b5fd)",
                         width: "0%",
                     }}
-                />
+                >
+                    {/* Shine line on top of bar */}
+                    <div
+                        className="absolute inset-x-0 top-0 h-1/2 rounded-full"
+                        style={{
+                            background:
+                                "linear-gradient(180deg, rgba(255,255,255,0.3) 0%, transparent 100%)",
+                        }}
+                    />
+                </div>
             </div>
 
-            <p className="text-wc-sub text-xs font-semibold mt-2 text-right">
+            <p
+                className="text-xs font-semibold mt-1.5 text-right"
+                style={{ color: "#7a6a50" }}
+            >
                 {xpToNext.toLocaleString()} {t("xp_to_next")}
             </p>
         </div>

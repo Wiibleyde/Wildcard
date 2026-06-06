@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { useRef, useState } from "react";
+import { GameButton } from "@/components/ui/GameButton";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import type { ProfilePatch, ProfilePatchErrorCode } from "@/lib/models/profile";
 import { createClient } from "@/lib/supabase/client";
@@ -125,37 +126,46 @@ export function ProfileForm({
 
     return (
         <form onSubmit={handleSave} className="space-y-5">
+            {/* Avatar upload row */}
             <div className="flex items-center gap-4">
                 <div className="relative group shrink-0">
-                    <div className="relative w-16 h-16 rounded-full overflow-hidden">
-                        {avatarDisplayUrl ? (
-                            <Image
-                                src={avatarDisplayUrl}
-                                alt="Avatar"
-                                fill
-                                sizes="64px"
-                                className="object-cover"
-                                loading="eager"
-                            />
-                        ) : (
-                            <div
-                                className="w-full h-full flex items-center justify-center text-xl font-black"
-                                style={{
-                                    background:
-                                        "linear-gradient(135deg, #e8c468, #c49b32)",
-                                    color: "#15110a",
-                                }}
-                            >
-                                {username?.[0]?.toUpperCase() ?? "?"}
-                            </div>
-                        )}
+                    <div
+                        className="relative w-16 h-16 rounded-full p-[2px]"
+                        style={{
+                            background:
+                                "linear-gradient(135deg, #f5c516, #e04040)",
+                        }}
+                    >
+                        <div className="relative w-full h-full rounded-full overflow-hidden">
+                            {avatarDisplayUrl ? (
+                                <Image
+                                    src={avatarDisplayUrl}
+                                    alt="Avatar"
+                                    fill
+                                    sizes="64px"
+                                    className="object-cover"
+                                    loading="eager"
+                                />
+                            ) : (
+                                <div
+                                    className="w-full h-full flex items-center justify-center text-xl font-black"
+                                    style={{
+                                        background:
+                                            "linear-gradient(135deg, #f5c516, #c49010)",
+                                        color: "#0d0a05",
+                                    }}
+                                >
+                                    {username?.[0]?.toUpperCase() ?? "?"}
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <button
                         type="button"
                         onClick={openFilePicker}
                         disabled={avatarBusy}
-                        className="absolute inset-0 rounded-full bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
+                        className="absolute inset-0 rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
                     >
                         {avatarBusy ? (
                             <span className="text-[10px] text-white font-semibold text-center px-1 leading-tight">
@@ -164,9 +174,9 @@ export function ProfileForm({
                         ) : avatarStatus === "saved" ? (
                             <svg
                                 viewBox="0 0 24 24"
-                                className="w-5 h-5 text-green-400"
+                                className="w-5 h-5"
                                 fill="none"
-                                stroke="currentColor"
+                                stroke="#48c97a"
                                 strokeWidth="2.5"
                                 aria-hidden="true"
                             >
@@ -196,9 +206,17 @@ export function ProfileForm({
                 </div>
 
                 <div className="flex flex-col gap-1">
-                    <p className="text-xs text-wc-sub">{t("avatar_upload")}</p>
+                    <p
+                        className="text-xs font-semibold"
+                        style={{ color: "#7a6a50" }}
+                    >
+                        {t("avatar_upload")}
+                    </p>
                     {avatarStatus === "error" && avatarError && (
-                        <p className="text-red-400 text-xs font-medium">
+                        <p
+                            className="text-xs font-medium"
+                            style={{ color: "#e04040" }}
+                        >
                             {avatarError}
                         </p>
                     )}
@@ -213,10 +231,12 @@ export function ProfileForm({
                 onChange={handleAvatarChange}
             />
 
+            {/* Username field */}
             <div>
                 <label
                     htmlFor="username"
-                    className="block text-xs font-semibold text-wc-muted mb-2 uppercase tracking-wider"
+                    className="block text-xs font-bold mb-2 uppercase tracking-widest"
+                    style={{ color: "#7a6a50" }}
                 >
                     {t("username_label")}
                 </label>
@@ -230,34 +250,42 @@ export function ProfileForm({
                     }}
                     placeholder={t("username_placeholder")}
                     maxLength={30}
-                    className="w-full bg-white/5 border border-wc-border rounded-(--radius-wc-btn) px-4 py-3 text-wc-text placeholder:text-wc-sub focus:outline-none focus:ring-2 focus:ring-wc-indigo/60 focus:border-transparent text-sm transition-colors"
+                    className="w-full rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none transition-all"
+                    style={{
+                        background: "rgba(255,255,255,0.04)",
+                        border: "2px solid #3d2d18",
+                        color: "#faf2e2",
+                    }}
+                    onFocus={(e) => {
+                        e.currentTarget.style.borderColor =
+                            "rgba(245,197,22,0.5)";
+                    }}
+                    onBlur={(e) => {
+                        e.currentTarget.style.borderColor = "#3d2d18";
+                    }}
                 />
             </div>
 
             {formErrorMessage && (
-                <p className="text-red-400 text-xs font-medium">
+                <p className="text-xs font-bold" style={{ color: "#e04040" }}>
                     {formErrorMessage}
                 </p>
             )}
 
-            <button
+            {/* Save button — 3D game style */}
+            <GameButton
                 type="submit"
+                variant={formSaved ? "green" : "gold"}
+                size="md"
                 disabled={formSaving || avatarBusy}
-                className="w-full font-bold py-3 rounded-(--radius-wc-btn) text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                style={{
-                    background: formSaved ? "rgba(52,211,153,0.2)" : "#6366f1",
-                    color: formSaved ? "#34d399" : "#fff",
-                    border: formSaved
-                        ? "1px solid rgba(52,211,153,0.4)"
-                        : "none",
-                }}
+                className="w-full py-3.5"
             >
                 {formSaving
                     ? tCommon("saving")
                     : formSaved
-                      ? tCommon("saved")
+                      ? `✓ ${tCommon("saved")}`
                       : tCommon("save")}
-            </button>
+            </GameButton>
         </form>
     );
 }
