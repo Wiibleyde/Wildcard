@@ -42,15 +42,45 @@ technique fullstack et une architecture solide, présentable devant un jury.
 ## Architecture applicative
 
 ### Moteur de jeu — Plugin Pattern
-Chaque jeu est un module indépendant qui implémente une interface commune :
+Chaque jeu est un module indépendant implémentant un **contrat reducer
+générique**. Un seul `playCard` ne suffit pas : le Tarot a des phases
+(enchères → chien → pli), le Solitaire plusieurs verbes, la Bataille une
+résolution simultanée. On modélise donc chaque jeu comme un réducteur
+`apply(state, action)` typé sur ses propres `State`/`Action`/`View`.
+
 ```ts
-interface GameModule {
-  initialState(players: Player[]): GameState;
-  playCard(state: GameState, action: PlayerAction): GameState;
-  nextTurn(state: GameState): GameState;
-  isGameOver(state: GameState): boolean;
+// src/lib/engine/types.ts
+interface GameModule<S extends GameState, A extends GameAction, V = S> {
+  readonly id: string;
+  readonly deck: DeckDefinition;
+  readonly minPlayers: number;
+  readonly maxPlayers: number;
+
+  setup(players: Player[], rng: Rng): S;              // distribution (shuffle seedé)
+  legalActions(state: S, playerId: string): A[];      // hints UI + bots
+  apply(state: S, action: A, rng: Rng): ApplyResult<S>; // valide + réduit + avance
+  isOver(state: S): boolean;
+  outcome(state: S): GameOutcome | null;              // gagnants / scores → ELO
+  view(state: S, viewerId: string | null): V;         // projection RLS (redaction)
 }
 ```
+
+Quatre garanties transverses (toutes défendables devant un jury) :
+1. **Déterminisme** — RNG seedé (`Rng`, mulberry32) ; la graine vit dans le
+   `state`. Une partie = fonction pure de `(seed, log d'actions)` → replay
+   gratuit, tests reproductibles, anti-triche (le serveur re-dérive tout shuffle).
+2. **`view()` = RLS en code** — la main adverse devient un simple compteur.
+   Défense en profondeur par-dessus le RLS base de données.
+3. **ECA = un `GameModule` de plus** — natifs et jeux du studio passent par le
+   **même** runner.
+4. **`apply` renvoie `{ ok, state, events } | { ok: false, error }`** — le
+   serveur refuse les actions illégales au lieu de faire confiance au client.
+
+Le **runner** (`src/lib/engine/runner.ts`) orchestre : `createGame` (graine
+aléatoire) et `dispatch` (vérifie l'identité de l'acteur, refuse si partie
+finie, seede le RNG depuis le `state`). La propriété du tour/phase reste dans
+`apply` car « à qui le tour » varie selon le jeu (simultané, séquentiel, solo).
+
 Ordre d'implémentation des jeux :
 1. **Bataille** — socle de l'architecture
 2. **Président / Trou du cul**
