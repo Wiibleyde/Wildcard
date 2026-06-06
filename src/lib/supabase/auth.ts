@@ -3,7 +3,7 @@
 import type { Provider } from "@supabase/supabase-js";
 import { createClient } from "./client";
 
-export type OAuthProvider = Extract<Provider, "google" | "discord" | "apple">;
+export type OAuthProvider = Extract<Provider, "google" | "discord">;
 
 export async function signInWithOAuth(
     provider: OAuthProvider,

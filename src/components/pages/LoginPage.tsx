@@ -125,7 +125,7 @@ export async function LoginPage({ lang }: { lang: string }) {
                         className="text-4xl xl:text-5xl font-black tracking-tight"
                         style={{ color: "#faf2e2" }}
                     >
-                        Wildcard
+                        {tHome("title")}
                     </h1>
                     <p
                         className="mt-2 text-sm font-semibold"
@@ -162,10 +162,6 @@ export async function LoginPage({ lang }: { lang: string }) {
                     <OAuthButton
                         provider="discord"
                         labelOverride={tAuth("login.with_discord")}
-                    />
-                    <OAuthButton
-                        provider="apple"
-                        labelOverride={tAuth("login.with_apple")}
                     />
                 </div>
 
