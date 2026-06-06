@@ -1,6 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Link } from "@/i18n/navigation";
 import { GameButton } from "@/components/ui/GameButton";
+import { Link } from "@/i18n/navigation";
 
 type GameEntry = {
     name: string;
