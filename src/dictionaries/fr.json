@@ -125,7 +125,9 @@
         "waiting_host": "En attente du lancement par l'hôte",
         "need_more_players": "Il faut au moins {min} joueurs",
         "error_not_host": "Seul l'hôte peut lancer",
-        "error_not_enough": "Pas assez de joueurs pour lancer"
+        "error_not_enough": "Pas assez de joueurs pour lancer",
+        "error_already_started": "Cette partie a déjà commencé",
+        "error_generic": "Une erreur est survenue"
     },
     "game": {
         "your_turn": "À toi de jouer",
@@ -151,6 +153,7 @@
         "passed": "a passé",
         "leave": "Quitter la partie",
         "error_conflict": "La partie a avancé — actualisation",
-        "error_illegal": "Coup illégal"
+        "error_illegal": "Coup illégal",
+        "error_generic": "Une erreur est survenue"
     }
 }

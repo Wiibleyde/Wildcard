@@ -31,8 +31,11 @@ export const batailleTable = registerTable<BatailleView>({
         const zones: TableZoneInstance[] = view.players.map((p) => ({
             key: `reveal:${p.playerId}`,
             zone: "reveal",
+            // Ids are scoped by turn: piles recycle (won cards reshuffle into
+            // the draw), so the same physical card reappears in later rounds
+            // and must get a fresh identity to animate again.
             cards: p.lastReveal.map((card) => ({
-                id: `reveal:${p.playerId}:${cardKey(card)}`,
+                id: `reveal:${p.playerId}:${view.turn}:${cardKey(card)}`,
                 card,
                 ownerId: p.playerId,
             })),

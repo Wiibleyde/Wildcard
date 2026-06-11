@@ -125,7 +125,9 @@
         "waiting_host": "Waiting for the host to start",
         "need_more_players": "Need at least {min} players",
         "error_not_host": "Only the host can start",
-        "error_not_enough": "Not enough players to start"
+        "error_not_enough": "Not enough players to start",
+        "error_already_started": "This game has already started",
+        "error_generic": "Something went wrong"
     },
     "game": {
         "your_turn": "Your turn",
@@ -151,6 +153,7 @@
         "passed": "passed",
         "leave": "Leave game",
         "error_conflict": "The game advanced — refreshing",
-        "error_illegal": "Illegal move"
+        "error_illegal": "Illegal move",
+        "error_generic": "Something went wrong"
     }
 }

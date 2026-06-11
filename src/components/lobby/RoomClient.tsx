@@ -51,6 +51,15 @@ export function RoomClient({
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const joinedRef = useRef(seated);
+    // Once the user left (or the component unmounted), late refreshes must
+    // neither update state nor yank them back into the game page.
+    const closedRef = useRef(false);
+    useEffect(() => {
+        closedRef.current = false;
+        return () => {
+            closedRef.current = true;
+        };
+    }, []);
 
     const refresh = useCallback(async () => {
         const supabase = createClient();
@@ -66,6 +75,7 @@ export function RoomClient({
                 .eq("room_id", roomId)
                 .order("seat", { ascending: true }),
         ]);
+        if (closedRef.current) return;
 
         if (room?.status === "playing" && room.current_game_id) {
             router.push(`/game/${room.current_game_id}`);
@@ -83,6 +93,7 @@ export function RoomClient({
                 rows.map((r) => r.user_id),
             );
         const nameOf = new Map((profiles ?? []).map((p) => [p.id, p.username]));
+        if (closedRef.current) return;
         setSeats(
             rows.map((r) => ({
                 userId: r.user_id,
@@ -120,18 +131,21 @@ export function RoomClient({
         });
     }
 
+    function startErrorLabel(errorCode: unknown): string {
+        if (errorCode === "not_host") return t("error_not_host");
+        if (errorCode === "not_enough_players") return t("error_not_enough");
+        if (errorCode === "already_started") return t("error_already_started");
+        return t("error_generic");
+    }
+
     async function start() {
         setBusy(true);
         setError(null);
         const res = await fetch(`/api/rooms/${code}/start`, { method: "POST" });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
             setBusy(false);
-            setError(
-                data.error === "not_host"
-                    ? t("error_not_host")
-                    : t("error_not_enough"),
-            );
+            setError(startErrorLabel(data.error));
             return;
         }
         router.push(`/game/${data.gameId}`);
@@ -139,15 +153,29 @@ export function RoomClient({
 
     async function leave() {
         setBusy(true);
-        await fetch(`/api/rooms/${code}/leave`, { method: "POST" });
+        setError(null);
+        const res = await fetch(`/api/rooms/${code}/leave`, {
+            method: "POST",
+        });
+        if (!res.ok) {
+            // Stay in the room rather than ghosting a seat on the server.
+            setBusy(false);
+            setError(t("error_generic"));
+            return;
+        }
+        closedRef.current = true;
         router.push("/lobby");
     }
 
-    function copyCode() {
-        navigator.clipboard.writeText(code).then(() => {
+    async function copyCode() {
+        try {
+            await navigator.clipboard.writeText(code);
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
-        });
+        } catch {
+            // Clipboard unavailable (insecure context, denied permission) —
+            // keep the "copy" label; the code stays selectable by hand.
+        }
     }
 
     const slots: Slot[] = Array.from({ length: maxPlayers }, (_, i) => {

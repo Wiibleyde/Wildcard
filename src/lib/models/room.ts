@@ -108,30 +108,34 @@ export async function joinRoom(
     const module = getGameModule(room.module_id);
     if (!module) return { ok: false, error: "unknown_game" };
 
-    const { data: seats } = await admin
-        .from("room_players")
-        .select("user_id, seat")
-        .eq("room_id", room.id);
-    const rows = seats ?? [];
+    // Retry loop: losing a seat race (unique violation) re-reads the seats and
+    // tries the next free one instead of reporting a full room by mistake.
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const { data: seats } = await admin
+            .from("room_players")
+            .select("user_id, seat")
+            .eq("room_id", room.id);
+        const rows = seats ?? [];
 
-    if (rows.some((s) => s.user_id === userId)) {
-        return { ok: true, roomId: room.id }; // already seated
-    }
-    if (rows.length >= module.maxPlayers) {
-        return { ok: false, error: "room_full" };
+        if (rows.some((s) => s.user_id === userId)) {
+            return { ok: true, roomId: room.id }; // already seated
+        }
+        if (rows.length >= module.maxPlayers) {
+            return { ok: false, error: "room_full" };
+        }
+
+        const seat = nextFreeSeat(rows.map((s) => s.seat));
+        const { error } = await admin
+            .from("room_players")
+            .insert({ room_id: room.id, user_id: userId, seat });
+        if (!error) return { ok: true, roomId: room.id };
+        if (error.code !== "23505") {
+            return { ok: false, error: "db_error", message: error.message };
+        }
+        // 23505 — someone claimed the seat (or we double-joined) → re-read.
     }
 
-    const seat = nextFreeSeat(rows.map((s) => s.seat));
-    const { error } = await admin
-        .from("room_players")
-        .insert({ room_id: room.id, user_id: userId, seat });
-    if (error) {
-        // Lost a seat race — caller can retry the join.
-        if (error.code === "23505") return { ok: false, error: "room_full" };
-        return { ok: false, error: "db_error", message: error.message };
-    }
-
-    return { ok: true, roomId: room.id };
+    return { ok: false, error: "room_full" };
 }
 
 /** Remove `userId` from the lobby; reassign host or delete the room if empty. */
@@ -144,7 +148,7 @@ export async function leaveRoom(
 > {
     const { data: room } = await admin
         .from("rooms")
-        .select("id, host_id")
+        .select("id, host_id, status")
         .eq("code", code.toUpperCase())
         .maybeSingle();
     if (!room) return { ok: false, error: "not_found" };
@@ -162,7 +166,12 @@ export async function leaveRoom(
         .order("seat", { ascending: true });
 
     if (!remaining || remaining.length === 0) {
-        await admin.from("rooms").delete().eq("id", room.id);
+        // Only reap empty LOBBIES. Played rooms stay: deleting them would
+        // cascade into games/game_actions and erase the match history that
+        // ELO and replays are built on.
+        if (room.status === "lobby") {
+            await admin.from("rooms").delete().eq("id", room.id);
+        }
         return { ok: true };
     }
 
@@ -244,6 +253,34 @@ export async function startGame(
     const module = getGameModule(room.module_id);
     if (!module) return { ok: false, error: "unknown_game" };
 
+    // Claim the room with a compare-and-set (lobby → playing). A concurrent
+    // start (double-click, two tabs) loses the claim instead of dealing a
+    // second game; it also freezes the seat list, since joins require
+    // status = 'lobby'.
+    const { data: claimed, error: claimError } = await admin
+        .from("rooms")
+        .update({ status: "playing" })
+        .eq("id", room.id)
+        .eq("status", "lobby")
+        .select("id")
+        .maybeSingle();
+    if (claimError) {
+        return { ok: false, error: "db_error", message: claimError.message };
+    }
+    if (!claimed) return { ok: false, error: "already_started" };
+
+    /** Any failure past the claim re-opens the lobby before reporting. */
+    const abort = async (
+        error: RoomErrorCode,
+        message?: string,
+    ): Promise<Result<{ gameId: string }>> => {
+        await admin
+            .from("rooms")
+            .update({ status: "lobby", current_game_id: null })
+            .eq("id", room.id);
+        return { ok: false, error, message };
+    };
+
     const { data: seats } = await admin
         .from("room_players")
         .select("user_id, seat")
@@ -266,31 +303,42 @@ export async function startGame(
         seat: s.seat,
     }));
 
-    // Materialise bots as synthetic uuid players seated after the humans.
+    // Materialise bots as synthetic uuid players. Seats come from
+    // nextFreeSeat — human seat numbers can have gaps after leavers, so
+    // "humans.length + i" could collide with a real seat. Bots only fill up
+    // to the game's max: a lobby that filled up after the host set the bot
+    // count simply uses fewer computers.
+    const takenSeats = rows.map((s) => s.seat);
+    const botCount = Math.max(
+        0,
+        Math.min(room.bot_count, module.maxPlayers - humans.length),
+    );
     const botIds: string[] = [];
-    const bots: Player[] = Array.from({ length: room.bot_count }, (_, i) => {
+    const bots: Player[] = [];
+    for (let i = 0; i < botCount; i++) {
         const id = crypto.randomUUID();
+        const seat = nextFreeSeat(takenSeats);
+        takenSeats.push(seat);
         botIds.push(id);
-        return { id, name: `Ordinateur ${i + 1}`, seat: humans.length + i };
-    });
+        bots.push({ id, name: `Ordinateur ${i + 1}`, seat });
+    }
 
     const players = [...humans, ...bots];
     if (
         players.length < module.minPlayers ||
         players.length > module.maxPlayers
     ) {
-        return { ok: false, error: "not_enough_players" };
+        return abort("not_enough_players");
     }
 
     let state: ReturnType<typeof createGame>;
     try {
         state = createGame(module, players);
     } catch (err) {
-        return {
-            ok: false,
-            error: "not_enough_players",
-            message: err instanceof Error ? err.message : String(err),
-        };
+        return abort(
+            "not_enough_players",
+            err instanceof Error ? err.message : String(err),
+        );
     }
 
     const { data: game, error: gameError } = await admin
@@ -307,11 +355,7 @@ export async function startGame(
         .select("id")
         .single();
     if (gameError || !game) {
-        return {
-            ok: false,
-            error: "db_error",
-            message: gameError?.message,
-        };
+        return abort("db_error", gameError?.message);
     }
 
     const { error: stateError } = await admin.from("game_states").insert({
@@ -321,12 +365,12 @@ export async function startGame(
     if (stateError) {
         // Roll back the orphan meta row so the room stays startable.
         await admin.from("games").delete().eq("id", game.id);
-        return { ok: false, error: "db_error", message: stateError.message };
+        return abort("db_error", stateError.message);
     }
 
     await admin
         .from("rooms")
-        .update({ status: "playing", current_game_id: game.id })
+        .update({ current_game_id: game.id })
         .eq("id", room.id);
 
     // If a bot leads (e.g. holds the 3♣ in Président), let it play at once.
