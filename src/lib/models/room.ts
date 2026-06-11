@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { after } from "next/server";
 import { createGame } from "@/lib/engine/runner";
 import type { Player } from "@/lib/engine/types";
 import { getGameModule } from "@/lib/games";
@@ -373,8 +374,13 @@ export async function startGame(
         .update({ current_game_id: game.id })
         .eq("id", room.id);
 
-    // If a bot leads (e.g. holds the 3♣ in Président), let it play at once.
-    await advanceBots(admin, game.id, room.id, module, state, 0, botIds);
+    // If a bot leads (e.g. holds the 3♣ in Président), let it play — after the
+    // response, paced, so every client sees the opening moves animate.
+    if (botIds.length > 0) {
+        after(() =>
+            advanceBots(admin, game.id, room.id, module, state, 0, botIds),
+        );
+    }
 
     return { ok: true, gameId: game.id };
 }

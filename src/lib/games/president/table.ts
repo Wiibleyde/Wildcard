@@ -16,7 +16,8 @@ function nameOf(ctx: TableContext, playerId: string | null): string {
     return ctx.players.find((p) => p.userId === playerId)?.username ?? "?";
 }
 
-/** "Président" / "Trou du cul" / "Terminé (n)" — or `null` while playing. */
+/** "Président" / "Vice-Président" / "Vice-Trou" / "Trou du cul" / "Terminé
+ * (n)" — or `null` while playing. Vice titles need a 4th seat to exist. */
 function placeLabel(
     ctx: TableContext,
     view: PresidentView,
@@ -24,15 +25,19 @@ function placeLabel(
 ): string | null {
     if (p.demoted) return ctx.t("place_asshole");
     if (p.place === null) return null;
+    const n = view.players.length;
     if (p.place === 1) return ctx.t("place_president");
-    if (p.place === view.players.length) return ctx.t("place_asshole");
+    if (p.place === n) return ctx.t("place_asshole");
+    if (n >= 4 && p.place === 2) return ctx.t("place_vice_president");
+    if (n >= 4 && p.place === n - 1) return ctx.t("place_vice_asshole");
     return ctx.t("finished", { place: p.place });
 }
 
 /**
  * Président table — opponent seats on top, the framed trick zone in the
- * center (top combo skinned with its player's deck style), the viewer's fan
- * at the bottom, and legal combos + pass as controls.
+ * center (every play of the uncleared trick, each card skinned with its
+ * player's deck style), the viewer's fan at the bottom, and legal combos +
+ * pass as controls.
  */
 export const presidentTable = registerTable<PresidentView>({
     zones: [
@@ -77,17 +82,20 @@ export const presidentTable = registerTable<PresidentView>({
                 };
             });
 
+        // The whole uncleared trick stays on the table — every play visible,
+        // each card skinned with the deck style of the player who laid it.
         const topPlay = view.pile.at(-1);
         const zones: TableZoneInstance[] = [
             {
                 key: "trick",
                 zone: "trick",
-                cards:
-                    topPlay?.cards.map((card) => ({
+                cards: view.pile.flatMap((play) =>
+                    play.cards.map((card) => ({
                         id: `trick:${cardKey(card)}`,
                         card,
-                        ownerId: topPlay.playerId,
-                    })) ?? [],
+                        ownerId: play.playerId,
+                    })),
+                ),
                 caption: topPlay ? nameOf(ctx, topPlay.playerId) : undefined,
                 emptyHint: ctx.t("in_play"),
             },
@@ -134,6 +142,7 @@ export const presidentTable = registerTable<PresidentView>({
             seats,
             zones,
             controls,
+            status: view.revolution ? ctx.t("revolution") : undefined,
         };
     },
 });

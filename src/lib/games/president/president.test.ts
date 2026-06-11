@@ -38,6 +38,7 @@ function state3(
         hands,
         pile: [],
         combo: null,
+        revolution: false,
         passed: [],
         finished: [],
         demoted: [],
@@ -50,6 +51,8 @@ function state3(
 const CLASSIC = {
     twoClosesTrick: false,
     finishOnTwoPenalty: false,
+    equalRankSkip: false,
+    revolution: false,
 } as const;
 
 /** Route through the runner (supplies rng + identity check). */
@@ -93,10 +96,12 @@ describe("president setup", () => {
         expect(new Set(all).size).toBe(52);
     });
 
-    it("seats the holder of 3♣ as the first leader", () => {
+    it("seats the holder of the Queen of Hearts as the first leader", () => {
         const s = createGame(president, P4, 4321);
-        const clubsThree = cardKey(card("3", "clubs"));
-        expect(s.hands[s.currentPlayerId].map(cardKey)).toContain(clubsThree);
+        const queenOfHearts = cardKey(card("Q", "hearts"));
+        expect(s.hands[s.currentPlayerId].map(cardKey)).toContain(
+            queenOfHearts,
+        );
     });
 
     it("is deterministic for a fixed seed", () => {
@@ -113,7 +118,7 @@ describe("president setup", () => {
 });
 
 describe("president move legality", () => {
-    it("requires a strictly higher rank to beat the table", () => {
+    it("rejects a lower rank than the table", () => {
         const s = state3(
             { a: [card("5")], b: [card("6")], c: [card("4")] },
             {
@@ -123,6 +128,49 @@ describe("president move legality", () => {
             },
         );
         const res = step(s, play("c", [card("4")]));
+        expect(res.ok).toBe(false);
+        if (res.ok) return;
+        expect(res.error.code).toBe("too_low");
+    });
+
+    it("accepts an equal rank and skips the next player (« ou rien »)", () => {
+        const s = state3(
+            {
+                a: [card("10", "hearts"), card("4", "hearts")],
+                b: [card("10"), card("5")],
+                c: [card("J")],
+            },
+            {
+                combo: { rank: "10", count: 1 },
+                lastPlayerId: "a",
+                currentPlayerId: "b",
+            },
+        );
+        const res = step(s, play("b", [card("10")]));
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(res.state.combo).toEqual({ rank: "10", count: 1 });
+        expect(res.state.lastPlayerId).toBe("b");
+        // c is forced to pass; the turn jumps straight to a.
+        expect(res.state.passed).toContain("c");
+        expect(res.state.currentPlayerId).toBe("a");
+        expect(res.events).toContainEqual({
+            type: "skipped",
+            payload: { playerId: "c" },
+        });
+    });
+
+    it("rejects an equal rank when « ou rien » is disabled", () => {
+        const s = state3(
+            { a: [card("10", "hearts")], b: [card("10")], c: [card("J")] },
+            {
+                combo: { rank: "10", count: 1 },
+                lastPlayerId: "a",
+                currentPlayerId: "b",
+                rules: CLASSIC,
+            },
+        );
+        const res = step(s, play("b", [card("10")]));
         expect(res.ok).toBe(false);
         if (res.ok) return;
         expect(res.error.code).toBe("too_low");
@@ -263,6 +311,101 @@ describe("president french table rules", () => {
     });
 });
 
+describe("president revolution", () => {
+    const quad = (rank: Rank): CardDescriptor[] => [
+        card(rank, "spades"),
+        card(rank, "hearts"),
+        card(rank, "diamonds"),
+        card(rank, "clubs"),
+    ];
+
+    it("a quad inverts the ranking until the trick clears", () => {
+        let s = state3({
+            a: [...quad("9"), card("K")],
+            b: [card("5"), card("A")],
+            c: [card("J"), card("3")],
+        });
+        const res = step(s, play("a", quad("9")));
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(res.state.revolution).toBe(true);
+        expect(res.events).toContainEqual({
+            type: "revolution",
+            payload: { active: true },
+        });
+        s = res.state;
+
+        // The combo is a quad — b holds no quad, so only pass remains.
+        expect(summary(president.legalActions(s, "b"))).toEqual(["pass"]);
+
+        s = ok(s, pass("b"));
+        s = ok(s, pass("c")); // trick clears back to a
+        expect(s.revolution).toBe(false); // revolution ends with the sweep
+        expect(s.combo).toBeNull();
+    });
+
+    it("a counter-quad flips the ranking back", () => {
+        const s = state3(
+            {
+                a: [card("K")],
+                b: [...quad("5"), card("A")],
+                c: [card("J")],
+            },
+            {
+                combo: { rank: "9", count: 4 },
+                revolution: true,
+                lastPlayerId: "a",
+                currentPlayerId: "b",
+            },
+        );
+        // Quad of 5s beats the quad of 9s under revolution AND cancels it.
+        const res = step(s, play("b", quad("5")));
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(res.state.revolution).toBe(false);
+        expect(res.events).toContainEqual({
+            type: "revolution",
+            payload: { active: false },
+        });
+    });
+
+    it("inverts single-card beats while a revolution holds", () => {
+        const s = state3(
+            { a: [], b: [card("3"), card("K")], c: [] },
+            {
+                combo: { rank: "8", count: 1 },
+                revolution: true,
+                lastPlayerId: "a",
+                currentPlayerId: "b",
+            },
+        );
+        // 3 (now strongest) beats the 8; the K (now weak) does not.
+        expect(summary(president.legalActions(s, "b"))).toEqual([
+            "3x1",
+            "pass",
+        ]);
+        const high = step(s, play("b", [card("K")]));
+        expect(high.ok).toBe(false);
+        const low = step(s, play("b", [card("3")]));
+        expect(low.ok).toBe(true);
+    });
+
+    it("does not trigger when the rule is disabled", () => {
+        const s = state3(
+            {
+                a: [...quad("9"), card("K")],
+                b: [card("5")],
+                c: [card("J")],
+            },
+            { rules: CLASSIC },
+        );
+        const res = step(s, play("a", quad("9")));
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(res.state.revolution).toBe(false);
+    });
+});
+
 describe("president trick flow", () => {
     it("clears the trick to the top player once everyone else passes", () => {
         let s = state3({
@@ -374,7 +517,7 @@ describe("president legal actions (which cards are playable)", () => {
         ]);
     });
 
-    it("responding requires the same count AND a strictly higher rank", () => {
+    it("responding requires the same count AND an equal or higher rank", () => {
         const s = state3(
             {
                 a: [],
@@ -394,7 +537,7 @@ describe("president legal actions (which cards are playable)", () => {
         ]);
     });
 
-    it("treats an equal rank as NOT playable (strictly higher only)", () => {
+    it("offers an equal rank as playable (equal or higher beats)", () => {
         const s = state3(
             { a: [], b: [card("8"), card("9")], c: [] },
             {
@@ -404,6 +547,7 @@ describe("president legal actions (which cards are playable)", () => {
             },
         );
         expect(summary(president.legalActions(s, "b"))).toEqual([
+            "8x1",
             "9x1",
             "pass",
         ]);

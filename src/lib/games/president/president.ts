@@ -12,7 +12,8 @@ import type {
 } from "@/lib/engine/types";
 
 /**
- * Président (Trou du cul) — one round of the climbing/shedding game.
+ * Président (Trou du cul) — one round of the climbing/shedding game, after
+ * the French rules (https://fr.wikipedia.org/wiki/Trou_du_cul_(jeu)).
  *
  * This is the engine's *turn-based* proof: a rotating `currentPlayerId`, a
  * multi-card action union (`play` N same-rank cards / `pass`), pass-lockout
@@ -21,27 +22,37 @@ import type {
  *
  * Base rules (always on):
  * - Ranking 3 (low) → 2 (high); 2 beats the Ace.
- * - A play is N cards of one rank; responses must match the count and be
- *   strictly higher.
+ * - The holder of the Queen of Hearts (« la dame de cœur commence ») leads
+ *   the first trick.
+ * - A play is N cards of one rank; responses must match the count and
+ *   « monter » — play a strictly higher rank (a pair of 10s needs at least a
+ *   pair of Jacks).
  * - Passing locks you out until the trick clears; the trick clears when the
  *   turn returns to the last player who laid cards, who then leads anew.
- * - Going out ranks you: 1st = Président … last (still holding cards) = Trou
- *   du cul.
+ * - Going out ranks you: 1st = Président, 2nd = Vice-Président …
+ *   second-to-last = Vice-Trou, last (still holding cards) = Trou du cul.
  *
  * French table rules — configurable via {@link PresidentRules}, all enabled
  * by default; see {@link createPresident}:
  * - `twoClosesTrick` — « le 2 ferme le pli » : playing 2s wins the trick on
  *   the spot (count must still match); the table sweeps and the same player
- *   leads again.
+ *   leads again. Inactive while a revolution holds (the 2 is then the
+ *   weakest card).
  * - `finishOnTwoPenalty` — « finir par un 2 » : going out on a 2 demotes the
  *   player to last place (each new offender takes the bottom spot).
+ * - `equalRankSkip` — « ou rien » : matching the table's rank exactly is a
+ *   legal play and forces the next player to pass for the trick.
+ * - `revolution` — playing four of a kind inverts the ranking (3 strongest,
+ *   2 weakest) for the rest of the trick; a counter-revolution (another
+ *   quad) flips it back. The table sweeping ends it.
  *
  * The chosen rules are stamped into the state at setup and read back by
  * `apply`, so ANY module instance can resume or replay a saved game —
  * persist `state.rules` alongside the seed and the action log.
  *
- * Still out of scope by design: equal-rank skip, revolution (4-of-a-kind),
- * and the inter-round card exchange (a meta layer above single rounds).
+ * Still out of scope by design: the inter-round card exchange (Trou ↔
+ * Président) and the putsch — both belong to a multi-round meta layer above
+ * single rounds, which is what a `games` row represents here.
  */
 
 /** Président ranking: 3 lowest → 2 highest. `C` (unused in french52) sits high.
@@ -69,11 +80,17 @@ export interface PresidentRules {
     readonly twoClosesTrick: boolean;
     /** « Finir par un 2 » — going out on a 2 demotes you to last place. */
     readonly finishOnTwoPenalty: boolean;
+    /** « Ou rien » — matching the rank is legal and skips the next player. */
+    readonly equalRankSkip: boolean;
+    /** Four of a kind inverts the ranking until the trick clears. */
+    readonly revolution: boolean;
 }
 
 export const DEFAULT_PRESIDENT_RULES: PresidentRules = {
     twoClosesTrick: true,
     finishOnTwoPenalty: true,
+    equalRankSkip: true,
+    revolution: true,
 };
 
 export interface TrickPlay {
@@ -98,6 +115,8 @@ export interface PresidentState extends GameState {
     readonly pile: readonly TrickPlay[];
     /** Shape to beat; `null` when the table is open (a fresh lead). */
     readonly combo: ComboShape | null;
+    /** Ranking inverted by a quad — holds until the trick clears. */
+    readonly revolution: boolean;
     /** Players who passed this trick (locked out until it clears). */
     readonly passed: readonly string[];
     /** Finishing order; index 0 = Président. */
@@ -136,6 +155,8 @@ export interface PresidentView {
     readonly currentPlayerId: string;
     readonly rules: PresidentRules;
     readonly combo: ComboShape | null;
+    /** True while a revolution holds — the UI should flag the inversion. */
+    readonly revolution: boolean;
     readonly pile: readonly TrickPlay[];
     readonly finished: readonly string[];
     readonly players: readonly PresidentPlayerView[];
@@ -145,6 +166,25 @@ export interface PresidentView {
 
 function rankOf(card: CardDescriptor): Rank | null {
     return card.type === "suited" ? card.rank : null;
+}
+
+/** Comparable strength under the current hierarchy — negated by revolution. */
+function strength(rank: Rank, revolution: boolean): number {
+    return revolution ? -RANK_VALUE[rank] : RANK_VALUE[rank];
+}
+
+/** Whether `rank` may be laid on the current combo under `rules`. */
+function beatsCombo(
+    rank: Rank,
+    combo: ComboShape,
+    revolution: boolean,
+    rules: PresidentRules,
+): boolean {
+    if (strength(rank, revolution) > strength(combo.rank, revolution)) {
+        return true;
+    }
+    // « Ou rien » — matching the rank exactly is legal (and skips a player).
+    return rules.equalRankSkip && rank === combo.rank;
 }
 
 function seatOrder(players: readonly Player[]): Player[] {
@@ -236,6 +276,7 @@ function clearTrick(
         ...state,
         pile: [],
         combo: null,
+        revolution: false, // a revolution only holds for the trick
         passed: [],
         currentPlayerId: leader,
     };
@@ -306,9 +347,11 @@ const base: Omit<
             }
         } else {
             const need = state.combo.count;
-            const floor = RANK_VALUE[state.combo.rank];
             for (const [rank, cards] of groups) {
-                if (cards.length >= need && RANK_VALUE[rank] > floor) {
+                if (
+                    cards.length >= need &&
+                    beatsCombo(rank, state.combo, state.revolution, state.rules)
+                ) {
                     actions.push({
                         type: "play",
                         playerId,
@@ -379,7 +422,7 @@ const base: Omit<
                     `Must play exactly ${state.combo.count} card(s).`,
                 );
             }
-            if (RANK_VALUE[rank] <= RANK_VALUE[state.combo.rank]) {
+            if (!beatsCombo(rank, state.combo, state.revolution, state.rules)) {
                 return fail("too_low", "Combo does not beat the table.");
             }
         }
@@ -418,19 +461,51 @@ const base: Omit<
             });
         }
 
-        const played: PresidentState = {
+        // Revolution — a quad flips the hierarchy; another quad flips it back.
+        const revolution =
+            state.rules.revolution && cards.length === 4
+                ? !state.revolution
+                : state.revolution;
+        if (revolution !== state.revolution) {
+            events.push({
+                type: "revolution",
+                payload: { active: revolution },
+            });
+        }
+
+        let played: PresidentState = {
             ...state,
             hands: { ...state.hands, [action.playerId]: remaining },
             finished,
             demoted,
             pile: [...state.pile, { playerId: action.playerId, cards }],
             combo: { rank, count: cards.length },
+            revolution,
             lastPlayerId: action.playerId,
             turn: state.turn + 1,
         };
 
+        // « Ou rien » — matching the table's rank forces the next player to
+        // pass: they join the passed list before the turn advances.
+        if (
+            state.rules.equalRankSkip &&
+            state.combo !== null &&
+            rank === state.combo.rank
+        ) {
+            const skipped = nextResponder(played, action.playerId);
+            if (skipped !== null) {
+                played = { ...played, passed: [...played.passed, skipped] };
+                events.push({
+                    type: "skipped",
+                    payload: { playerId: skipped },
+                });
+            }
+        }
+
         // « Le 2 ferme le pli » — the table sweeps and the actor leads again.
-        const closesTrick = state.rules.twoClosesTrick && rank === "2";
+        // Under a revolution the 2 is the weakest card and closes nothing.
+        const closesTrick =
+            state.rules.twoClosesTrick && rank === "2" && !state.revolution;
         const advanced = closesTrick
             ? (endIfDecided(played, action.playerId) ??
               clearTrick(played, action.playerId))
@@ -485,6 +560,7 @@ const base: Omit<
             currentPlayerId: state.currentPlayerId,
             rules: state.rules,
             combo: state.combo,
+            revolution: state.revolution,
             pile: state.pile,
             finished: state.finished,
             self: viewerId,
@@ -524,11 +600,11 @@ export function createPresident(
                 hands[order[i % order.length].id].push(card);
             });
 
-            // Holder of the 3 of clubs leads the first trick.
+            // « La dame de cœur commence » — her holder leads the first trick.
             const leadKey = cardKey({
                 type: "suited",
-                suit: "clubs",
-                rank: "3",
+                suit: "hearts",
+                rank: "Q",
             });
             let leader = order[0].id;
             for (const p of order) {
@@ -550,6 +626,7 @@ export function createPresident(
                 hands,
                 pile: [],
                 combo: null,
+                revolution: false,
                 passed: [],
                 finished: [],
                 demoted: [],

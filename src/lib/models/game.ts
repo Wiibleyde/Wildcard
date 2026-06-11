@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { after } from "next/server";
 import { clientState, dispatch } from "@/lib/engine/runner";
 import type {
     AnyGameModule,
@@ -180,13 +181,27 @@ function chooseBotAction(legal: readonly GameAction[]): GameAction {
 const MAX_BOT_STEPS = 500;
 
 /**
- * Drive every bot whose turn it currently is, one move at a time, until a human
- * is on turn or the game ends. Each step bumps `version` (so Realtime pushes the
- * move to every client), rewrites the secret state, and logs the action.
+ * Pause before each bot move so every move lands as its own Realtime version
+ * bump — clients refetch per move and each card gets its play animation,
+ * instead of a whole bot chain appearing at once. Roughly one card animation.
+ */
+const BOT_TURN_DELAY_MS = 900;
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Drive every bot whose turn it currently is, one paced move at a time, until
+ * a human is on turn or the game ends. Each step bumps `version` (so Realtime
+ * pushes the move to every client), rewrites the secret state, and logs the
+ * action.
  *
- * Runs after each human action and once at deal time (the opening leader may be
- * a bot). No compare-and-set needed: the caller already holds the latest
- * version, and a stray human action would lose the version race and refetch.
+ * Runs *after the response* of each human action and once at deal time (the
+ * opening leader may be a bot) — see the `after()` calls at the call sites.
+ * Because the chain now overlaps the request window, each step claims its
+ * version transition with a compare-and-set and stops if anything else won
+ * the race.
  *
  * Returns the final version after all bot moves.
  */
@@ -214,6 +229,10 @@ export async function advanceBots(
         const legal = module.legalActions(state, botId);
         if (legal.length === 0) break;
 
+        // The bot "thinks" — gives every client time to animate the previous
+        // play before the next version bump arrives.
+        await sleep(BOT_TURN_DELAY_MS);
+
         const action = chooseBotAction(legal);
         const result = dispatch(module, state, action, botId);
         if (!result.ok) break;
@@ -224,7 +243,7 @@ export async function advanceBots(
         const outcome = module.outcome(state);
         const now = new Date().toISOString();
 
-        await admin
+        const { data: claimed } = await admin
             .from("games")
             .update({
                 version,
@@ -234,7 +253,13 @@ export async function advanceBots(
                 winner_ids: [...(outcome?.winners ?? [])],
                 updated_at: now,
             })
-            .eq("id", gameId);
+            .eq("id", gameId)
+            .eq("version", version - 1)
+            .select("id")
+            .maybeSingle();
+        // Someone else advanced the game while we slept — stop, their chain
+        // (or the next human action) owns the state now.
+        if (!claimed) break;
         await admin
             .from("game_states")
             .update({
@@ -378,16 +403,22 @@ export async function applyAction(
             .eq("id", meta.room_id);
     }
 
-    // Let any bots now on turn play out before returning.
-    const finalVersion = await advanceBots(
-        admin,
-        gameId,
-        meta.room_id,
-        module,
-        newState,
-        newVersion,
-        meta.bot_ids,
-    );
+    // Let any bots now on turn play out AFTER the response: the human's card
+    // animates immediately, then each paced bot move arrives over Realtime as
+    // its own update — visible turns instead of one burst.
+    if (meta.bot_ids.length > 0) {
+        after(() =>
+            advanceBots(
+                admin,
+                gameId,
+                meta.room_id,
+                module,
+                newState,
+                newVersion,
+                meta.bot_ids,
+            ),
+        );
+    }
 
-    return { ok: true, version: finalVersion, events: result.events };
+    return { ok: true, version: newVersion, events: result.events };
 }

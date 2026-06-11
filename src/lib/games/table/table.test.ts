@@ -111,7 +111,11 @@ describe("president table", () => {
         currentPlayerId: "a",
         rules: DEFAULT_PRESIDENT_RULES,
         combo: { rank: "9", count: 1 },
-        pile: [{ playerId: "b", cards: [card("9")] }],
+        revolution: false,
+        pile: [
+            { playerId: "c", cards: [card("8")] },
+            { playerId: "b", cards: [card("9")] },
+        ],
         finished: [],
         self: "a",
         players: [
@@ -148,12 +152,12 @@ describe("president table", () => {
         { type: "pass", playerId: "a" },
     ];
 
-    it("shows the top play in the trick zone, skinned by its player", () => {
+    it("shows the whole trick pile, each play skinned by its player", () => {
         const data = presidentTable.mapView(view, ctx());
         const trick = data.zones.find((z) => z.key === "trick");
-        expect(trick?.cards).toHaveLength(1);
-        expect(trick?.cards[0]?.ownerId).toBe("b");
-        expect(trick?.caption).toBe("Bob");
+        expect(trick?.cards).toHaveLength(2);
+        expect(trick?.cards.map((c) => c.ownerId)).toEqual(["c", "b"]);
+        expect(trick?.caption).toBe("Bob"); // caption names the top play
     });
 
     it("renders the hand only for the seated viewer", () => {
