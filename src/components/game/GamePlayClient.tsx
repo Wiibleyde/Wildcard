@@ -1,15 +1,13 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { BatailleTable } from "@/components/game/BatailleTable";
-import { PresidentTable } from "@/components/game/PresidentTable";
+import { GameTable } from "@/components/game/GameTable";
 import { BOARD_THEMES } from "@/lib/board/themes";
 import { greenFeltTheme } from "@/lib/board/themes/green_felt";
 import { THEMES } from "@/lib/card/themes";
 import { freeTheme } from "@/lib/card/themes/free";
 import type { GameAction } from "@/lib/engine/types";
-import type { BatailleView } from "@/lib/games/bataille/bataille";
-import type { PresidentView } from "@/lib/games/president/president";
+import { getGameTable } from "@/lib/games";
 import type { GameClientPayload } from "@/lib/models/game";
 import { useGameChannel } from "@/lib/realtime/useGameChannel";
 
@@ -23,8 +21,8 @@ interface Props {
 /**
  * Owns the live game session on the client: holds the latest redacted payload,
  * refetches it whenever Realtime rings the doorbell, and forwards actions to
- * the server. It is game-agnostic — it picks the right table by `moduleId` and
- * hands it the narrowed `view`.
+ * the server. Fully game-agnostic — the single `GameTable` renders whichever
+ * game the catalog describes via its table config.
  */
 export function GamePlayClient({
     initial,
@@ -62,32 +60,25 @@ export function GamePlayClient({
         [initial.gameId, payload.version, refetch],
     );
 
-    const deckTheme = THEMES[deckStyleId] ?? freeTheme;
-    const boardTheme = BOARD_THEMES[boardStyleId] ?? greenFeltTheme;
-
-    const shared = {
-        payload,
-        currentUserId,
-        deckTheme,
-        boardTheme,
-        pending,
-        onAction,
-    } as const;
-
-    if (payload.moduleId === "bataille") {
+    const table = getGameTable(payload.moduleId);
+    if (!table) {
         return (
-            <BatailleTable {...shared} view={payload.view as BatailleView} />
-        );
-    }
-    if (payload.moduleId === "president") {
-        return (
-            <PresidentTable {...shared} view={payload.view as PresidentView} />
+            <div className="p-8 text-center" style={{ color: "#9a8870" }}>
+                {payload.moduleId}
+            </div>
         );
     }
 
     return (
-        <div className="p-8 text-center" style={{ color: "#9a8870" }}>
-            {payload.moduleId}
-        </div>
+        <GameTable
+            table={table}
+            view={payload.view}
+            payload={payload}
+            currentUserId={currentUserId}
+            deckTheme={THEMES[deckStyleId] ?? freeTheme}
+            boardTheme={BOARD_THEMES[boardStyleId] ?? greenFeltTheme}
+            pending={pending}
+            onAction={onAction}
+        />
     );
 }

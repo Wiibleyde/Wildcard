@@ -18,6 +18,12 @@ export interface GamePlayer {
     readonly userId: string;
     readonly username: string;
     readonly seat: number;
+    /**
+     * deck_style_id from player_customizations — every viewer renders this
+     * player's cards in this style. Bots and unknown players fall back to
+     * "free".
+     */
+    readonly deckStyleId: string;
 }
 
 /**
@@ -81,11 +87,23 @@ async function loadGame(
     };
 }
 
-function playersOf(state: GameState): GamePlayer[] {
+async function playersOf(
+    admin: Admin,
+    state: GameState,
+): Promise<GamePlayer[]> {
+    const ids = state.players.map((p) => p.id);
+    const { data } = await admin
+        .from("player_customizations")
+        .select("user_id, deck_style_id")
+        .in("user_id", ids);
+    const styles = new Map(
+        (data ?? []).map((row) => [row.user_id, row.deck_style_id]),
+    );
     return state.players.map((p) => ({
         userId: p.id,
         username: p.name,
         seat: p.seat,
+        deckStyleId: styles.get(p.id) ?? "free",
     }));
 }
 
@@ -122,7 +140,7 @@ export async function getGameClientState(
             view: cs.view,
             legalActions: cs.legalActions,
             outcome: module.outcome(state),
-            players: playersOf(state),
+            players: await playersOf(admin, state),
             viewerId: effectiveViewer,
         },
     };
