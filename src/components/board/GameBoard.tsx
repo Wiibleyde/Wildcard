@@ -1,8 +1,12 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { Card } from "@/components/card/Card";
 import { greenFeltTheme } from "@/lib/board/themes/green_felt";
 import type { BoardTheme, GameBoardProps } from "@/lib/board/types";
+import { CARD_WIDTH_CLASS, HAND_OVERLAP_CLASS } from "@/lib/card/sizes";
+import { getCardTheme } from "@/lib/card/themes";
+import { FACE_DOWN_CARD } from "@/lib/card/utils";
 
 function buildSurfaceStyle(theme: BoardTheme): CSSProperties {
     const { surface } = theme;
@@ -36,6 +40,8 @@ export function GameBoard({
     players,
     playArea,
     handArea,
+    playAreaPlaceholder,
+    handPlaceholder,
 }: GameBoardProps) {
     const opponents = players.filter((p) => !p.isCurrentPlayer);
     const currentPlayer = players.find((p) => p.isCurrentPlayer);
@@ -62,15 +68,22 @@ export function GameBoard({
                         >
                             {player.username}
                         </span>
-                        {/* Opponent hand placeholder — cards face-down, style resolved server-side */}
-                        <div className="flex gap-1">
+                        {/* Opponent hand — face-down backs in THAT player's deck style */}
+                        <div className="flex">
                             {(["c1", "c2", "c3", "c4", "c5"] as const).map(
                                 (slot) => (
                                     <div
                                         key={`${player.userId}-${slot}`}
-                                        className="h-14 w-9 rounded-md backdrop-blur-sm"
-                                        style={zoneStyle}
-                                    />
+                                        className={`${CARD_WIDTH_CLASS.sm} ${HAND_OVERLAP_CLASS.sm}`}
+                                    >
+                                        <Card
+                                            card={FACE_DOWN_CARD}
+                                            faceDown
+                                            theme={getCardTheme(
+                                                player.deckStyleId,
+                                            )}
+                                        />
+                                    </div>
                                 ),
                             )}
                         </div>
@@ -81,20 +94,21 @@ export function GameBoard({
             {/* Center play area */}
             <div className="flex flex-1 items-center justify-center px-8 py-4">
                 <div
-                    className="flex min-h-36 w-full max-w-xl items-center justify-center rounded-xl backdrop-blur-sm"
+                    className="flex min-h-44 w-full max-w-xl items-center justify-center rounded-xl backdrop-blur-sm xl:min-h-52 xl:max-w-3xl 2xl:min-h-56"
                     style={zoneStyle}
                 >
-                    {playArea ?? (
-                        <span
-                            className="text-sm"
-                            style={{
-                                color: theme.badge.textColor,
-                                opacity: 0.4,
-                            }}
-                        >
-                            Zone de jeu
-                        </span>
-                    )}
+                    {playArea ??
+                        (playAreaPlaceholder && (
+                            <span
+                                className="text-sm"
+                                style={{
+                                    color: theme.badge.textColor,
+                                    opacity: 0.4,
+                                }}
+                            >
+                                {playAreaPlaceholder}
+                            </span>
+                        ))}
                 </div>
             </div>
 
@@ -109,20 +123,21 @@ export function GameBoard({
                     </span>
                 )}
                 <div
-                    className="flex min-h-20 items-end justify-center gap-1 rounded-xl px-4 py-2 backdrop-blur-sm"
+                    className="flex min-h-24 items-end justify-center gap-1 rounded-xl px-4 py-2 backdrop-blur-sm"
                     style={zoneStyle}
                 >
-                    {handArea ?? (
-                        <span
-                            className="text-sm"
-                            style={{
-                                color: theme.badge.textColor,
-                                opacity: 0.4,
-                            }}
-                        >
-                            Votre main
-                        </span>
-                    )}
+                    {handArea ??
+                        (handPlaceholder && (
+                            <span
+                                className="text-sm"
+                                style={{
+                                    color: theme.badge.textColor,
+                                    opacity: 0.4,
+                                }}
+                            >
+                                {handPlaceholder}
+                            </span>
+                        ))}
                 </div>
             </div>
         </div>

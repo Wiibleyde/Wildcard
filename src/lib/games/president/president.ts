@@ -1,6 +1,7 @@
 import { french52 } from "@/lib/card/decks";
 import type { CardDescriptor, Rank } from "@/lib/card/types";
-import { buildDeck, cardKey } from "@/lib/engine/deck";
+import { cardKey } from "@/lib/card/utils";
+import { buildDeck } from "@/lib/engine/deck";
 import type { Rng } from "@/lib/engine/rng";
 import type {
     ApplyResult,
@@ -18,14 +19,29 @@ import type {
  * tricks, and a finishing-order ranking. It complements Bataille, which proved
  * the simultaneous/engine-driven path.
  *
- * Base rules modelled here:
+ * Base rules (always on):
  * - Ranking 3 (low) → 2 (high); 2 beats the Ace.
  * - A play is N cards of one rank; responses must match the count and be
- *   strictly higher. No bombs / equal-rank skips (kept out of the base set).
+ *   strictly higher.
  * - Passing locks you out until the trick clears; the trick clears when the
  *   turn returns to the last player who laid cards, who then leads anew.
- * - Going out ranks you: 1st = Président … last (still holding cards) = Trou du
- *   cul. Inter-round card exchange is a separate meta layer, not modelled here.
+ * - Going out ranks you: 1st = Président … last (still holding cards) = Trou
+ *   du cul.
+ *
+ * French table rules — configurable via {@link PresidentRules}, all enabled
+ * by default; see {@link createPresident}:
+ * - `twoClosesTrick` — « le 2 ferme le pli » : playing 2s wins the trick on
+ *   the spot (count must still match); the table sweeps and the same player
+ *   leads again.
+ * - `finishOnTwoPenalty` — « finir par un 2 » : going out on a 2 demotes the
+ *   player to last place (each new offender takes the bottom spot).
+ *
+ * The chosen rules are stamped into the state at setup and read back by
+ * `apply`, so ANY module instance can resume or replay a saved game —
+ * persist `state.rules` alongside the seed and the action log.
+ *
+ * Still out of scope by design: equal-rank skip, revolution (4-of-a-kind),
+ * and the inter-round card exchange (a meta layer above single rounds).
  */
 
 /** Président ranking: 3 lowest → 2 highest. `C` (unused in french52) sits high.
@@ -47,6 +63,19 @@ const RANK_VALUE: Record<Rank, number> = {
     "2": 16,
 };
 
+/** Optional French table rules — see the module doc for what each enables. */
+export interface PresidentRules {
+    /** « Le 2 ferme le pli » — playing 2s sweeps the trick immediately. */
+    readonly twoClosesTrick: boolean;
+    /** « Finir par un 2 » — going out on a 2 demotes you to last place. */
+    readonly finishOnTwoPenalty: boolean;
+}
+
+export const DEFAULT_PRESIDENT_RULES: PresidentRules = {
+    twoClosesTrick: true,
+    finishOnTwoPenalty: true,
+};
+
 export interface TrickPlay {
     readonly playerId: string;
     readonly cards: readonly CardDescriptor[];
@@ -62,6 +91,8 @@ export interface PresidentState extends GameState {
     readonly phase: "playing" | "done";
     /** Always a seated, in-play player while `phase === "playing"`. */
     readonly currentPlayerId: string;
+    /** Table rules this game was created with — drives `apply`. */
+    readonly rules: PresidentRules;
     readonly hands: Readonly<Record<string, readonly CardDescriptor[]>>;
     /** Cards laid in the current (uncleared) trick — public. */
     readonly pile: readonly TrickPlay[];
@@ -71,6 +102,8 @@ export interface PresidentState extends GameState {
     readonly passed: readonly string[];
     /** Finishing order; index 0 = Président. */
     readonly finished: readonly string[];
+    /** Players demoted for going out on a 2 — ranked below everyone else. */
+    readonly demoted: readonly string[];
     /** Last player to lay the top combo — leads once the trick clears. */
     readonly lastPlayerId: string | null;
 }
@@ -88,8 +121,10 @@ export interface PresidentPlayerView {
     readonly name: string;
     readonly handCount: number;
     readonly passed: boolean;
-    /** Set once the player goes out; 1 = Président. */
+    /** Set once the player goes out cleanly; 1 = Président. */
     readonly place: number | null;
+    /** True when the player went out on a 2 and awaits the bottom rank. */
+    readonly demoted: boolean;
     /** Own cards — present only in the viewer's own slot. */
     readonly hand?: readonly CardDescriptor[];
 }
@@ -99,6 +134,7 @@ export interface PresidentView {
     readonly phase: PresidentState["phase"];
     readonly turn: number;
     readonly currentPlayerId: string;
+    readonly rules: PresidentRules;
     readonly combo: ComboShape | null;
     readonly pile: readonly TrickPlay[];
     readonly finished: readonly string[];
@@ -115,8 +151,9 @@ function seatOrder(players: readonly Player[]): Player[] {
     return [...players].sort((a, b) => a.seat - b.seat);
 }
 
-function isFinished(state: PresidentState, id: string): boolean {
-    return state.finished.includes(id);
+/** Out of the round — went out cleanly (ranked) or was demoted on a 2. */
+function isOut(state: PresidentState, id: string): boolean {
+    return state.finished.includes(id) || state.demoted.includes(id);
 }
 
 /** The single rank shared by `cards`, or `null` if mixed/empty/non-suited. */
@@ -152,7 +189,7 @@ function nextResponder(state: PresidentState, afterId: string): string | null {
     for (let k = 1; k <= order.length; k++) {
         const candidate = order[(start + k) % order.length];
         if (
-            !isFinished(state, candidate.id) &&
+            !isOut(state, candidate.id) &&
             !state.passed.includes(candidate.id)
         ) {
             return candidate.id;
@@ -167,9 +204,41 @@ function nextInPlay(state: PresidentState, afterId: string): string | null {
     const start = order.findIndex((p) => p.id === afterId);
     for (let k = 1; k <= order.length; k++) {
         const candidate = order[(start + k) % order.length];
-        if (!isFinished(state, candidate.id)) return candidate.id;
+        if (!isOut(state, candidate.id)) return candidate.id;
     }
     return null;
+}
+
+/** Round over (≤1 player still holding cards) ⇒ final state, else `null`. */
+function endIfDecided(
+    state: PresidentState,
+    fallbackId: string,
+): PresidentState | null {
+    const remaining = state.players.filter((p) => !isOut(state, p.id));
+    if (remaining.length > 1) return null;
+    return {
+        ...state,
+        phase: "done",
+        currentPlayerId: remaining[0]?.id ?? fallbackId,
+    };
+}
+
+/** Sweep the table and hand the lead to `preferredLeader` (or the next seat
+ * still in play when that player just went out). */
+function clearTrick(
+    state: PresidentState,
+    preferredLeader: string,
+): PresidentState {
+    const leader = !isOut(state, preferredLeader)
+        ? preferredLeader
+        : (nextInPlay(state, preferredLeader) ?? preferredLeader);
+    return {
+        ...state,
+        pile: [],
+        combo: null,
+        passed: [],
+        currentPlayerId: leader,
+    };
 }
 
 /**
@@ -178,16 +247,8 @@ function nextInPlay(state: PresidentState, afterId: string): string | null {
  * last player who laid cards.
  */
 function settle(state: PresidentState, actorId: string): PresidentState {
-    const remaining = state.players.filter((p) => !isFinished(state, p.id));
-
-    // One player left holding cards ⇒ they are the Trou du cul; round over.
-    if (remaining.length <= 1) {
-        return {
-            ...state,
-            phase: "done",
-            currentPlayerId: remaining[0]?.id ?? actorId,
-        };
-    }
+    const ended = endIfDecided(state, actorId);
+    if (ended) return ended;
 
     const next = nextResponder(state, actorId);
     const top = state.lastPlayerId;
@@ -195,17 +256,7 @@ function settle(state: PresidentState, actorId: string): PresidentState {
     // Trick clears when the turn comes back to the top player (everyone else
     // passed or finished) or no one can respond.
     if (next === null || next === top) {
-        const leader =
-            top && !isFinished(state, top)
-                ? top
-                : (nextInPlay(state, top ?? actorId) ?? actorId);
-        return {
-            ...state,
-            pile: [],
-            combo: null,
-            passed: [],
-            currentPlayerId: leader,
-        };
+        return clearTrick(state, top ?? actorId);
     }
 
     return { ...state, currentPlayerId: next };
@@ -215,10 +266,9 @@ function fail(code: string, message: string): ApplyResult<PresidentState> {
     return { ok: false, error: { code, message } };
 }
 
-export const president: GameModule<
-    PresidentState,
-    PresidentAction,
-    PresidentView
+const base: Omit<
+    GameModule<PresidentState, PresidentAction, PresidentView>,
+    "setup"
 > = {
     id: "president",
     name: "Président",
@@ -226,46 +276,10 @@ export const president: GameModule<
     minPlayers: 3,
     maxPlayers: 6,
 
-    setup(players, rng, seed) {
-        const order = seatOrder(players);
-        const deck = rng.shuffle(buildDeck(french52));
-        const hands: Record<string, CardDescriptor[]> = {};
-        for (const p of order) hands[p.id] = [];
-        deck.forEach((card, i) => {
-            hands[order[i % order.length].id].push(card);
-        });
-
-        // Holder of the 3 of clubs leads the first trick.
-        const leadKey = cardKey({ type: "suited", suit: "clubs", rank: "3" });
-        let leader = order[0].id;
-        for (const p of order) {
-            if (hands[p.id].some((c) => cardKey(c) === leadKey)) {
-                leader = p.id;
-                break;
-            }
-        }
-
-        return {
-            gameId: crypto.randomUUID(),
-            players,
-            phase: "playing",
-            currentPlayerId: leader,
-            turn: 0,
-            seed,
-            rngState: rng.state,
-            hands,
-            pile: [],
-            combo: null,
-            passed: [],
-            finished: [],
-            lastPlayerId: null,
-        };
-    },
-
     legalActions(state, playerId) {
         if (state.phase === "done") return [];
         if (playerId !== state.currentPlayerId) return [];
-        if (isFinished(state, playerId)) return [];
+        if (isOut(state, playerId)) return [];
 
         const hand = state.hands[playerId];
         const groups = new Map<Rank, CardDescriptor[]>();
@@ -315,7 +329,7 @@ export const president: GameModule<
         if (action.playerId !== state.currentPlayerId) {
             return fail("not_your_turn", "It is not this player's turn.");
         }
-        if (isFinished(state, action.playerId)) {
+        if (isOut(state, action.playerId)) {
             return fail("already_finished", "This player is already out.");
         }
 
@@ -331,13 +345,17 @@ export const president: GameModule<
                 },
                 action.playerId,
             );
-            return {
-                ok: true,
-                state: advanced,
-                events: [
-                    { type: "passed", payload: { playerId: action.playerId } },
-                ],
-            };
+            const events: GameEvent[] = [
+                { type: "passed", payload: { playerId: action.playerId } },
+            ];
+            // combo was non-null (pass requires a live trick) — null ⇒ swept.
+            if (advanced.combo === null) {
+                events.push({
+                    type: "trick_cleared",
+                    payload: { leadPlayerId: advanced.currentPlayerId },
+                });
+            }
+            return { ok: true, state: advanced, events };
         }
 
         const { cards } = action;
@@ -366,10 +384,17 @@ export const president: GameModule<
             }
         }
 
+        const wentOut = remaining.length === 0;
+        // « Finir par un 2 » — going out on a 2 demotes instead of ranking.
+        const demotedNow =
+            wentOut && state.rules.finishOnTwoPenalty && rank === "2";
         const finished =
-            remaining.length === 0
+            wentOut && !demotedNow
                 ? [...state.finished, action.playerId]
                 : state.finished;
+        const demoted = demotedNow
+            ? [...state.demoted, action.playerId]
+            : state.demoted;
 
         const events: GameEvent[] = [
             {
@@ -381,28 +406,44 @@ export const president: GameModule<
                 },
             },
         ];
-        if (remaining.length === 0) {
+        if (demotedNow) {
+            events.push({
+                type: "demoted",
+                payload: { playerId: action.playerId },
+            });
+        } else if (wentOut) {
             events.push({
                 type: "finished",
                 payload: { playerId: action.playerId, place: finished.length },
             });
         }
 
-        const advanced = settle(
-            {
-                ...state,
-                hands: { ...state.hands, [action.playerId]: remaining },
-                finished,
-                pile: [...state.pile, { playerId: action.playerId, cards }],
-                combo: { rank, count: cards.length },
-                lastPlayerId: action.playerId,
-                turn: state.turn + 1,
-            },
-            action.playerId,
-        );
+        const played: PresidentState = {
+            ...state,
+            hands: { ...state.hands, [action.playerId]: remaining },
+            finished,
+            demoted,
+            pile: [...state.pile, { playerId: action.playerId, cards }],
+            combo: { rank, count: cards.length },
+            lastPlayerId: action.playerId,
+            turn: state.turn + 1,
+        };
+
+        // « Le 2 ferme le pli » — the table sweeps and the actor leads again.
+        const closesTrick = state.rules.twoClosesTrick && rank === "2";
+        const advanced = closesTrick
+            ? (endIfDecided(played, action.playerId) ??
+              clearTrick(played, action.playerId))
+            : settle(played, action.playerId);
 
         if (advanced.phase === "done") {
             events.push({ type: "game_over" });
+        } else if (advanced.combo === null) {
+            // The play set a combo and it is gone ⇒ the trick was swept.
+            events.push({
+                type: "trick_cleared",
+                payload: { leadPlayerId: advanced.currentPlayerId },
+            });
         }
         return { ok: true, state: advanced, events };
     },
@@ -414,10 +455,16 @@ export const president: GameModule<
     outcome(state) {
         if (state.phase !== "done") return null;
 
+        // Clean finishers first, then whoever still holds cards (seat order),
+        // then the demoted — each successive offender took the bottom spot.
         const ranked = [...state.finished];
         for (const p of seatOrder(state.players)) {
-            if (!ranked.includes(p.id)) ranked.push(p.id);
+            if (!ranked.includes(p.id) && !state.demoted.includes(p.id)) {
+                ranked.push(p.id);
+            }
         }
+        ranked.push(...state.demoted);
+
         const rankings = ranked.map((playerId, index) => ({
             playerId,
             rank: index + 1,
@@ -436,22 +483,81 @@ export const president: GameModule<
             phase: state.phase,
             turn: state.turn,
             currentPlayerId: state.currentPlayerId,
+            rules: state.rules,
             combo: state.combo,
             pile: state.pile,
             finished: state.finished,
             self: viewerId,
             players: state.players.map((p): PresidentPlayerView => {
-                const base: PresidentPlayerView = {
+                const slot: PresidentPlayerView = {
                     playerId: p.id,
                     name: p.name,
                     handCount: state.hands[p.id].length,
                     passed: state.passed.includes(p.id),
                     place: placeOf(p.id),
+                    demoted: state.demoted.includes(p.id),
                 };
                 return viewerId === p.id
-                    ? { ...base, hand: state.hands[p.id] }
-                    : base;
+                    ? { ...slot, hand: state.hands[p.id] }
+                    : slot;
             }),
         };
     },
 };
+
+/**
+ * Build a Président module for a given table-rule configuration. The rules
+ * are stamped into the state, so a saved game resumes/replays identically on
+ * any instance — pair the persisted `state.rules` with the seed + action log.
+ */
+export function createPresident(
+    rules: PresidentRules = DEFAULT_PRESIDENT_RULES,
+): GameModule<PresidentState, PresidentAction, PresidentView> {
+    return {
+        ...base,
+        setup(players, rng, seed, gameId) {
+            const order = seatOrder(players);
+            const deck = rng.shuffle(buildDeck(french52));
+            const hands: Record<string, CardDescriptor[]> = {};
+            for (const p of order) hands[p.id] = [];
+            deck.forEach((card, i) => {
+                hands[order[i % order.length].id].push(card);
+            });
+
+            // Holder of the 3 of clubs leads the first trick.
+            const leadKey = cardKey({
+                type: "suited",
+                suit: "clubs",
+                rank: "3",
+            });
+            let leader = order[0].id;
+            for (const p of order) {
+                if (hands[p.id].some((c) => cardKey(c) === leadKey)) {
+                    leader = p.id;
+                    break;
+                }
+            }
+
+            return {
+                gameId,
+                players,
+                phase: "playing",
+                currentPlayerId: leader,
+                turn: 0,
+                seed,
+                rngState: rng.state,
+                rules,
+                hands,
+                pile: [],
+                combo: null,
+                passed: [],
+                finished: [],
+                demoted: [],
+                lastPlayerId: null,
+            };
+        },
+    };
+}
+
+/** Default module — French table rules enabled. */
+export const president = createPresident();

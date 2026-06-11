@@ -1,7 +1,17 @@
 {
     "home": {
         "title": "Wildcard",
-        "subtitle": "Plateforme de jeux de cartes en ligne"
+        "subtitle": "Plateforme de jeux de cartes en ligne",
+        "games_section": "Jeux disponibles",
+        "available": "Disponible",
+        "coming_soon": "Bientôt",
+        "players_count": "{count} joueurs",
+        "play_now": "Jouer",
+        "in_development": "En développement",
+        "game_desc_bataille": "Le classique des classiques",
+        "game_desc_president": "Grimpe au sommet, évite le trou",
+        "game_desc_kems": "Communication secrète en équipe",
+        "game_desc_belote": "Le roi des jeux de plis"
     },
     "navigation": {
         "home": "Accueil",
@@ -46,12 +56,17 @@
         "tier_ethereal": "Éthéré",
         "selected": "Sélectionné",
         "select": "Choisir",
-        "nav_label": "Style"
+        "nav_label": "Style",
+        "subtitle": "Personnalise ton style de jeu",
+        "preview_action": "Aperçu"
     },
     "preview": {
         "back": "Retour",
         "cards": "Cartes",
-        "board": "Plateau"
+        "board": "Plateau",
+        "play_hint": "Clique sur une carte pour la jouer",
+        "you": "Vous",
+        "opponent_name": "Joueur 2"
     },
     "profile": {
         "title": "Mon profil",

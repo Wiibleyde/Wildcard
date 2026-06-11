@@ -7,7 +7,11 @@ export type BoardStyle = Database["public"]["Tables"]["board_styles"]["Row"];
 export type PlayerCustomization =
     Database["public"]["Tables"]["player_customizations"]["Row"];
 
-// ── Client-side helpers ───────────────────────────────────────────────────────
+// ── Client-side READ helpers ──────────────────────────────────────────────────
+//
+// Reads only. Customization writes must go through PATCH /api/customization,
+// which enforces inventory ownership server-side — never mutate
+// player_customizations from the browser client.
 
 export async function getPlayerCustomization(
     userId: string,
@@ -19,36 +23,6 @@ export async function getPlayerCustomization(
         .eq("user_id", userId)
         .single();
     return data;
-}
-
-export async function updateDeckStyle(
-    userId: string,
-    deckStyleId: string,
-): Promise<void> {
-    const supabase = createClient();
-    const { error } = await supabase
-        .from("player_customizations")
-        .update({
-            deck_style_id: deckStyleId,
-            updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", userId);
-    if (error) throw error;
-}
-
-export async function updateBoardStyle(
-    userId: string,
-    boardStyleId: string,
-): Promise<void> {
-    const supabase = createClient();
-    const { error } = await supabase
-        .from("player_customizations")
-        .update({
-            board_style_id: boardStyleId,
-            updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", userId);
-    if (error) throw error;
 }
 
 export async function listDeckStyles(): Promise<DeckStyle[]> {

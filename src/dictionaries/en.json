@@ -1,7 +1,17 @@
 {
     "home": {
         "title": "Wildcard",
-        "subtitle": "Online card game platform"
+        "subtitle": "Online card game platform",
+        "games_section": "Available games",
+        "available": "Available",
+        "coming_soon": "Coming soon",
+        "players_count": "{count} players",
+        "play_now": "Play",
+        "in_development": "In development",
+        "game_desc_bataille": "The classic of classics",
+        "game_desc_president": "Climb to the top, avoid the pit",
+        "game_desc_kems": "Secret team communication",
+        "game_desc_belote": "The king of trick-taking games"
     },
     "navigation": {
         "home": "Home",
@@ -46,12 +56,17 @@
         "tier_ethereal": "Ethereal",
         "selected": "Selected",
         "select": "Choose",
-        "nav_label": "Style"
+        "nav_label": "Style",
+        "subtitle": "Customize your play style",
+        "preview_action": "Preview"
     },
     "preview": {
         "back": "Back",
         "cards": "Cards",
-        "board": "Board"
+        "board": "Board",
+        "play_hint": "Click a card to play it",
+        "you": "You",
+        "opponent_name": "Player 2"
     },
     "profile": {
         "title": "My profile",

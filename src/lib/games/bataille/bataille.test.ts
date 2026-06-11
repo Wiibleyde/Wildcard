@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CardDescriptor, Rank, Suit } from "@/lib/card/types";
-import { cardKey } from "@/lib/engine/deck";
+import { cardKey } from "@/lib/card/utils";
 import { createRng } from "@/lib/engine/rng";
 import { createGame, dispatch } from "@/lib/engine/runner";
 import type { Player } from "@/lib/engine/types";

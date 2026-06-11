@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
-    type ProfilePatch,
     type ProfilePatchErrorCode,
+    parseProfilePatch,
     patchProfile,
 } from "@/lib/models/profile";
 import { createClient } from "@/lib/supabase/server";
@@ -23,8 +23,13 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = (await request.json()) as ProfilePatch;
-    const result = await patchProfile(supabase, user.id, body);
+    const body: unknown = await request.json().catch(() => null);
+    const patch = parseProfilePatch(body);
+    if (!patch) {
+        return NextResponse.json({ error: "invalid_body" }, { status: 400 });
+    }
+
+    const result = await patchProfile(supabase, user.id, patch);
 
     if (!result.ok) {
         return NextResponse.json(

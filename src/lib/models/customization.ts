@@ -12,6 +12,43 @@ export type CustomizationPatchErrorCode =
     | "board_style_not_owned"
     | "db_error";
 
+/** Catalog ids are short slugs — anything longer is garbage input. */
+const STYLE_ID_MAX_LENGTH = 64;
+
+function isStyleId(value: unknown): value is string {
+    return (
+        typeof value === "string" &&
+        value.length > 0 &&
+        value.length <= STYLE_ID_MAX_LENGTH
+    );
+}
+
+/**
+ * Narrow an unknown request body into a {@link CustomizationPatch}, or `null`
+ * when the shape is invalid. The API boundary must never trust a client cast.
+ */
+export function parseCustomizationPatch(
+    body: unknown,
+): CustomizationPatch | null {
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+        return null;
+    }
+    const record = body as Record<string, unknown>;
+    const patch: CustomizationPatch = {};
+
+    if ("deck_style_id" in record) {
+        if (!isStyleId(record.deck_style_id)) return null;
+        patch.deck_style_id = record.deck_style_id;
+    }
+
+    if ("board_style_id" in record) {
+        if (!isStyleId(record.board_style_id)) return null;
+        patch.board_style_id = record.board_style_id;
+    }
+
+    return patch;
+}
+
 type PatchResult =
     | { ok: true }
     | { ok: false; error: CustomizationPatchErrorCode; message?: string };

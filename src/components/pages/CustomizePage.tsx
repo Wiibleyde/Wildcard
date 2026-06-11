@@ -85,7 +85,7 @@ export function CustomizePage({
                         className="text-sm font-semibold mt-1"
                         style={{ color: "#7a6a50" }}
                     >
-                        Personnalise ton style de jeu
+                        {t("subtitle")}
                     </p>
                 </div>
 

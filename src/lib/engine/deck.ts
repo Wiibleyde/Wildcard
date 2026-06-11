@@ -37,22 +37,3 @@ export function buildDeck(def: DeckDefinition): CardDescriptor[] {
 
     return def.doubled ? [...cards, ...cards] : cards;
 }
-
-/** Stable identity string — safe as a React key and for equality checks. */
-export function cardKey(card: CardDescriptor): string {
-    switch (card.type) {
-        case "suited":
-            return `s:${card.suit}:${card.rank}`;
-        case "trump":
-            return `t:${card.index}`;
-        case "fool":
-            return "fool";
-        case "joker":
-            return `j:${card.variant ?? "red"}`;
-    }
-}
-
-/** Structural card equality, via {@link cardKey}. */
-export function sameCard(a: CardDescriptor, b: CardDescriptor): boolean {
-    return cardKey(a) === cardKey(b);
-}
