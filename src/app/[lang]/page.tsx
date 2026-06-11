@@ -2,9 +2,11 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { GameButton } from "@/components/ui/GameButton";
 import { Link } from "@/i18n/navigation";
 
+type GameId = "bataille" | "president" | "kems" | "belote";
+
 type GameEntry = {
+    id: GameId;
     name: string;
-    desc: string;
     suits: string;
     players: string;
     available: boolean;
@@ -12,10 +14,11 @@ type GameEntry = {
     shadowColor: string;
 };
 
+/** Game names are proper nouns — descriptions live in the dictionaries. */
 const GAMES: GameEntry[] = [
     {
+        id: "bataille",
         name: "Bataille",
-        desc: "Le classique des classiques",
         suits: "♠ ♥",
         players: "2–8",
         available: false,
@@ -23,8 +26,8 @@ const GAMES: GameEntry[] = [
         shadowColor: "#8a1010",
     },
     {
+        id: "president",
         name: "Président",
-        desc: "Grimpe au sommet, évite le trou",
         suits: "♦ ♣",
         players: "3–6",
         available: false,
@@ -32,8 +35,8 @@ const GAMES: GameEntry[] = [
         shadowColor: "#8a6800",
     },
     {
+        id: "kems",
         name: "Kems",
-        desc: "Communication secrète en équipe",
         suits: "♥ ♣",
         players: "4",
         available: false,
@@ -41,8 +44,8 @@ const GAMES: GameEntry[] = [
         shadowColor: "#1a6038",
     },
     {
+        id: "belote",
         name: "Belote",
-        desc: "Le roi des jeux de plis",
         suits: "♠ ♦",
         players: "4",
         available: false,
@@ -50,6 +53,13 @@ const GAMES: GameEntry[] = [
         shadowColor: "#4a2a90",
     },
 ];
+
+const GAME_DESC_KEY = {
+    bataille: "game_desc_bataille",
+    president: "game_desc_president",
+    kems: "game_desc_kems",
+    belote: "game_desc_belote",
+} as const;
 
 export default async function Home({
     params,
@@ -59,6 +69,7 @@ export default async function Home({
     const { lang } = await params;
     setRequestLocale(lang);
     const t = await getTranslations("navigation");
+    const tHome = await getTranslations("home");
 
     return (
         <div
@@ -131,7 +142,7 @@ export default async function Home({
                                 className="mt-2 text-lg font-semibold"
                                 style={{ color: "#9a8870" }}
                             >
-                                Plateforme de jeux de cartes en ligne
+                                {tHome("subtitle")}
                             </p>
                         </div>
 
@@ -149,12 +160,12 @@ export default async function Home({
                         className="text-xs font-bold uppercase tracking-widest mb-5"
                         style={{ color: "#7a6a50" }}
                     >
-                        Jeux disponibles
+                        {tHome("games_section")}
                     </h2>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                         {GAMES.map((game) => (
                             <div
-                                key={game.name}
+                                key={game.id}
                                 className="relative rounded-xl overflow-hidden flex flex-col"
                                 style={{
                                     background: "#1c1510",
@@ -199,8 +210,8 @@ export default async function Home({
                                         }
                                     >
                                         {game.available
-                                            ? "Disponible"
-                                            : "Bientôt"}
+                                            ? tHome("available")
+                                            : tHome("coming_soon")}
                                     </span>
                                 </div>
 
@@ -220,7 +231,7 @@ export default async function Home({
                                             className="text-xs font-semibold mt-0.5 leading-snug"
                                             style={{ color: "#7a6a50" }}
                                         >
-                                            {game.desc}
+                                            {tHome(GAME_DESC_KEY[game.id])}
                                         </p>
                                     </div>
 
@@ -228,7 +239,9 @@ export default async function Home({
                                         className="text-xs font-bold"
                                         style={{ color: "#9a8870" }}
                                     >
-                                        {game.players} joueurs
+                                        {tHome("players_count", {
+                                            count: game.players,
+                                        })}
                                     </div>
 
                                     {game.available ? (
@@ -243,7 +256,7 @@ export default async function Home({
                                                     "transform 80ms ease, box-shadow 80ms ease",
                                             }}
                                         >
-                                            Jouer
+                                            {tHome("play_now")}
                                         </Link>
                                     ) : (
                                         <div
@@ -255,7 +268,7 @@ export default async function Home({
                                                 border: "1px solid #3d2d18",
                                             }}
                                         >
-                                            En développement
+                                            {tHome("in_development")}
                                         </div>
                                     )}
                                 </div>

@@ -40,6 +40,8 @@ export function GameBoard({
     players,
     playArea,
     handArea,
+    playAreaPlaceholder,
+    handPlaceholder,
 }: GameBoardProps) {
     const opponents = players.filter((p) => !p.isCurrentPlayer);
     const currentPlayer = players.find((p) => p.isCurrentPlayer);
@@ -95,17 +97,18 @@ export function GameBoard({
                     className="flex min-h-44 w-full max-w-xl items-center justify-center rounded-xl backdrop-blur-sm xl:min-h-52 xl:max-w-3xl 2xl:min-h-56"
                     style={zoneStyle}
                 >
-                    {playArea ?? (
-                        <span
-                            className="text-sm"
-                            style={{
-                                color: theme.badge.textColor,
-                                opacity: 0.4,
-                            }}
-                        >
-                            Zone de jeu
-                        </span>
-                    )}
+                    {playArea ??
+                        (playAreaPlaceholder && (
+                            <span
+                                className="text-sm"
+                                style={{
+                                    color: theme.badge.textColor,
+                                    opacity: 0.4,
+                                }}
+                            >
+                                {playAreaPlaceholder}
+                            </span>
+                        ))}
                 </div>
             </div>
 
@@ -123,17 +126,18 @@ export function GameBoard({
                     className="flex min-h-24 items-end justify-center gap-1 rounded-xl px-4 py-2 backdrop-blur-sm"
                     style={zoneStyle}
                 >
-                    {handArea ?? (
-                        <span
-                            className="text-sm"
-                            style={{
-                                color: theme.badge.textColor,
-                                opacity: 0.4,
-                            }}
-                        >
-                            Votre main
-                        </span>
-                    )}
+                    {handArea ??
+                        (handPlaceholder && (
+                            <span
+                                className="text-sm"
+                                style={{
+                                    color: theme.badge.textColor,
+                                    opacity: 0.4,
+                                }}
+                            >
+                                {handPlaceholder}
+                            </span>
+                        ))}
                 </div>
             </div>
         </div>

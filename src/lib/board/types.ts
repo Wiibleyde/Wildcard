@@ -73,4 +73,8 @@ export interface GameBoardProps {
     playArea?: ReactNode;
     /** Current player's hand */
     handArea?: ReactNode;
+    /** Localized hint shown when `playArea` is absent */
+    playAreaPlaceholder?: string;
+    /** Localized hint shown when `handArea` is absent */
+    handPlaceholder?: string;
 }

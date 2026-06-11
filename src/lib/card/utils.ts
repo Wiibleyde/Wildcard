@@ -20,20 +20,29 @@ export function rankToPipIndex(rank: Rank): number {
 }
 
 /**
- * Stable identity string for a descriptor — React keys, ref maps, logs.
- * Unique within a single deck (a deck never holds duplicate cards).
+ * Stable identity string for a descriptor — React keys, ref maps, equality
+ * checks, logs. The single source of truth for card identity: the engine
+ * re-exports it from `@/lib/engine/deck`.
+ *
+ * Unique within a single-copy deck. Doubled decks (Pinochle) hold two cards
+ * per key — callers needing per-copy identity must add their own index.
  */
 export function cardKey(card: CardDescriptor): string {
     switch (card.type) {
         case "suited":
-            return `suited-${card.suit}-${card.rank}`;
+            return `s:${card.suit}:${card.rank}`;
         case "trump":
-            return `trump-${card.index}`;
+            return `t:${card.index}`;
         case "fool":
             return "fool";
         case "joker":
-            return `joker-${card.variant ?? "red"}`;
+            return `j:${card.variant ?? "red"}`;
     }
+}
+
+/** Structural card equality, via {@link cardKey}. */
+export function sameCard(a: CardDescriptor, b: CardDescriptor): boolean {
+    return cardKey(a) === cardKey(b);
 }
 
 /**

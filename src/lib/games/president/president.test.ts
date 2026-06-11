@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { CardDescriptor, Rank, Suit } from "@/lib/card/types";
-import { cardKey } from "@/lib/engine/deck";
+import { cardKey } from "@/lib/card/utils";
 import { createGame, dispatch } from "@/lib/engine/runner";
 import type { Player } from "@/lib/engine/types";
 import {
+    DEFAULT_PRESIDENT_RULES,
     type PresidentAction,
     type PresidentState,
     president,
@@ -33,15 +34,23 @@ function state3(
         turn: 0,
         seed: 0,
         rngState: 1,
+        rules: DEFAULT_PRESIDENT_RULES,
         hands,
         pile: [],
         combo: null,
         passed: [],
         finished: [],
+        demoted: [],
         lastPlayerId: null,
         ...overrides,
     };
 }
+
+/** Classic ruleset — disables the French table rules to isolate the base. */
+const CLASSIC = {
+    twoClosesTrick: false,
+    finishOnTwoPenalty: false,
+} as const;
 
 /** Route through the runner (supplies rng + identity check). */
 function step(
@@ -155,18 +164,90 @@ describe("president move legality", () => {
     });
 
     it("lets a 2 beat an Ace (ranking 3-low to 2-high)", () => {
+        // Classic rules so the 2 neither sweeps nor demotes — pure ranking.
         const s = state3(
-            { a: [card("A")], b: [card("2")], c: [] },
+            { a: [card("A")], b: [card("2")], c: [card("K")] },
             {
                 combo: { rank: "A", count: 1 },
                 lastPlayerId: "a",
                 currentPlayerId: "b",
+                rules: CLASSIC,
             },
         );
         const res = step(s, play("b", [card("2")]));
         expect(res.ok).toBe(true);
         if (!res.ok) return;
         expect(res.state.combo).toEqual({ rank: "2", count: 1 });
+        // Without the penalty rule, going out on a 2 ranks normally.
+        expect(res.state.finished).toEqual(["b"]);
+        expect(res.state.demoted).toEqual([]);
+    });
+});
+
+describe("president french table rules", () => {
+    it("a 2 sweeps the trick and the same player leads again", () => {
+        const s = state3(
+            {
+                a: [card("5"), card("7")],
+                b: [card("2"), card("9")],
+                c: [card("K"), card("4")],
+            },
+            {
+                combo: { rank: "K", count: 1 },
+                pile: [{ playerId: "c", cards: [card("K", "hearts")] }],
+                lastPlayerId: "c",
+                currentPlayerId: "b",
+                passed: ["a"],
+            },
+        );
+        const res = step(s, play("b", [card("2")]));
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(res.state.combo).toBeNull();
+        expect(res.state.pile).toHaveLength(0);
+        expect(res.state.passed).toHaveLength(0);
+        expect(res.state.currentPlayerId).toBe("b"); // leads again
+        expect(res.events).toContainEqual({
+            type: "trick_cleared",
+            payload: { leadPlayerId: "b" },
+        });
+    });
+
+    it("leading a 2 sweeps immediately and the leader replays", () => {
+        const s = state3({
+            a: [card("2"), card("6")],
+            b: [card("9")],
+            c: [card("K")],
+        });
+        const next = ok(s, play("a", [card("2")]));
+        expect(next.combo).toBeNull();
+        expect(next.currentPlayerId).toBe("a");
+    });
+
+    it("going out on a 2 demotes the player to last place", () => {
+        let s = state3({
+            a: [card("2")],
+            b: [card("9"), card("J")],
+            c: [card("4")],
+        });
+        s = ok(s, play("a", [card("2")])); // a goes out on a 2 → demoted
+        expect(s.demoted).toEqual(["a"]);
+        expect(s.finished).toEqual([]);
+        expect(s.phase).toBe("playing");
+        expect(s.currentPlayerId).toBe("b"); // sweep skips the demoted actor
+
+        s = ok(s, play("b", [card("9")]));
+        s = ok(s, pass("c")); // trick clears back to b
+        s = ok(s, play("b", [card("J")])); // b out cleanly → round over
+        expect(s.phase).toBe("done");
+
+        const outcome = president.outcome(s);
+        expect(outcome?.rankings).toEqual([
+            { playerId: "b", rank: 1 }, // Président
+            { playerId: "c", rank: 2 }, // still holding cards
+            { playerId: "a", rank: 3 }, // Trou — demoted despite going out first
+        ]);
+        expect(outcome?.winners).toEqual(["b"]);
     });
 });
 
@@ -189,6 +270,31 @@ describe("president trick flow", () => {
         expect(s.pile).toHaveLength(0);
         expect(s.passed).toHaveLength(0);
         expect(s.currentPlayerId).toBe("c");
+    });
+
+    it("emits trick_cleared with the new leader when the trick sweeps", () => {
+        const s = state3(
+            {
+                a: [card("5"), card("Q")],
+                b: [card("9"), card("J")],
+                c: [card("10"), card("A")],
+            },
+            {
+                combo: { rank: "10", count: 1 },
+                pile: [{ playerId: "c", cards: [card("10", "hearts")] }],
+                lastPlayerId: "c",
+                currentPlayerId: "a",
+                passed: ["b"],
+            },
+        );
+        const res = step(s, pass("a")); // last responder folds → sweep to c
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(res.events).toContainEqual({
+            type: "trick_cleared",
+            payload: { leadPlayerId: "c" },
+        });
+        expect(res.state.currentPlayerId).toBe("c");
     });
 
     it("records finishing order and keeps the round going", () => {
@@ -233,5 +339,10 @@ describe("president view (RLS in code)", () => {
         expect(self?.hand).toHaveLength(s.hands.a.length);
         expect(other?.hand).toBeUndefined(); // opponents redacted
         expect(other?.handCount).toBe(s.hands.b.length); // count still public
+    });
+
+    it("exposes the active table rules to every viewer", () => {
+        const s = createGame(president, P4, 11);
+        expect(president.view(s, null).rules).toEqual(DEFAULT_PRESIDENT_RULES);
     });
 });

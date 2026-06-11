@@ -85,14 +85,11 @@ export function GameButton({
 
     const baseClass = `btn-game inline-flex items-center justify-center gap-2 ${s.cls} ${className}`;
 
-    if ("href" in rest && rest.href !== undefined) {
+    // A disabled "link" must not be navigable or focusable — fall through to
+    // the disabled <button> branch instead of rendering an <a aria-disabled>.
+    if ("href" in rest && rest.href !== undefined && !disabled) {
         return (
-            <Link
-                href={rest.href}
-                className={baseClass}
-                style={style}
-                aria-disabled={disabled || undefined}
-            >
+            <Link href={rest.href} className={baseClass} style={style}>
                 {children}
             </Link>
         );

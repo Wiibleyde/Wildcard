@@ -250,12 +250,12 @@ export const bataille: GameModule<BatailleState, BatailleAction, BatailleView> =
         minPlayers: 2,
         maxPlayers: 2,
 
-        setup(players, rng, seed) {
+        setup(players, rng, seed, gameId) {
             const [p0, p1] = players;
             const deck = rng.shuffle(buildDeck(french52));
             const half = Math.floor(deck.length / 2);
             return {
-                gameId: crypto.randomUUID(),
+                gameId,
                 players,
                 phase: "reveal",
                 currentPlayerId: null,

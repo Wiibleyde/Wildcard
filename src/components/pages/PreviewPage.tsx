@@ -126,13 +126,13 @@ export function PreviewPage({ deckId, boardId, backHref }: Props) {
     const players = [
         {
             userId: "opponent-1",
-            username: "Joueur 2",
+            username: t("opponent_name"),
             deckStyleId: opponentDeckId,
             isCurrentPlayer: false,
         },
         {
             userId: "current",
-            username: "Vous",
+            username: t("you"),
             deckStyleId: deckId,
             isCurrentPlayer: true,
         },

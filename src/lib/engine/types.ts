@@ -103,8 +103,18 @@ export interface GameModule<S extends GameState, A extends GameAction, V = S> {
     readonly minPlayers: number;
     readonly maxPlayers: number;
 
-    /** Build the opening state, using `rng` for the initial shuffle/deal. */
-    setup(players: readonly Player[], rng: Rng, seed: number): S;
+    /**
+     * Build the opening state, using `rng` for the initial shuffle/deal.
+     * The runner supplies all impure inputs — randomness (`rng`/`seed`) and
+     * identity (`gameId`) — so setup stays a pure function and a game can be
+     * re-derived exactly from `(gameId, seed, action log)`.
+     */
+    setup(
+        players: readonly Player[],
+        rng: Rng,
+        seed: number,
+        gameId: string,
+    ): S;
 
     /** Actions `playerId` may legally take right now — for UI hints and bots. */
     legalActions(state: S, playerId: string): readonly A[];
