@@ -1,8 +1,11 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { Card } from "@/components/card/Card";
 import { TierBadge } from "@/components/ui/TierBadge";
+import { CARD_WIDTH_CLASS } from "@/lib/card/sizes";
 import type { CardTheme } from "@/lib/card/types";
+import { FACE_DOWN_CARD } from "@/lib/card/utils";
 import { TileShell } from "./TileShell";
 
 const TIER_KEYS: Record<string, string> = {
@@ -29,22 +32,15 @@ export function DeckTile({ theme, selected, onClick, previewHref }: Props) {
     // biome-ignore lint/suspicious/noExplicitAny: dynamic i18n key lookup
     const tierName = tierKey ? t(tierKey as any) : theme.tier;
 
-    const backBg = theme.back.pattern ?? theme.back.color;
-
     return (
         <TileShell
             selected={selected}
             onClick={onClick}
             previewHref={previewHref}
         >
-            <div
-                className="w-10 h-14 rounded-md overflow-hidden shrink-0"
-                style={{
-                    background: backBg,
-                    backgroundColor: theme.back.color,
-                    border: `1px solid ${theme.border.color}`,
-                }}
-            />
+            <div className={`${CARD_WIDTH_CLASS.xs} shrink-0`}>
+                <Card card={FACE_DOWN_CARD} faceDown theme={theme} />
+            </div>
             <span className="text-xs font-semibold text-wc-text truncate w-full text-center">
                 {theme.name}
             </span>

@@ -51,7 +51,8 @@
     "preview": {
         "back": "Back",
         "cards": "Cards",
-        "board": "Board"
+        "board": "Board",
+        "play_hint": "Click a card to play it"
     },
     "profile": {
         "title": "My profile",

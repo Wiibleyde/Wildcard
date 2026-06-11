@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import type { CardDescriptor } from "@/lib/card/types";
 
 export type BoardThemeTier =
     | "common"
@@ -50,6 +51,19 @@ export interface BoardPlayer {
     /** deck_style_id resolved from player_customizations */
     deckStyleId: string;
     isCurrentPlayer: boolean;
+}
+
+/**
+ * A card played to the table. Each table card is rendered in its owner's deck
+ * style for every viewer — a table mixes styles — while hands stay in the
+ * viewer's own style.
+ */
+export interface TableCard {
+    /** Stable unique id — React key and animation tracking */
+    id: string;
+    card: CardDescriptor;
+    /** Seat that played it; resolves to that player's deck style */
+    playerId: string;
 }
 
 export interface GameBoardProps {

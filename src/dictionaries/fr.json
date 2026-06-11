@@ -51,7 +51,8 @@
     "preview": {
         "back": "Retour",
         "cards": "Cartes",
-        "board": "Plateau"
+        "board": "Plateau",
+        "play_hint": "Clique sur une carte pour la jouer"
     },
     "profile": {
         "title": "Mon profil",

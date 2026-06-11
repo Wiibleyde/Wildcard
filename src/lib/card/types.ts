@@ -142,6 +142,21 @@ export interface CardEffect {
     speed?: number;
 }
 
+/**
+ * Built-in play-animation templates. Implementations live in the
+ * `PLAY_ANIMATIONS` registry (`src/lib/card/animations.ts`) — decks reference
+ * a template by id instead of shipping animation code, so ECA/studio decks
+ * stored as JSON can pick one too.
+ */
+export type PlayAnimationTemplateId = "simple" | "flip" | "arc";
+
+/** A deck's pick of entry animation for cards it plays to the table. */
+export interface PlayAnimationRef {
+    template: PlayAnimationTemplateId;
+    /** Seconds — overrides the template's default duration */
+    duration?: number;
+}
+
 export interface ThemeFont {
     /** CSS font-family string — caller is responsible for @font-face loading */
     family: string;
@@ -228,12 +243,17 @@ export interface CardTheme {
 
     /** Visual effects applied to all card faces */
     effects?: CardEffect[];
+    /**
+     * Entry animation when a card from this deck lands on the table.
+     * Omitted → the "simple" template.
+     */
+    playAnimation?: PlayAnimationRef;
     /** Custom typography — caller must load the font */
     font?: ThemeFont;
 
     /** Accent color for tarot trump and fool labels (falls back to textColor) */
     trumpColor?: string;
 
-    /** Brand/partner metadata — typically set only for tier: "collab" */
+    /** Brand/partner metadata — set on brand-collaboration decks */
     brand?: BrandInfo;
 }
