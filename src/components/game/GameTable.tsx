@@ -11,6 +11,7 @@ import type { CardTheme } from "@/lib/card/types";
 import type { GameAction } from "@/lib/engine/types";
 import type {
     AnyGameTableConfig,
+    TableContext,
     TableData,
     TableText,
     TableZoneTemplate,
@@ -18,6 +19,7 @@ import type {
 } from "@/lib/games/table/types";
 import type { GameClientPayload } from "@/lib/models/game";
 import { GameOverOverlay, TurnBanner } from "./GameChrome";
+import { GameLog, type GameLogLine } from "./GameLog";
 import { TableControls } from "./TableControls";
 import { TableSeats } from "./TableSeats";
 import { TableZone, type ZoneContext } from "./TableZone";
@@ -56,13 +58,27 @@ export function GameTable({
         // biome-ignore lint/suspicious/noExplicitAny: dynamic i18n key lookup
         t(key as any, values as any);
 
-    const data: TableData = table.mapView(view, {
+    const ctx: TableContext = {
         viewerId: payload.viewerId,
         players: payload.players,
         legalActions: payload.legalActions,
         isOver: payload.isOver,
         t: text,
-    });
+    };
+    const data: TableData = table.mapView(view, ctx);
+
+    // History feed — newest entry first, each event turned into a localized
+    // sentence by the game's own `logLine`. Games without the hook get no feed.
+    const logLines: GameLogLine[] | null = table.logLine
+        ? [...payload.log].reverse().flatMap((entry) =>
+              entry.events.flatMap((event, eventIndex) => {
+                  const line = table.logLine?.(event, ctx);
+                  return line
+                      ? [{ id: `${entry.seq}.${eventIndex}`, text: line }]
+                      : [];
+              }),
+          )
+        : null;
 
     const templates = new Map<string, TableZoneTemplate>(
         table.zones.map((z) => [z.id, z]),
@@ -142,56 +158,67 @@ export function GameTable({
                 highlight={data.banner.highlight}
             />
 
-            <div
-                ref={rootRef}
-                className="relative flex min-h-[60vh] flex-col gap-3 overflow-hidden rounded-2xl p-3 sm:gap-4 sm:p-4 xl:p-6"
-                style={buildSurfaceStyle(boardTheme)}
-            >
-                {data.seats && (
-                    <TableSeats
-                        seats={data.seats}
-                        boardTheme={boardTheme}
-                        deckStyleOf={(playerId) => styleOf.get(playerId)}
-                    />
-                )}
+            <div className="flex flex-col gap-3 lg:flex-row">
+                <div
+                    ref={rootRef}
+                    className="relative flex min-h-[60vh] flex-1 flex-col gap-3 overflow-hidden rounded-2xl p-3 sm:gap-4 sm:p-4 xl:p-6"
+                    style={buildSurfaceStyle(boardTheme)}
+                >
+                    {data.seats && (
+                        <TableSeats
+                            seats={data.seats}
+                            boardTheme={boardTheme}
+                            deckStyleOf={(playerId) => styleOf.get(playerId)}
+                        />
+                    )}
 
-                {top.length > 0 && (
-                    <div className="flex flex-wrap items-start justify-center gap-3 sm:gap-4 xl:gap-6">
-                        {top}
-                    </div>
-                )}
+                    {top.length > 0 && (
+                        <div className="flex flex-wrap items-start justify-center gap-3 sm:gap-4 xl:gap-6">
+                            {top}
+                        </div>
+                    )}
 
-                <div className="flex flex-1 flex-col items-center justify-center gap-3">
-                    <div className="flex flex-wrap items-start justify-center gap-4 sm:gap-6 xl:gap-10">
-                        {center}
+                    <div className="flex flex-1 flex-col items-center justify-center gap-3">
+                        <div className="flex flex-wrap items-start justify-center gap-4 sm:gap-6 xl:gap-10">
+                            {center}
+                        </div>
+                        {data.status && (
+                            <span
+                                className="text-sm font-black xl:text-base"
+                                style={{ color: boardTheme.accentColor }}
+                            >
+                                {data.status}
+                            </span>
+                        )}
                     </div>
-                    {data.status && (
-                        <span
-                            className="text-sm font-black xl:text-base"
-                            style={{ color: boardTheme.accentColor }}
-                        >
-                            {data.status}
-                        </span>
+
+                    {(bottom.length > 0 || controls.length > 0) && (
+                        <div className="flex flex-col items-center gap-3">
+                            {bottom}
+                            <TableControls
+                                controls={controls}
+                                deckTheme={deckTheme}
+                                pending={pending}
+                                onAction={onAction}
+                            />
+                        </div>
+                    )}
+
+                    {payload.isOver && (
+                        <GameOverOverlay
+                            outcome={payload.outcome}
+                            players={payload.players}
+                            currentUserId={currentUserId}
+                        />
                     )}
                 </div>
 
-                {(bottom.length > 0 || controls.length > 0) && (
-                    <div className="flex flex-col items-center gap-3">
-                        {bottom}
-                        <TableControls
-                            controls={controls}
-                            deckTheme={deckTheme}
-                            pending={pending}
-                            onAction={onAction}
-                        />
-                    </div>
-                )}
-
-                {payload.isOver && (
-                    <GameOverOverlay
-                        outcome={payload.outcome}
-                        players={payload.players}
-                        currentUserId={currentUserId}
+                {logLines && (
+                    <GameLog
+                        title={t("log_title")}
+                        emptyText={t("log_empty")}
+                        lines={logLines}
+                        boardTheme={boardTheme}
                     />
                 )}
             </div>

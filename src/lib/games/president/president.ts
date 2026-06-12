@@ -40,11 +40,21 @@ import type {
  *   weakest card).
  * - `finishOnTwoPenalty` — « finir par un 2 » : going out on a 2 demotes the
  *   player to last place (each new offender takes the bottom spot).
- * - `equalRankSkip` — « ou rien » : matching the table's rank exactly is a
- *   legal play and forces the next player to pass for the trick.
+ * - `equalRank` — matching the table's rank exactly is a legal play (the
+ *   entry point to « ou rien » and to completing a carré on the table).
+ * - `equalRankLock` — « ou rien » : once a player matches the table's rank
+ *   (an 8 on an 8), the trick locks on that rank — every following player
+ *   must lay that exact rank or pass, each on their own turn (never an
+ *   auto-pass). The lock holds until the table sweeps; chaining matches is
+ *   how a carré gets completed.
  * - `revolution` — playing four of a kind inverts the ranking (3 strongest,
  *   2 weakest) for the rest of the trick; a counter-revolution (another
  *   quad) flips it back. The table sweeping ends it.
+ * - `quadClosesTrick` — « le carré ferme le pli » : completing the fourth
+ *   card of a rank on the table (via « ou rien » plays) sweeps the trick on
+ *   the spot and the completer leads anew. A quad laid from hand in one play
+ *   stays a revolution when that rule is on — it closes nothing, otherwise
+ *   the inversion would die the instant it was born.
  *
  * The chosen rules are stamped into the state at setup and read back by
  * `apply`, so ANY module instance can resume or replay a saved game —
@@ -80,17 +90,25 @@ export interface PresidentRules {
     readonly twoClosesTrick: boolean;
     /** « Finir par un 2 » — going out on a 2 demotes you to last place. */
     readonly finishOnTwoPenalty: boolean;
-    /** « Ou rien » — matching the rank is legal and skips the next player. */
-    readonly equalRankSkip: boolean;
+    /** Matching the table's rank is a legal play (entry to « ou rien »). */
+    readonly equalRank: boolean;
+    /** « Ou rien » — an equal-rank play locks the trick on that rank: only
+     * that rank may follow until the table sweeps; others pass themselves. */
+    readonly equalRankLock: boolean;
     /** Four of a kind inverts the ranking until the trick clears. */
     readonly revolution: boolean;
+    /** « Le carré ferme le pli » — completing four of a kind on the table
+     * sweeps the trick; the completer leads anew. */
+    readonly quadClosesTrick: boolean;
 }
 
 export const DEFAULT_PRESIDENT_RULES: PresidentRules = {
     twoClosesTrick: true,
     finishOnTwoPenalty: true,
-    equalRankSkip: true,
+    equalRank: true,
+    equalRankLock: true,
     revolution: true,
+    quadClosesTrick: true,
 };
 
 export interface TrickPlay {
@@ -117,6 +135,8 @@ export interface PresidentState extends GameState {
     readonly combo: ComboShape | null;
     /** Ranking inverted by a quad — holds until the trick clears. */
     readonly revolution: boolean;
+    /** « Ou rien » engaged — only the combo's rank may follow this trick. */
+    readonly equalLock: boolean;
     /** Players who passed this trick (locked out until it clears). */
     readonly passed: readonly string[];
     /** Finishing order; index 0 = Président. */
@@ -157,6 +177,8 @@ export interface PresidentView {
     readonly combo: ComboShape | null;
     /** True while a revolution holds — the UI should flag the inversion. */
     readonly revolution: boolean;
+    /** True while « ou rien » locks the trick on the combo's rank. */
+    readonly equalLock: boolean;
     readonly pile: readonly TrickPlay[];
     readonly finished: readonly string[];
     readonly players: readonly PresidentPlayerView[];
@@ -178,13 +200,17 @@ function beatsCombo(
     rank: Rank,
     combo: ComboShape,
     revolution: boolean,
+    locked: boolean,
     rules: PresidentRules,
 ): boolean {
+    // « Ou rien » engaged — the trick is frozen on the combo's rank: only
+    // that exact rank may follow until the table sweeps.
+    if (locked) return rank === combo.rank;
     if (strength(rank, revolution) > strength(combo.rank, revolution)) {
         return true;
     }
-    // « Ou rien » — matching the rank exactly is legal (and skips a player).
-    return rules.equalRankSkip && rank === combo.rank;
+    // Matching the rank exactly is a legal play (and may engage the lock).
+    return rules.equalRank && rank === combo.rank;
 }
 
 function seatOrder(players: readonly Player[]): Player[] {
@@ -277,6 +303,7 @@ function clearTrick(
         pile: [],
         combo: null,
         revolution: false, // a revolution only holds for the trick
+        equalLock: false, // « ou rien » dies with the trick
         passed: [],
         currentPlayerId: leader,
     };
@@ -350,7 +377,13 @@ const base: Omit<
             for (const [rank, cards] of groups) {
                 if (
                     cards.length >= need &&
-                    beatsCombo(rank, state.combo, state.revolution, state.rules)
+                    beatsCombo(
+                        rank,
+                        state.combo,
+                        state.revolution,
+                        state.equalLock,
+                        state.rules,
+                    )
                 ) {
                     actions.push({
                         type: "play",
@@ -422,7 +455,15 @@ const base: Omit<
                     `Must play exactly ${state.combo.count} card(s).`,
                 );
             }
-            if (!beatsCombo(rank, state.combo, state.revolution, state.rules)) {
+            if (
+                !beatsCombo(
+                    rank,
+                    state.combo,
+                    state.revolution,
+                    state.equalLock,
+                    state.rules,
+                )
+            ) {
                 return fail("too_low", "Combo does not beat the table.");
             }
         }
@@ -473,7 +514,13 @@ const base: Omit<
             });
         }
 
-        let played: PresidentState = {
+        // « Ou rien » — matching the table's rank freezes the trick on it;
+        // an existing lock simply carries (only matches were legal anyway).
+        const equalMatch = state.combo !== null && rank === state.combo.rank;
+        const equalLock =
+            state.equalLock || (state.rules.equalRankLock && equalMatch);
+
+        const played: PresidentState = {
             ...state,
             hands: { ...state.hands, [action.playerId]: remaining },
             finished,
@@ -481,31 +528,44 @@ const base: Omit<
             pile: [...state.pile, { playerId: action.playerId, cards }],
             combo: { rank, count: cards.length },
             revolution,
+            equalLock,
             lastPlayerId: action.playerId,
             turn: state.turn + 1,
         };
 
-        // « Ou rien » — matching the table's rank forces the next player to
-        // pass: they join the passed list before the turn advances.
+        // « Le carré ferme le pli » — this play completed the fourth card of
+        // the rank on the table: sweep and hand the completer the lead. A
+        // quad laid from hand in one play is excluded while the revolution
+        // rule is on — it inverts the ranking instead of closing, otherwise
+        // the inversion could never outlive the play that created it.
+        let quadCompleted = false;
         if (
-            state.rules.equalRankSkip &&
-            state.combo !== null &&
-            rank === state.combo.rank
+            state.rules.quadClosesTrick &&
+            !(state.rules.revolution && cards.length === 4)
         ) {
-            const skipped = nextResponder(played, action.playerId);
-            if (skipped !== null) {
-                played = { ...played, passed: [...played.passed, skipped] };
-                events.push({
-                    type: "skipped",
-                    payload: { playerId: skipped },
-                });
+            let laid = 0;
+            for (let i = played.pile.length - 1; i >= 0; i--) {
+                if (comboRank(played.pile[i].cards) !== rank) break;
+                laid += played.pile[i].cards.length;
             }
+            quadCompleted = laid === 4;
+        }
+
+        // Announce the lock the moment it engages — moot when the same play
+        // completed the carré and the trick is closing anyway.
+        if (equalLock && !state.equalLock && !quadCompleted) {
+            events.push({
+                type: "or_nothing",
+                payload: { playerId: action.playerId, rank },
+            });
         }
 
         // « Le 2 ferme le pli » — the table sweeps and the actor leads again.
         // Under a revolution the 2 is the weakest card and closes nothing.
+        // A completed carré sweeps the same way.
         const closesTrick =
-            state.rules.twoClosesTrick && rank === "2" && !state.revolution;
+            quadCompleted ||
+            (state.rules.twoClosesTrick && rank === "2" && !state.revolution);
         const advanced = closesTrick
             ? (endIfDecided(played, action.playerId) ??
               clearTrick(played, action.playerId))
@@ -561,6 +621,7 @@ const base: Omit<
             rules: state.rules,
             combo: state.combo,
             revolution: state.revolution,
+            equalLock: state.equalLock,
             pile: state.pile,
             finished: state.finished,
             self: viewerId,
@@ -627,6 +688,7 @@ export function createPresident(
                 pile: [],
                 combo: null,
                 revolution: false,
+                equalLock: false,
                 passed: [],
                 finished: [],
                 demoted: [],

@@ -157,6 +157,25 @@
         "leave": "Leave game",
         "error_conflict": "The game advanced — refreshing",
         "error_illegal": "Illegal move",
-        "error_generic": "Something went wrong"
+        "error_generic": "Something went wrong",
+        "rank_J": "Jack",
+        "rank_Q": "Queen",
+        "rank_K": "King",
+        "rank_A": "Ace",
+        "log_title": "History",
+        "log_empty": "Nothing has happened yet",
+        "log_played_one": "{name} plays {rank}",
+        "log_played_many": "{name} plays {count}× {rank}",
+        "log_passed": "{name} passes",
+        "log_finished_title": "{name} finishes as {title}!",
+        "log_finished": "{name} went out in place {place}",
+        "log_demoted": "{name} went out on a 2 → straight to last place!",
+        "log_revolution": "Revolution! Card order is inverted",
+        "log_counter_revolution": "Counter-revolution! Order is back to normal",
+        "log_trick_cleared": "{name} takes the trick and leads again",
+        "log_round_won": "{name} wins round {n}",
+        "log_round_draw": "Round {n}: tie",
+        "log_or_nothing": "{name} calls “{rank} or nothing!”",
+        "or_nothing_status": "“{rank} or nothing” — play {rank} or pass"
     }
 }

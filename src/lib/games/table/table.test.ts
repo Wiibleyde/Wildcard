@@ -112,6 +112,7 @@ describe("president table", () => {
         rules: DEFAULT_PRESIDENT_RULES,
         combo: { rank: "9", count: 1 },
         revolution: false,
+        equalLock: false,
         pile: [
             { playerId: "c", cards: [card("8")] },
             { playerId: "b", cards: [card("9")] },
@@ -190,5 +191,62 @@ describe("president table", () => {
         const carl = data.seats?.find((s) => s.playerId === "c");
         expect(bob?.status).toBe("passed");
         expect(carl?.status).toBe("place_asshole");
+    });
+});
+
+describe("history log lines", () => {
+    const line = (type: string, payload?: Record<string, unknown>) =>
+        presidentTable.logLine?.({ type, payload }, ctx());
+
+    it("narrates plays with localized rank labels and counts", () => {
+        expect(line("played", { playerId: "b", rank: "Q", count: 1 })).toBe(
+            "log_played_one|Bob,rank_Q",
+        );
+        expect(line("played", { playerId: "a", rank: "8", count: 2 })).toBe(
+            "log_played_many|Alice,8,2",
+        );
+    });
+
+    it("narrates passes, sweeps and revolutions", () => {
+        expect(line("passed", { playerId: "c" })).toBe("log_passed|Carl");
+        expect(line("trick_cleared", { leadPlayerId: "a" })).toBe(
+            "log_trick_cleared|Alice",
+        );
+        expect(line("revolution", { active: true })).toBe("log_revolution");
+        expect(line("revolution", { active: false })).toBe(
+            "log_counter_revolution",
+        );
+    });
+
+    it("narrates the « ou rien » lock with the locked rank", () => {
+        expect(line("or_nothing", { playerId: "b", rank: "Q" })).toBe(
+            "log_or_nothing|Bob,rank_Q",
+        );
+    });
+
+    it("crowns finishers with their title when one applies", () => {
+        // 3 players: place 1 = Président, no vice titles.
+        expect(line("finished", { playerId: "b", place: 1 })).toBe(
+            "log_finished_title|Bob,place_president",
+        );
+        expect(line("finished", { playerId: "b", place: 2 })).toBe(
+            "log_finished|Bob,2",
+        );
+    });
+
+    it("hides unknown event types instead of leaking raw names", () => {
+        expect(line("internal_thing")).toBeNull();
+    });
+
+    it("narrates bataille rounds: winner or tie, flips hidden", () => {
+        const bLine = (type: string, payload?: Record<string, unknown>) =>
+            batailleTable.logLine?.({ type, payload }, ctx());
+        expect(bLine("round_resolved", { winner: "b", round: 4 })).toBe(
+            "log_round_won|Bob,4",
+        );
+        expect(bLine("round_resolved", { winner: null, round: 5 })).toBe(
+            "log_round_draw|5",
+        );
+        expect(bLine("flip", { playerId: "a" })).toBeNull();
     });
 });

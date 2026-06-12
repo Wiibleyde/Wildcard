@@ -16,21 +16,30 @@ function nameOf(ctx: TableContext, playerId: string | null): string {
     return ctx.players.find((p) => p.userId === playerId)?.username ?? "?";
 }
 
+/** Court cards get their localized name ("Dame"), pips stay as digits. */
+function rankLabel(ctx: TableContext, rank: unknown): string {
+    const r = String(rank);
+    return r === "J" || r === "Q" || r === "K" || r === "A"
+        ? ctx.t(`rank_${r}`)
+        : r;
+}
+
+/** Title for a clean finish, when one exists ("Président", "Vice-Trou"…). */
+function finishTitle(ctx: TableContext, place: number): string | null {
+    const n = ctx.players.length;
+    if (place === 1) return ctx.t("place_president");
+    if (place === n) return ctx.t("place_asshole");
+    if (n >= 4 && place === 2) return ctx.t("place_vice_president");
+    if (n >= 4 && place === n - 1) return ctx.t("place_vice_asshole");
+    return null;
+}
+
 /** "Président" / "Vice-Président" / "Vice-Trou" / "Trou du cul" / "Terminé
  * (n)" — or `null` while playing. Vice titles need a 4th seat to exist. */
-function placeLabel(
-    ctx: TableContext,
-    view: PresidentView,
-    p: PresidentPlayerView,
-): string | null {
+function placeLabel(ctx: TableContext, p: PresidentPlayerView): string | null {
     if (p.demoted) return ctx.t("place_asshole");
     if (p.place === null) return null;
-    const n = view.players.length;
-    if (p.place === 1) return ctx.t("place_president");
-    if (p.place === n) return ctx.t("place_asshole");
-    if (n >= 4 && p.place === 2) return ctx.t("place_vice_president");
-    if (n >= 4 && p.place === n - 1) return ctx.t("place_vice_asshole");
-    return ctx.t("finished", { place: p.place });
+    return finishTitle(ctx, p.place) ?? ctx.t("finished", { place: p.place });
 }
 
 /**
@@ -68,7 +77,7 @@ export const presidentTable = registerTable<PresidentView>({
         const seats = view.players
             .filter((p) => p.playerId !== ctx.viewerId)
             .map((p) => {
-                const place = placeLabel(ctx, view, p);
+                const place = placeLabel(ctx, p);
                 return {
                     playerId: p.playerId,
                     name: p.name,
@@ -109,7 +118,7 @@ export const presidentTable = registerTable<PresidentView>({
                     id: `hand:${cardKey(card)}`,
                     card,
                 })),
-                badge: placeLabel(ctx, view, self) ?? undefined,
+                badge: placeLabel(ctx, self) ?? undefined,
             });
         }
 
@@ -142,7 +151,63 @@ export const presidentTable = registerTable<PresidentView>({
             seats,
             zones,
             controls,
-            status: view.revolution ? ctx.t("revolution") : undefined,
+            status: view.revolution
+                ? ctx.t("revolution")
+                : view.equalLock && view.combo
+                  ? ctx.t("or_nothing_status", {
+                        rank: rankLabel(ctx, view.combo.rank),
+                    })
+                  : undefined,
         };
+    },
+
+    logLine(event, ctx) {
+        const p = event.payload ?? {};
+        const name = nameOf(
+            ctx,
+            typeof p.playerId === "string" ? p.playerId : null,
+        );
+        switch (event.type) {
+            case "played": {
+                const rank = rankLabel(ctx, p.rank);
+                const count = typeof p.count === "number" ? p.count : 1;
+                return count > 1
+                    ? ctx.t("log_played_many", { name, rank, count })
+                    : ctx.t("log_played_one", { name, rank });
+            }
+            case "passed":
+                return ctx.t("log_passed", { name });
+            case "or_nothing":
+                return ctx.t("log_or_nothing", {
+                    name,
+                    rank: rankLabel(ctx, p.rank),
+                });
+            case "finished": {
+                const place = typeof p.place === "number" ? p.place : 0;
+                const title = finishTitle(ctx, place);
+                return title
+                    ? ctx.t("log_finished_title", { name, title })
+                    : ctx.t("log_finished", { name, place });
+            }
+            case "demoted":
+                return ctx.t("log_demoted", { name });
+            case "revolution":
+                return p.active === true
+                    ? ctx.t("log_revolution")
+                    : ctx.t("log_counter_revolution");
+            case "trick_cleared":
+                return ctx.t("log_trick_cleared", {
+                    name: nameOf(
+                        ctx,
+                        typeof p.leadPlayerId === "string"
+                            ? p.leadPlayerId
+                            : null,
+                    ),
+                });
+            case "game_over":
+                return ctx.t("game_over");
+            default:
+                return null;
+        }
     },
 });

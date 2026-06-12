@@ -1,6 +1,6 @@
 import type { CardSize } from "@/lib/card/sizes";
 import type { CardDescriptor } from "@/lib/card/types";
-import type { GameAction } from "@/lib/engine/types";
+import type { GameAction, GameEvent } from "@/lib/engine/types";
 
 /**
  * Config-driven table layouts — ONE generic component (`GameTable`) renders
@@ -142,6 +142,12 @@ export interface GameTableConfig<V> {
     readonly zones: readonly TableZoneTemplate[];
     /** Pure projection — no JSX, fully unit-testable. */
     mapView(view: V, ctx: TableContext): TableData;
+    /**
+     * Localized, user-friendly sentence for one history event — `null` hides
+     * it (noise like per-step internals). Drives the log feed next to the
+     * table; omitting the hook hides the feed for that game.
+     */
+    logLine?(event: GameEvent, ctx: TableContext): string | null;
 }
 
 /** Type-erased table config, as stored in the catalog. */

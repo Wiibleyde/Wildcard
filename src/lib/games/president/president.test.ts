@@ -39,6 +39,7 @@ function state3(
         pile: [],
         combo: null,
         revolution: false,
+        equalLock: false,
         passed: [],
         finished: [],
         demoted: [],
@@ -51,8 +52,10 @@ function state3(
 const CLASSIC = {
     twoClosesTrick: false,
     finishOnTwoPenalty: false,
-    equalRankSkip: false,
+    equalRank: false,
+    equalRankLock: false,
     revolution: false,
+    quadClosesTrick: false,
 } as const;
 
 /** Route through the runner (supplies rng + identity check). */
@@ -133,7 +136,7 @@ describe("president move legality", () => {
         expect(res.error.code).toBe("too_low");
     });
 
-    it("accepts an equal rank and skips the next player (« ou rien »)", () => {
+    it("locks the trick on a matched rank (« ou rien ») without auto-passing", () => {
         const s = state3(
             {
                 a: [card("10", "hearts"), card("4", "hearts")],
@@ -150,14 +153,79 @@ describe("president move legality", () => {
         expect(res.ok).toBe(true);
         if (!res.ok) return;
         expect(res.state.combo).toEqual({ rank: "10", count: 1 });
-        expect(res.state.lastPlayerId).toBe("b");
-        // c is forced to pass; the turn jumps straight to a.
-        expect(res.state.passed).toContain("c");
-        expect(res.state.currentPlayerId).toBe("a");
+        expect(res.state.equalLock).toBe(true);
         expect(res.events).toContainEqual({
-            type: "skipped",
-            payload: { playerId: "c" },
+            type: "or_nothing",
+            payload: { playerId: "b", rank: "10" },
         });
+        // No auto-pass: c keeps the turn — but holding no 10, may only pass.
+        expect(res.state.passed).toHaveLength(0);
+        expect(res.state.currentPlayerId).toBe("c");
+        expect(summary(president.legalActions(res.state, "c"))).toEqual([
+            "pass",
+        ]);
+    });
+
+    it("refuses a higher rank while the lock holds, accepts the match", () => {
+        const s = state3(
+            { a: [], b: [card("10", "diamonds"), card("K")], c: [] },
+            {
+                combo: { rank: "10", count: 1 },
+                equalLock: true,
+                lastPlayerId: "a",
+                currentPlayerId: "b",
+            },
+        );
+        const high = step(s, play("b", [card("K")]));
+        expect(high.ok).toBe(false);
+        if (!high.ok) expect(high.error.code).toBe("too_low");
+        expect(step(s, play("b", [card("10", "diamonds")])).ok).toBe(true);
+    });
+
+    it("lifts the lock when the trick clears", () => {
+        const s = state3(
+            { a: [card("4")], b: [card("K")], c: [card("J")] },
+            {
+                combo: { rank: "10", count: 1 },
+                equalLock: true,
+                pile: [{ playerId: "b", cards: [card("10")] }],
+                lastPlayerId: "b",
+                currentPlayerId: "c",
+                passed: ["a"],
+            },
+        );
+        const res = step(s, pass("c")); // back to b → sweep
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(res.state.equalLock).toBe(false);
+        expect(res.state.combo).toBeNull();
+        expect(res.state.currentPlayerId).toBe("b");
+    });
+
+    it("does not lock when the rule is disabled — higher ranks stay legal", () => {
+        const s = state3(
+            {
+                a: [card("10", "hearts")],
+                b: [card("10")],
+                c: [card("J")],
+            },
+            {
+                combo: { rank: "10", count: 1 },
+                lastPlayerId: "a",
+                currentPlayerId: "b",
+                rules: { ...DEFAULT_PRESIDENT_RULES, equalRankLock: false },
+            },
+        );
+        const res = step(s, play("b", [card("10")]));
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(res.state.equalLock).toBe(false);
+        expect(res.events.some((e) => e.type === "or_nothing")).toBe(false);
+        // c may still climb with the Jack.
+        expect(summary(president.legalActions(res.state, "c"))).toEqual([
+            "Jx1",
+            "pass",
+        ]);
     });
 
     it("rejects an equal rank when « ou rien » is disabled", () => {
@@ -403,6 +471,146 @@ describe("president revolution", () => {
         expect(res.ok).toBe(true);
         if (!res.ok) return;
         expect(res.state.revolution).toBe(false);
+    });
+});
+
+describe("president carré (« le carré ferme le pli »)", () => {
+    it("completing a quad with a second pair sweeps and the completer leads", () => {
+        const s = state3(
+            {
+                a: [card("8", "spades"), card("8", "hearts"), card("K")],
+                b: [card("9"), card("J")],
+                c: [card("4"), card("A")],
+            },
+            {
+                combo: { rank: "8", count: 2 },
+                pile: [
+                    {
+                        playerId: "c",
+                        cards: [card("8", "diamonds"), card("8", "clubs")],
+                    },
+                ],
+                lastPlayerId: "c",
+                currentPlayerId: "a",
+            },
+        );
+        const res = step(
+            s,
+            play("a", [card("8", "spades"), card("8", "hearts")]),
+        );
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(res.state.combo).toBeNull();
+        expect(res.state.pile).toHaveLength(0);
+        expect(res.state.currentPlayerId).toBe("a"); // completer leads anew
+        expect(res.events).toContainEqual({
+            type: "trick_cleared",
+            payload: { leadPlayerId: "a" },
+        });
+        // The close supersedes « ou rien » — no lock announcement on a sweep.
+        expect(res.events.some((e) => e.type === "or_nothing")).toBe(false);
+        expect(res.state.equalLock).toBe(false);
+    });
+
+    it("completing a quad as the fourth single sweeps the trick", () => {
+        const s = state3(
+            {
+                a: [card("8", "clubs"), card("K")],
+                b: [card("9"), card("J")],
+                c: [card("4"), card("A")],
+            },
+            {
+                combo: { rank: "8", count: 1 },
+                pile: [
+                    { playerId: "a", cards: [card("8", "spades")] },
+                    { playerId: "b", cards: [card("8", "hearts")] },
+                    { playerId: "c", cards: [card("8", "diamonds")] },
+                ],
+                equalLock: true, // engaged by the second 8
+                lastPlayerId: "c",
+                currentPlayerId: "a",
+            },
+        );
+        const res = step(s, play("a", [card("8", "clubs")]));
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(res.state.combo).toBeNull();
+        expect(res.state.currentPlayerId).toBe("a");
+    });
+
+    it("keeps the trick open when the rule is disabled", () => {
+        const s = state3(
+            {
+                a: [card("8", "spades"), card("8", "hearts"), card("K")],
+                b: [card("9"), card("J")],
+                c: [card("4"), card("A")],
+            },
+            {
+                combo: { rank: "8", count: 2 },
+                pile: [
+                    {
+                        playerId: "c",
+                        cards: [card("8", "diamonds"), card("8", "clubs")],
+                    },
+                ],
+                lastPlayerId: "c",
+                currentPlayerId: "a",
+                rules: { ...DEFAULT_PRESIDENT_RULES, quadClosesTrick: false },
+            },
+        );
+        const res = step(
+            s,
+            play("a", [card("8", "spades"), card("8", "hearts")]),
+        );
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        // Plain equal-rank play: the trick stays open, b keeps the turn.
+        expect(res.state.combo).toEqual({ rank: "8", count: 2 });
+        expect(res.state.passed).toHaveLength(0);
+        expect(res.state.currentPlayerId).toBe("b");
+    });
+
+    it("a quad from hand stays a revolution and does not close the trick", () => {
+        const s = state3({
+            a: [
+                card("9", "spades"),
+                card("9", "hearts"),
+                card("9", "diamonds"),
+                card("9", "clubs"),
+                card("K"),
+            ],
+            b: [card("5"), card("A")],
+            c: [card("J"), card("3")],
+        });
+        const res = step(s, play("a", s.hands.a.slice(0, 4)));
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(res.state.revolution).toBe(true);
+        expect(res.state.combo).toEqual({ rank: "9", count: 4 }); // trick open
+        expect(res.state.currentPlayerId).toBe("b");
+    });
+
+    it("a quad from hand closes the trick when revolution is disabled", () => {
+        const s = state3(
+            {
+                a: [
+                    card("9", "spades"),
+                    card("9", "hearts"),
+                    card("9", "diamonds"),
+                    card("9", "clubs"),
+                    card("K"),
+                ],
+                b: [card("5"), card("A")],
+                c: [card("J"), card("3")],
+            },
+            { rules: { ...DEFAULT_PRESIDENT_RULES, revolution: false } },
+        );
+        const res = step(s, play("a", s.hands.a.slice(0, 4)));
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(res.state.revolution).toBe(false);
+        expect(res.state.combo).toBeNull();
+        expect(res.state.currentPlayerId).toBe("a"); // leads again
     });
 });
 

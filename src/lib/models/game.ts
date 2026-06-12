@@ -28,6 +28,21 @@ export interface GamePlayer {
 }
 
 /**
+ * One applied action's worth of history: who acted and the public events the
+ * reducer emitted for it. Events are public-safe by module contract (only
+ * table-visible facts), so every viewer — including spectators — gets the
+ * same log.
+ */
+export interface GameLogEntry {
+    readonly seq: number;
+    readonly actorId: string;
+    readonly events: readonly GameEvent[];
+}
+
+/** Most recent actions exposed to clients — enough to scroll a whole round. */
+const LOG_LIMIT = 80;
+
+/**
  * Everything one client is allowed to receive for the current game. `view` is
  * the module's redacted projection (opponents' hands stripped) — never raw
  * state. `legalActions` is empty for spectators.
@@ -43,6 +58,8 @@ export interface GameClientPayload {
     readonly legalActions: readonly GameAction[];
     readonly outcome: GameOutcome | null;
     readonly players: readonly GamePlayer[];
+    /** Recent history, oldest first — drives the in-game log feed. */
+    readonly log: readonly GameLogEntry[];
     /** The viewer this payload was built for; `null` = spectator. */
     readonly viewerId: string | null;
 }
@@ -108,6 +125,21 @@ async function playersOf(
     }));
 }
 
+/** Last {@link LOG_LIMIT} applied actions with their events, oldest first. */
+async function logOf(admin: Admin, gameId: string): Promise<GameLogEntry[]> {
+    const { data } = await admin
+        .from("game_actions")
+        .select("seq, actor_id, events")
+        .eq("game_id", gameId)
+        .order("seq", { ascending: false })
+        .limit(LOG_LIMIT);
+    return (data ?? []).reverse().map((row) => ({
+        seq: row.seq,
+        actorId: row.actor_id,
+        events: row.events as unknown as readonly GameEvent[],
+    }));
+}
+
 /**
  * Build the redacted payload for one viewer. `viewerId` that is not seated is
  * treated as a spectator (`null` view, no legal actions).
@@ -128,6 +160,10 @@ export async function getGameClientState(
     const effectiveViewer = isPlayer ? viewerId : null;
 
     const cs = clientState(module, state, effectiveViewer);
+    const [players, log] = await Promise.all([
+        playersOf(admin, state),
+        logOf(admin, gameId),
+    ]);
 
     return {
         ok: true,
@@ -141,7 +177,8 @@ export async function getGameClientState(
             view: cs.view,
             legalActions: cs.legalActions,
             outcome: module.outcome(state),
-            players: await playersOf(admin, state),
+            players,
+            log,
             viewerId: effectiveViewer,
         },
     };
@@ -272,6 +309,7 @@ export async function advanceBots(
             seq: version,
             actor_id: botId,
             action: action as unknown as Record<string, unknown>,
+            events: result.events as unknown as Record<string, unknown>[],
         });
 
         if (over) {
@@ -387,6 +425,7 @@ export async function applyAction(
             seq: newVersion,
             actor_id: actorId,
             action: action as unknown as Record<string, unknown>,
+            events: result.events as unknown as Record<string, unknown>[],
         }),
     ]);
     if (stateError) {

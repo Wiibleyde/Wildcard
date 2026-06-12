@@ -362,6 +362,7 @@ export type Database = {
                     seq: number;
                     actor_id: string;
                     action: Record<string, unknown>;
+                    events: Record<string, unknown>[];
                     created_at: string;
                 };
                 Insert: {
@@ -370,6 +371,7 @@ export type Database = {
                     seq: number;
                     actor_id: string;
                     action: Record<string, unknown>;
+                    events?: Record<string, unknown>[];
                     created_at?: string;
                 };
                 Update: {
@@ -378,6 +380,7 @@ export type Database = {
                     seq?: number;
                     actor_id?: string;
                     action?: Record<string, unknown>;
+                    events?: Record<string, unknown>[];
                     created_at?: string;
                 };
                 Relationships: [

@@ -157,6 +157,25 @@
         "leave": "Quitter la partie",
         "error_conflict": "La partie a avancé — actualisation",
         "error_illegal": "Coup illégal",
-        "error_generic": "Une erreur est survenue"
+        "error_generic": "Une erreur est survenue",
+        "rank_J": "Valet",
+        "rank_Q": "Dame",
+        "rank_K": "Roi",
+        "rank_A": "As",
+        "log_title": "Historique",
+        "log_empty": "Aucune action pour l'instant",
+        "log_played_one": "{name} pose {rank}",
+        "log_played_many": "{name} pose {count}× {rank}",
+        "log_passed": "{name} passe",
+        "log_finished_title": "{name} termine {title} !",
+        "log_finished": "{name} a fini à la place {place}",
+        "log_demoted": "{name} termine sur un 2 → Trou du cul !",
+        "log_revolution": "Révolution ! L'ordre des cartes est inversé",
+        "log_counter_revolution": "Contre-révolution ! L'ordre redevient normal",
+        "log_trick_cleared": "{name} ramasse le pli et relance",
+        "log_round_won": "{name} remporte la manche {n}",
+        "log_round_draw": "Manche {n} : égalité",
+        "log_or_nothing": "{name} annonce « {rank} ou rien ! »",
+        "or_nothing_status": "« {rank} ou rien » — joue {rank} ou passe"
     }
 }

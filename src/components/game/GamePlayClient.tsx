@@ -51,7 +51,10 @@ export function GamePlayClient({
             cache: "no-store",
         });
         if (res.ok) {
-            setPayload((await res.json()) as GameClientPayload);
+            const next = (await res.json()) as GameClientPayload;
+            // Concurrent refetches can resolve out of order — never let a
+            // stale snapshot overwrite a newer one.
+            setPayload((prev) => (next.version >= prev.version ? next : prev));
         }
     }, [initial.gameId]);
 
