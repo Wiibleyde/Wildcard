@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useCallback, useRef, useState } from "react";
 import { GameTable } from "@/components/game/GameTable";
+import { ReconnectingBanner } from "@/components/realtime/ReconnectingBanner";
 import { BOARD_THEMES } from "@/lib/board/themes";
 import { greenFeltTheme } from "@/lib/board/themes/green_felt";
 import { THEMES } from "@/lib/card/themes";
@@ -58,7 +59,7 @@ export function GamePlayClient({
         }
     }, [initial.gameId]);
 
-    useGameChannel(initial.gameId, refetch);
+    const conn = useGameChannel(initial.gameId, refetch);
 
     const onAction = useCallback(
         async (action: GameAction) => {
@@ -99,6 +100,7 @@ export function GamePlayClient({
 
     return (
         <div className="flex flex-col gap-2">
+            <ReconnectingBanner status={conn} />
             {actionError && (
                 <div
                     className="mx-auto w-full max-w-3xl rounded-xl px-4 py-2 text-center text-sm font-bold xl:max-w-5xl 2xl:max-w-7xl"

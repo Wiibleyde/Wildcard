@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ReconnectingBanner } from "@/components/realtime/ReconnectingBanner";
 import { useRouter } from "@/i18n/navigation";
 import { useRoomChannel } from "@/lib/realtime/useRoomChannel";
 import { createClient } from "@/lib/supabase/client";
@@ -115,7 +116,7 @@ export function RoomClient({
         bootstrap();
     }, [code, refresh]);
 
-    useRoomChannel(roomId, refresh);
+    const conn = useRoomChannel(roomId, refresh);
 
     const isHost = hostId === currentUserId;
     const total = seats.length + botCount;
@@ -197,6 +198,7 @@ export function RoomClient({
 
     return (
         <div className="flex flex-col gap-6">
+            <ReconnectingBanner status={conn} />
             {/* Code share */}
             <div
                 className="rounded-2xl p-6 xl:p-8 flex flex-col items-center gap-3 text-center"
