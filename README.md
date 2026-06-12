@@ -13,7 +13,7 @@ Plateforme de jeux de cartes multijoueur en ligne — projet de fin d'études Ma
 | Node.js | 20+ | [nodejs.org](https://nodejs.org) |
 | Bun | 1.0+ | `npm install -g bun` |
 | Docker | 24+ | [docker.com](https://www.docker.com) |
-| Supabase CLI | 2.0+ | `npm install -g supabase` |
+| Supabase CLI | 2.0+ | `bun install -g supabase` |
 
 ---
 

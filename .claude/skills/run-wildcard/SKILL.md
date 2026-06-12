@@ -14,14 +14,14 @@ All paths below are relative to the repo root.
 Playwright is a devDependency but its browser needs a one-time download:
 
 ```bash
-npm install
-npx playwright install chromium
+bun install
+bunx playwright install chromium
 ```
 
 ## Launch
 
 ```bash
-npm run dev   # docker compose (supabase) + next dev on :3000
+bun run dev   # docker compose (supabase) + next dev on :3000
 ```
 
 Often already running — check first:
@@ -64,13 +64,13 @@ node .claude/skills/run-wildcard/driver.mjs play
 
 ## Run (human path)
 
-`npm run dev` → http://localhost:3000 → login via Google/Discord OAuth.
+`bun run dev` → http://localhost:3000 → login via Google/Discord OAuth.
 Useless headless; agents use the driver.
 
 ## Test
 
 ```bash
-npm test   # vitest run — engine/game-module unit tests
+bun run test   # vitest run — engine/game-module unit tests
 ```
 
 ## Gotchas
@@ -84,7 +84,7 @@ npm test   # vitest run — engine/game-module unit tests
   dies with `ERR_MODULE_NOT_FOUND`.
 - **fullPage screenshots paint the fixed mobile bottom nav mid-image** (at
   its viewport position). Artifact, not a layout bug.
-- **`npx` output can be mangled in this environment** — call binaries
+- **`bunx` output can be mangled in this environment** — call binaries
   directly: `./node_modules/.bin/biome`, `./node_modules/.bin/tsc`.
 - Game modules registered: `bataille` (2 players), `president` (3–6 → use
   `count: 3` bots before `start`).
@@ -95,7 +95,7 @@ npm test   # vitest run — engine/game-module unit tests
 ## Troubleshooting
 
 - `Dev server not responding on http://localhost:3000` (driver exit 1) →
-  run `npm run dev`, wait for the 307 from the curl check above. (Auth is
+  run `bun run dev`, wait for the 307 from the curl check above. (Auth is
   self-healing: the driver re-creates its test user on every run.)
 - Hand/clickable cards rendering as ~4px slivers → `Card`'s root must keep
   `block w-full` (buttons collapse to their borders without it; regression

@@ -90,7 +90,7 @@ async function authCookies() {
 // ── Shared setup ──
 const ping = await fetch(BASE).catch(() => null);
 if (!ping) {
-    console.error(`Dev server not responding on ${BASE} — run: npm run dev`);
+    console.error(`Dev server not responding on ${BASE} — run: bun run dev`);
     process.exit(1);
 }
 const browser = await chromium.launch({ args: ["--no-sandbox"] });
