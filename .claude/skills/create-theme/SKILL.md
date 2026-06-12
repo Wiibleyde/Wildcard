@@ -14,13 +14,14 @@ Scaffold a typed `CardTheme` file for the Wildcard card system.
    If no args, ask the user for the theme id (kebab-case) before proceeding.
 
 2. Ask the user (in a single message) for the following, offering sensible defaults:
-   - **Tier** — `free | premium | exclusive | collab` (default: `premium`)
-   - **Brand name** — only for `collab` tier; skip otherwise
+   - **Tier** — `common | uncommon | rare | epic | legendary | mystical | ethereal` (default: `rare`)
+   - **Brand name** — only for brand-collab decks; skip otherwise
    - **Card face** — background color + default text color
    - **Border** — color + effect (`solid | glow`); if glow, also glowColor
    - **Suits** — color for black suits (♠♣) and color for red suits (♥♦); symbols stay as unicode unless the user specifies SVG/image
    - **Back** — base color + optional pattern description (e.g. "diagonal stripes", "diamond lattice")
    - **Effects** — comma-separated list of `shimmer | foil | holographic | sparkle` (optional)
+   - **Play animation** — template used when a card of this deck lands on the table: `simple | flip | arc` (optional; omitting it means `simple`). Templates live in `src/lib/card/animations.ts` (`PLAY_ANIMATIONS`)
    - **Font** — CSS font-family (optional; user must load the font themselves)
 
 3. Once you have the answers, create the file at:
@@ -46,7 +47,7 @@ Scaffold a typed `CardTheme` file for the Wildcard card system.
 interface CardTheme {
   id: string;                   // kebab-case, matches filename
   name: string;                 // Display name shown in the UI
-  tier: "free" | "premium" | "exclusive" | "collab";
+  tier: "common" | "uncommon" | "rare" | "epic" | "legendary" | "mystical" | "ethereal";
 
   suits: Record<"spades"|"hearts"|"diamonds"|"clubs", {
     symbol: string;             // Unicode char e.g. "♠" — or ReactElement for SVG
@@ -88,6 +89,11 @@ interface CardTheme {
     speed?: number;
   }>;
 
+  playAnimation?: {             // Entry animation when a card lands on the table
+    template: "simple" | "flip" | "arc";  // Registry: src/lib/card/animations.ts
+    duration?: number;          // Seconds — overrides the template default
+  };
+
   font?: {
     family: string;             // CSS font-family
     rankWeight?: number | string;
@@ -97,7 +103,7 @@ interface CardTheme {
 
   trumpColor?: string;          // Accent for tarot trump/fool labels
 
-  brand?: {                     // Only for collab tier
+  brand?: {                     // Only for brand-collab decks
     name: string;
     logo?: string | ReactElement;
     edition?: string;           // e.g. "2025 S1"
@@ -114,7 +120,7 @@ import type { CardTheme } from "@/lib/card/types";
 export const obsidianGold: CardTheme = {
   id: "obsidian-gold",
   name: "Obsidian Gold",
-  tier: "premium",
+  tier: "epic",
   suits: {
     spades:   { symbol: "♠", color: "#c9a84c", symbolStyle: { textShadow: "0 0 6px #c9a84c88" } },
     hearts:   { symbol: "♥", color: "#e8433a", symbolStyle: { textShadow: "0 0 6px #e8433a88" } },
@@ -135,6 +141,7 @@ export const obsidianGold: CardTheme = {
       "repeating-conic-gradient(#c9a84c18 0deg, transparent 0deg, transparent 22.5deg, #c9a84c18 22.5deg, #c9a84c18 23deg) center / 28px 28px",
     emblem: "✦",
   },
+  playAnimation: { template: "flip" },
   font: {
     family: "'Playfair Display', serif",
     rankItalic: true,
@@ -151,7 +158,7 @@ import type { CardTheme } from "@/lib/card/types";
 export const fcAzur: CardTheme = {
   id: "fc-azur",
   name: "FC Azur × Wildcard",
-  tier: "collab",
+  tier: "legendary",
   suits: {
     spades:   { symbol: "♠", color: "#c9a84c" },
     hearts:   { symbol: "♥", color: "#e8433a" },

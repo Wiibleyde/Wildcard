@@ -198,7 +198,11 @@ services:
       PORT: 4000
       DB_HOST: ${POSTGRES_HOST}
       DB_PORT: ${POSTGRES_PORT}
-      DB_USER: postgres
+      # Must be the superuser that owns the `realtime` schema, or tenant
+      # migrations fail with "permission denied for schema realtime" and
+      # postgres_changes never work. `postgres` is NOT superuser in the
+      # supabase image; `supabase_admin` is (password set by zzz-set-role-passwords.sh).
+      DB_USER: supabase_admin
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
       DB_AFTER_CONNECT_QUERY: "SET search_path TO _realtime"

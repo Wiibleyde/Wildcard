@@ -48,5 +48,7 @@ export const creatorTheme: CardTheme = {
         ],
     },
     effects: [{ type: "shimmer", color: "#e8c468", speed: 0.8 }],
+    // Signature throw — this deck's cards land on the table in an arc
+    playAnimation: { template: "arc" },
     trumpColor: "#e8c468",
 };

@@ -13,6 +13,47 @@ export type ProfilePatchErrorCode =
     | "username_taken"
     | "db_error";
 
+/** Server-side cap — mirrors the form's `maxLength={30}`. */
+const USERNAME_MAX_LENGTH = 30;
+const AVATAR_URL_MAX_LENGTH = 2048;
+
+/**
+ * Narrow an unknown request body into a {@link ProfilePatch}, or `null` when
+ * the shape is invalid. The API boundary must never trust a client cast.
+ */
+export function parseProfilePatch(body: unknown): ProfilePatch | null {
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+        return null;
+    }
+    const record = body as Record<string, unknown>;
+    const patch: ProfilePatch = {};
+
+    if ("username" in record) {
+        const { username } = record;
+        if (
+            typeof username !== "string" ||
+            username.length > USERNAME_MAX_LENGTH
+        ) {
+            return null;
+        }
+        patch.username = username;
+    }
+
+    if ("avatar_url" in record) {
+        const avatar = record.avatar_url;
+        if (avatar !== null && typeof avatar !== "string") return null;
+        if (
+            typeof avatar === "string" &&
+            avatar.length > AVATAR_URL_MAX_LENGTH
+        ) {
+            return null;
+        }
+        patch.avatar_url = avatar;
+    }
+
+    return patch;
+}
+
 type PatchResult =
     | { ok: true }
     | { ok: false; error: ProfilePatchErrorCode; message?: string };

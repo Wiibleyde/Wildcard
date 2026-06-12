@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import type { Locale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 import { PreviewPage } from "@/components/pages/PreviewPage";
 import { BOARD_THEMES } from "@/lib/board/themes";
@@ -9,7 +10,7 @@ export default async function Page({
     params,
     searchParams,
 }: {
-    params: Promise<{ lang: string }>;
+    params: Promise<{ lang: Locale }>;
     searchParams: Promise<{ deck?: string; board?: string }>;
 }) {
     const { lang } = await params;

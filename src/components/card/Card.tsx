@@ -82,7 +82,7 @@ export function Card({
     };
 
     const cls = [
-        "relative select-none overflow-hidden",
+        "relative block w-full select-none overflow-hidden",
         !disableTransitions && "transition-transform duration-150",
         !disableTransitions &&
             onClick &&

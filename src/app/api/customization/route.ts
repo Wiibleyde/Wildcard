@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
-    type CustomizationPatch,
     type CustomizationPatchErrorCode,
+    parseCustomizationPatch,
     patchCustomization,
 } from "@/lib/models/customization";
 import { createClient } from "@/lib/supabase/server";
@@ -24,8 +24,13 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = (await request.json()) as CustomizationPatch;
-    const result = await patchCustomization(supabase, user.id, body);
+    const body: unknown = await request.json().catch(() => null);
+    const patch = parseCustomizationPatch(body);
+    if (!patch) {
+        return NextResponse.json({ error: "invalid_body" }, { status: 400 });
+    }
+
+    const result = await patchCustomization(supabase, user.id, patch);
 
     if (!result.ok) {
         return NextResponse.json(

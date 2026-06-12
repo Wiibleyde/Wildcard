@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import type { Locale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 import { CustomizePage } from "@/components/pages/CustomizePage";
 import { createClient } from "@/lib/supabase/server";
@@ -6,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 export default async function Page({
     params,
 }: {
-    params: Promise<{ lang: string }>;
+    params: Promise<{ lang: Locale }>;
 }) {
     const { lang } = await params;
     setRequestLocale(lang);

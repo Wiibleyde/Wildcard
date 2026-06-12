@@ -159,8 +159,8 @@ Ce projet doit fonctionner correctement de **mobile** (375px) jusqu'aux **écran
 Ce projet utilise **Biome** comme linter et formateur. **Après chaque modification de fichier**, vérifier l'absence d'erreurs :
 
 ```bash
-npx biome check --write <fichier>   # lint + format + auto-fix
-npx biome check <fichier>           # lint + format (lecture seule)
+bunx biome check --write <fichier>   # lint + format + auto-fix
+bunx biome check <fichier>           # lint + format (lecture seule)
 ```
 
 Règles fréquentes à respecter :

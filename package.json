@@ -10,8 +10,8 @@
         "format": "biome format --write",
         "test": "vitest run",
         "test:watch": "vitest",
-        "db:start": "docker compose --env-file .env.docker up -d",
-        "db:stop": "docker compose --env-file .env.docker down",
+        "up": "docker compose --env-file .env.docker up -d",
+        "down": "docker compose --env-file .env.docker down",
         "db:reset": "supabase db reset",
         "db:push": "supabase db push",
         "db:types": "supabase gen types typescript --local > src/lib/supabase/types.ts",
@@ -34,6 +34,7 @@
         "@types/react": "^19",
         "@types/react-dom": "^19",
         "babel-plugin-react-compiler": "1.0.0",
+        "playwright": "^1.60.0",
         "tailwindcss": "^4",
         "typescript": "^5",
         "vitest": "^4.1.8"

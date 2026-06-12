@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 
 function EyeIcon() {
@@ -45,6 +46,7 @@ type Props = {
 };
 
 export function TileShell({ selected, onClick, previewHref, children }: Props) {
+    const t = useTranslations("customize");
     return (
         <div
             className="relative rounded-xl overflow-hidden transition-all"
@@ -84,7 +86,7 @@ export function TileShell({ selected, onClick, previewHref, children }: Props) {
                 }}
             >
                 <EyeIcon />
-                <span>Aperçu</span>
+                <span>{t("preview_action")}</span>
             </Link>
         </div>
     );

@@ -207,6 +207,191 @@ export type Database = {
                 };
                 Relationships: [];
             };
+            rooms: {
+                Row: {
+                    id: string;
+                    code: string;
+                    module_id: string;
+                    host_id: string;
+                    status: "lobby" | "playing" | "finished";
+                    current_game_id: string | null;
+                    bot_count: number;
+                    created_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    code: string;
+                    module_id: string;
+                    host_id: string;
+                    status?: "lobby" | "playing" | "finished";
+                    current_game_id?: string | null;
+                    bot_count?: number;
+                    created_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    code?: string;
+                    module_id?: string;
+                    host_id?: string;
+                    status?: "lobby" | "playing" | "finished";
+                    current_game_id?: string | null;
+                    bot_count?: number;
+                    created_at?: string;
+                };
+                Relationships: [
+                    {
+                        foreignKeyName: "rooms_host_id_fkey";
+                        columns: ["host_id"];
+                        referencedRelation: "profiles";
+                        referencedColumns: ["id"];
+                    },
+                ];
+            };
+            room_players: {
+                Row: {
+                    room_id: string;
+                    user_id: string;
+                    seat: number;
+                    joined_at: string;
+                };
+                Insert: {
+                    room_id: string;
+                    user_id: string;
+                    seat: number;
+                    joined_at?: string;
+                };
+                Update: {
+                    room_id?: string;
+                    user_id?: string;
+                    seat?: number;
+                    joined_at?: string;
+                };
+                Relationships: [
+                    {
+                        foreignKeyName: "room_players_room_id_fkey";
+                        columns: ["room_id"];
+                        referencedRelation: "rooms";
+                        referencedColumns: ["id"];
+                    },
+                    {
+                        foreignKeyName: "room_players_user_id_fkey";
+                        columns: ["user_id"];
+                        referencedRelation: "profiles";
+                        referencedColumns: ["id"];
+                    },
+                ];
+            };
+            games: {
+                Row: {
+                    id: string;
+                    room_id: string;
+                    module_id: string;
+                    version: number;
+                    phase: string;
+                    current_player_id: string | null;
+                    is_over: boolean;
+                    winner_ids: string[];
+                    bot_ids: string[];
+                    created_at: string;
+                    updated_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    room_id: string;
+                    module_id: string;
+                    version?: number;
+                    phase: string;
+                    current_player_id?: string | null;
+                    is_over?: boolean;
+                    winner_ids?: string[];
+                    bot_ids?: string[];
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    room_id?: string;
+                    module_id?: string;
+                    version?: number;
+                    phase?: string;
+                    current_player_id?: string | null;
+                    is_over?: boolean;
+                    winner_ids?: string[];
+                    bot_ids?: string[];
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Relationships: [
+                    {
+                        foreignKeyName: "games_room_id_fkey";
+                        columns: ["room_id"];
+                        referencedRelation: "rooms";
+                        referencedColumns: ["id"];
+                    },
+                ];
+            };
+            game_states: {
+                Row: {
+                    game_id: string;
+                    state: Record<string, unknown>;
+                    updated_at: string;
+                };
+                Insert: {
+                    game_id: string;
+                    state: Record<string, unknown>;
+                    updated_at?: string;
+                };
+                Update: {
+                    game_id?: string;
+                    state?: Record<string, unknown>;
+                    updated_at?: string;
+                };
+                Relationships: [
+                    {
+                        foreignKeyName: "game_states_game_id_fkey";
+                        columns: ["game_id"];
+                        referencedRelation: "games";
+                        referencedColumns: ["id"];
+                    },
+                ];
+            };
+            game_actions: {
+                Row: {
+                    id: number;
+                    game_id: string;
+                    seq: number;
+                    actor_id: string;
+                    action: Record<string, unknown>;
+                    events: Record<string, unknown>[];
+                    created_at: string;
+                };
+                Insert: {
+                    id?: number;
+                    game_id: string;
+                    seq: number;
+                    actor_id: string;
+                    action: Record<string, unknown>;
+                    events?: Record<string, unknown>[];
+                    created_at?: string;
+                };
+                Update: {
+                    id?: number;
+                    game_id?: string;
+                    seq?: number;
+                    actor_id?: string;
+                    action?: Record<string, unknown>;
+                    events?: Record<string, unknown>[];
+                    created_at?: string;
+                };
+                Relationships: [
+                    {
+                        foreignKeyName: "game_actions_game_id_fkey";
+                        columns: ["game_id"];
+                        referencedRelation: "games";
+                        referencedColumns: ["id"];
+                    },
+                ];
+            };
         };
         Views: Record<string, never>;
         Functions: Record<string, never>;
