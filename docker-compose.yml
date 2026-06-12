@@ -194,6 +194,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      # Start only after app migrations finish: they `ALTER PUBLICATION
+      # supabase_realtime`, which deadlocks against the realtime tenant doing
+      # the same on boot — and `_realtime` is created by the db-migrate step.
+      db-migrate:
+        condition: service_completed_successfully
     environment:
       PORT: 4000
       DB_HOST: ${POSTGRES_HOST}
@@ -275,15 +280,23 @@ services:
     image: supabase/storage-api:v1.14.0
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/status"]
+      # 127.0.0.1, not localhost: the server binds IPv4 0.0.0.0 while `localhost`
+      # resolves to IPv6 ::1 in this image → "connection refused". start_period
+      # covers the schema-migration boot before the HTTP server listens.
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:5000/status"]
       timeout: 5s
       interval: 5s
-      retries: 3
+      retries: 5
+      start_period: 30s
     depends_on:
       db:
         condition: service_healthy
       rest:
         condition: service_started
+      # After app migrations: avoids racing them on the storage schema and lets
+      # storage-api run its own schema migration cleanly (see storage-init).
+      db-migrate:
+        condition: service_completed_successfully
     environment:
       ANON_KEY: ${ANON_KEY}
       SERVICE_KEY: ${SERVICE_ROLE_KEY}
@@ -299,6 +312,24 @@ services:
       ENABLE_IMAGE_TRANSFORMATION: "false"
     volumes:
       - storage-data:/var/lib/storage
+
+  # One-shot : crée le bucket avatars + RLS APRÈS que storage-api ait migré son
+  # schéma. Appliquer ces policies avant rendrait storage.foldername(text)
+  # indéboulonnable et bloquerait la migration storage-schema en boucle.
+  storage-init:
+    profiles: [studio]
+    container_name: supabase-storage-init
+    image: postgres:15-alpine
+    restart: "no"
+    depends_on:
+      storage:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./supabase/init/storage-avatars.sql:/storage-avatars.sql:ro
+    command: >
+      sh -c "psql -h db -U postgres -d ${POSTGRES_DB} -f /storage-avatars.sql"
 
   studio:
     profiles: [studio]
