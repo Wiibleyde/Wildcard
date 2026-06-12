@@ -139,7 +139,7 @@ export function PreviewPage({ deckId, boardId, backHref }: Props) {
     ];
 
     const handArea = (
-        <div className="flex flex-col items-center gap-1">
+        <div className="flex w-full min-w-0 flex-col items-center gap-1">
             <Hand cards={hand} theme={cardTheme} onPlay={playCard} />
             <span
                 className="text-xs font-semibold"
@@ -153,7 +153,7 @@ export function PreviewPage({ deckId, boardId, backHref }: Props) {
     const playArea = <PlayArea cards={table} players={players} />;
 
     return (
-        <div className="flex flex-col h-screen bg-wc-surface">
+        <div className="flex flex-col h-[calc(100dvh-4rem)] md:h-screen bg-wc-surface">
             <div
                 className="shrink-0 flex items-center justify-between px-4 py-3 border-b"
                 style={{ borderColor: "rgba(255,255,255,0.08)" }}

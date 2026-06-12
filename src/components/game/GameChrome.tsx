@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Link } from "@/i18n/navigation";
+import { GameButton } from "@/components/ui/GameButton";
 import type { GameOutcome } from "@/lib/engine/types";
 import type { GamePlayer } from "@/lib/models/game";
 
@@ -88,17 +88,9 @@ export function GameOverOverlay({
                 </ol>
             )}
 
-            <Link
-                href="/lobby"
-                className="mt-2 rounded-xl px-6 py-3 font-black text-sm"
-                style={{
-                    background: "#f5c516",
-                    color: "#0d0a05",
-                    boxShadow: "0 4px 0 0 #7a5a00",
-                }}
-            >
+            <GameButton href="/lobby" className="mt-2">
                 {t("back_to_lobby")}
-            </Link>
+            </GameButton>
         </div>
     );
 }

@@ -3,23 +3,11 @@
 import { useGSAP } from "@gsap/react";
 import { useRef } from "react";
 import { Card } from "@/components/card/Card";
+import { tableTilt } from "@/lib/board/styles";
 import type { BoardPlayer, TableCard } from "@/lib/board/types";
 import { getPlayAnimation, prefersReducedMotion } from "@/lib/card/animations";
 import { CARD_WIDTH_CLASS, type CardSize } from "@/lib/card/sizes";
 import { getCardTheme } from "@/lib/card/themes";
-
-/**
- * Deterministic tilt in [-5°, +5°] derived from the card id — gives the
- * "thrown on the table" look while staying identical between server and
- * client renders (no hydration mismatch).
- */
-function tableTilt(id: string): number {
-    let hash = 0;
-    for (let i = 0; i < id.length; i++) {
-        hash = (hash * 31 + id.charCodeAt(i)) | 0;
-    }
-    return (Math.abs(hash) % 11) - 5;
-}
 
 export interface PlayAreaProps {
     cards: TableCard[];

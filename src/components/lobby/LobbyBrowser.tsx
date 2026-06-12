@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { GameButton } from "@/components/ui/GameButton";
 import { useRouter } from "@/i18n/navigation";
 import type { GameCatalogEntry } from "@/lib/games";
 
@@ -73,7 +74,7 @@ export function LobbyBrowser({ catalog, openRooms }: Props) {
         <div className="flex flex-col gap-8 lg:grid lg:grid-cols-2 lg:items-start">
             {/* Create */}
             <section
-                className="rounded-2xl p-6 xl:p-8 flex flex-col gap-5"
+                className="rounded-2xl p-5 sm:p-8 flex flex-col gap-5"
                 style={{
                     background: "#1c1510",
                     border: "2px solid #3d2d18",
@@ -150,7 +151,7 @@ export function LobbyBrowser({ catalog, openRooms }: Props) {
             {/* Join + open rooms */}
             <section className="flex flex-col gap-8">
                 <div
-                    className="rounded-2xl p-6 xl:p-8 flex flex-col gap-4"
+                    className="rounded-2xl p-5 sm:p-8 flex flex-col gap-4"
                     style={{
                         background: "#1c1510",
                         border: "2px solid #3d2d18",
@@ -170,26 +171,20 @@ export function LobbyBrowser({ catalog, openRooms }: Props) {
                             }
                             placeholder={t("code_placeholder")}
                             maxLength={5}
-                            className="flex-1 rounded-xl px-4 py-3 font-black tracking-[0.3em] text-center outline-none"
+                            className="min-w-0 flex-1 rounded-xl px-4 py-3 font-black tracking-[0.3em] text-center outline-none"
                             style={{
                                 background: "rgba(0,0,0,0.3)",
                                 border: "2px solid #3d2d18",
                                 color: "#faf2e2",
                             }}
                         />
-                        <button
-                            type="button"
+                        <GameButton
                             onClick={() => joinRoom(code)}
                             disabled={busy !== null || code.length < 3}
-                            className="rounded-xl px-6 font-black text-sm disabled:opacity-50"
-                            style={{
-                                background: "#f5c516",
-                                color: "#0d0a05",
-                                boxShadow: "0 4px 0 0 #7a5a00",
-                            }}
+                            className="shrink-0"
                         >
                             {busy === "join" ? t("joining") : t("join_room")}
-                        </button>
+                        </GameButton>
                     </div>
                     {error && (
                         <p
@@ -241,19 +236,14 @@ export function LobbyBrowser({ catalog, openRooms }: Props) {
                                             {room.max} {t("players")}
                                         </div>
                                     </div>
-                                    <button
-                                        type="button"
+                                    <GameButton
+                                        size="sm"
+                                        className="shrink-0"
                                         onClick={() => joinRoom(room.code)}
                                         disabled={busy !== null}
-                                        className="rounded-lg px-4 py-2 font-bold text-xs disabled:opacity-50"
-                                        style={{
-                                            background: "rgba(72,201,122,0.15)",
-                                            color: "#48c97a",
-                                            border: "1px solid rgba(72,201,122,0.4)",
-                                        }}
                                     >
                                         {t("join_room")}
-                                    </button>
+                                    </GameButton>
                                 </li>
                             ))}
                         </ul>

@@ -98,7 +98,7 @@ export function GamePlayClient({
         <div className="flex flex-col gap-2">
             {actionError && (
                 <div
-                    className="mx-auto w-full max-w-3xl rounded-xl px-4 py-2 text-center text-sm font-bold xl:max-w-5xl"
+                    className="mx-auto w-full max-w-3xl rounded-xl px-4 py-2 text-center text-sm font-bold xl:max-w-5xl 2xl:max-w-7xl"
                     style={{
                         background: "rgba(224,64,64,0.12)",
                         color: "#e04040",

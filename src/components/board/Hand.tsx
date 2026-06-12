@@ -33,21 +33,25 @@ export function Hand({
     disabled = false,
 }: HandProps) {
     return (
-        <div className="flex items-end justify-center px-2 py-2">
-            {cards.map((card) => (
-                <div
-                    key={cardKey(card)}
-                    className={`${CARD_WIDTH_CLASS[size]} ${HAND_OVERLAP_CLASS[size]} relative transition-transform duration-150 hover:z-10 hover:-translate-y-2 focus-within:z-10`}
-                >
-                    <Card
-                        card={card}
-                        theme={theme}
-                        onClick={
-                            onPlay && !disabled ? () => onPlay(card) : undefined
-                        }
-                    />
-                </div>
-            ))}
+        <div className="flex w-full max-w-full items-end overflow-x-auto">
+            <div className="mx-auto flex items-end px-2 pb-2 pt-3">
+                {cards.map((card) => (
+                    <div
+                        key={cardKey(card)}
+                        className={`${CARD_WIDTH_CLASS[size]} ${HAND_OVERLAP_CLASS[size]} relative shrink-0 transition-transform duration-150 hover:z-10 hover:-translate-y-2 focus-within:z-10`}
+                    >
+                        <Card
+                            card={card}
+                            theme={theme}
+                            onClick={
+                                onPlay && !disabled
+                                    ? () => onPlay(card)
+                                    : undefined
+                            }
+                        />
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }
