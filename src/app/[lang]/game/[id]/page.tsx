@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import type { Locale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 import { GamePlayClient } from "@/components/game/GamePlayClient";
 import { getGameClientState } from "@/lib/models/game";
@@ -8,7 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 export default async function Page({
     params,
 }: {
-    params: Promise<{ lang: string; id: string }>;
+    params: Promise<{ lang: Locale; id: string }>;
 }) {
     const { lang, id } = await params;
     setRequestLocale(lang);

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import type { Locale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { LobbyBrowser, type OpenRoom } from "@/components/lobby/LobbyBrowser";
 import { GAMES, gameCatalog } from "@/lib/games";
@@ -7,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 export default async function Page({
     params,
 }: {
-    params: Promise<{ lang: string }>;
+    params: Promise<{ lang: Locale }>;
 }) {
     const { lang } = await params;
     setRequestLocale(lang);

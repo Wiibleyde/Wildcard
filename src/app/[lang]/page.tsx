@@ -1,3 +1,4 @@
+import type { Locale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { GameButton } from "@/components/ui/GameButton";
 import { Link } from "@/i18n/navigation";
@@ -64,7 +65,7 @@ const GAME_DESC_KEY = {
 export default async function Home({
     params,
 }: {
-    params: Promise<{ lang: string }>;
+    params: Promise<{ lang: Locale }>;
 }) {
     const { lang } = await params;
     setRequestLocale(lang);
