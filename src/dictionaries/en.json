@@ -177,5 +177,8 @@
         "log_round_draw": "Round {n}: tie",
         "log_or_nothing": "{name} calls “{rank} or nothing!”",
         "or_nothing_status": "“{rank} or nothing” — play {rank} or pass"
+    },
+    "realtime": {
+        "reconnecting": "Reconnecting…"
     }
 }

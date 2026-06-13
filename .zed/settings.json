@@ -1,0 +1,91 @@
+{
+    "tab_size": 4,
+    "hard_tabs": false,
+    "remove_trailing_whitespace_on_save": true,
+    "ensure_final_newline_on_save": true,
+    "formatter": "language_server",
+    "format_on_save": "on",
+
+    "code_actions_on_format": {
+        "source.fixAll.biome": true,
+        "source.organizeImports.biome": true
+    },
+
+    "languages": {
+        "JavaScript": {
+            "language_servers": [
+                "biome",
+                "!typescript-language-server",
+                "!eslint",
+                "vtsls",
+                "..."
+            ],
+            "formatter": { "language_server": { "name": "biome" } }
+        },
+        "TypeScript": {
+            "language_servers": [
+                "biome",
+                "!typescript-language-server",
+                "!eslint",
+                "vtsls",
+                "..."
+            ],
+            "formatter": { "language_server": { "name": "biome" } }
+        },
+        "TSX": {
+            "language_servers": [
+                "biome",
+                "!typescript-language-server",
+                "!eslint",
+                "vtsls",
+                "tailwindcss-language-server",
+                "..."
+            ],
+            "formatter": { "language_server": { "name": "biome" } }
+        },
+        "JSON": {
+            "tab_size": 4,
+            "language_servers": ["biome", "..."],
+            "formatter": { "language_server": { "name": "biome" } }
+        },
+        "JSONC": {
+            "tab_size": 4,
+            "language_servers": ["biome", "..."],
+            "formatter": { "language_server": { "name": "biome" } }
+        },
+        "CSS": {
+            "tab_size": 4,
+            "language_servers": ["tailwindcss-language-server", "..."]
+        }
+    },
+
+    "lsp": {
+        "biome": {
+            "settings": {
+                "require_config_file": true
+            }
+        },
+        "tailwindcss-language-server": {
+            "settings": {
+                "classAttributes": [
+                    "class",
+                    "className",
+                    "ngClass",
+                    "class:list"
+                ],
+                "experimental": {
+                    "classRegex": [
+                        ["cva\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"],
+                        ["cx\\(([^)]*)\\)", "(?:'|\"|`)([^']*)(?:'|\"|`)"],
+                        ["clsx\\(([^)]*)\\)", "(?:'|\"|`)([^']*)(?:'|\"|`)"],
+                        ["tw`([^`]*)", "([^`]*)"]
+                    ]
+                }
+            }
+        }
+    },
+
+    "file_types": {
+        "JSONC": ["biome.json", "tsconfig.json", ".vscode/*.json", "*.jsonc"]
+    }
+}

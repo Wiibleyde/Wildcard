@@ -177,5 +177,8 @@
         "log_round_draw": "Manche {n} : égalité",
         "log_or_nothing": "{name} annonce « {rank} ou rien ! »",
         "or_nothing_status": "« {rank} ou rien » — joue {rank} ou passe"
+    },
+    "realtime": {
+        "reconnecting": "Reconnexion en cours…"
     }
 }
