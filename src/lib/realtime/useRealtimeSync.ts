@@ -2,14 +2,14 @@
 
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
+import {
+    backoffDelay,
+    classifyChannelStatus,
+    type RealtimeStatus,
+} from "@/lib/realtime/reconnect";
 import { createClient } from "@/lib/supabase/client";
 
-/**
- * Connection health surfaced to the UI. `connecting` is the first join,
- * `reconnecting` is any gap after a drop (CHANNEL_ERROR / TIMED_OUT / CLOSED)
- * while we re-join, `connected` is a live subscription.
- */
-export type RealtimeStatus = "connecting" | "connected" | "reconnecting";
+export type { RealtimeStatus };
 
 /** Attaches the per-feature `.on(...)` listeners to a fresh channel. */
 type ChannelBuilder = (channel: RealtimeChannel) => RealtimeChannel;
@@ -92,9 +92,7 @@ export function useRealtimeSync(
 
         const scheduleRejoin = () => {
             if (!active || retry) return;
-            // Capped exponential backoff: 1s, 2s, 4s … max 10s, so a flapping
-            // network never hammers the socket.
-            const delay = Math.min(1000 * 2 ** attempt, 10_000);
+            const delay = backoffDelay(attempt);
             attempt += 1;
             retry = setTimeout(() => {
                 retry = undefined;
@@ -115,17 +113,14 @@ export function useRealtimeSync(
             }
             channel = build(supabase.channel(topic)).subscribe((s) => {
                 if (!active || myEpoch !== epoch) return;
-                if (s === "SUBSCRIBED") {
+                const next = classifyChannelStatus(s);
+                if (!next) return;
+                setStatus(next.status);
+                if (next.status === "connected") {
                     attempt = 0;
-                    setStatus("connected");
                     // Resync to cover anything missed while detached.
                     onChange();
-                } else if (
-                    s === "CHANNEL_ERROR" ||
-                    s === "TIMED_OUT" ||
-                    s === "CLOSED"
-                ) {
-                    setStatus("reconnecting");
+                } else if (next.rejoin) {
                     scheduleRejoin();
                 }
             });
