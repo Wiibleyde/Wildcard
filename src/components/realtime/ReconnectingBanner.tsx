@@ -16,17 +16,9 @@ export function ReconnectingBanner({ status }: { status: RealtimeStatus }) {
     return (
         <output
             aria-live="polite"
-            className="mx-auto flex w-full max-w-3xl items-center justify-center gap-2 rounded-xl px-4 py-2 text-center text-sm font-bold xl:max-w-5xl 2xl:max-w-7xl"
-            style={{
-                background: "rgba(245,197,22,0.12)",
-                color: "#f5c516",
-                border: "1px solid rgba(245,197,22,0.4)",
-            }}
+            className="mx-auto flex w-full max-w-3xl items-center justify-center gap-2 rounded-xl border border-wc-gold/40 bg-wc-gold-dim px-4 py-2 text-center text-sm font-bold text-wc-gold xl:max-w-5xl 2xl:max-w-7xl"
         >
-            <span
-                className="inline-block h-2 w-2 animate-pulse rounded-full"
-                style={{ background: "#f5c516" }}
-            />
+            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-wc-gold" />
             {t("reconnecting")}
         </output>
     );
