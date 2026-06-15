@@ -2,7 +2,7 @@
 
 import { useGSAP } from "@gsap/react";
 import { useTranslations } from "next-intl";
-import { useRef } from "react";
+import { type ReactNode, useRef } from "react";
 import { buildSurfaceStyle } from "@/lib/board/styles";
 import type { BoardTheme } from "@/lib/board/types";
 import { getPlayAnimation, prefersReducedMotion } from "@/lib/card/animations";
@@ -34,6 +34,8 @@ interface GameTableProps {
     boardTheme: BoardTheme;
     pending: boolean;
     onAction: (action: GameAction) => void;
+    /** Optional right-rail slot rendered under the history feed (e.g. chat). */
+    chat?: ReactNode;
 }
 
 /**
@@ -52,6 +54,7 @@ export function GameTable({
     boardTheme,
     pending,
     onAction,
+    chat,
 }: GameTableProps) {
     const t = useTranslations("game");
     const text: TableText = (key, values) =>
@@ -161,7 +164,7 @@ export function GameTable({
             <div className="flex flex-col gap-3 lg:flex-row">
                 <div
                     ref={rootRef}
-                    className="relative flex min-h-[60vh] flex-1 flex-col gap-3 overflow-hidden rounded-2xl p-3 sm:gap-4 sm:p-4 xl:p-6"
+                    className="relative flex min-h-[60vh] flex-1 flex-col gap-3 overflow-hidden rounded-2xl p-3 sm:gap-4 sm:p-4 lg:h-[70vh] lg:min-h-0 xl:p-6"
                     style={buildSurfaceStyle(boardTheme)}
                 >
                     {data.seats && (
@@ -213,13 +216,18 @@ export function GameTable({
                     )}
                 </div>
 
-                {logLines && (
-                    <GameLog
-                        title={t("log_title")}
-                        emptyText={t("log_empty")}
-                        lines={logLines}
-                        boardTheme={boardTheme}
-                    />
+                {(logLines || chat) && (
+                    <div className="flex flex-col gap-3 lg:h-[70vh] lg:self-start">
+                        {logLines && (
+                            <GameLog
+                                title={t("log_title")}
+                                emptyText={t("log_empty")}
+                                lines={logLines}
+                                boardTheme={boardTheme}
+                            />
+                        )}
+                        {chat}
+                    </div>
                 )}
             </div>
         </div>

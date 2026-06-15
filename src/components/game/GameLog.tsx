@@ -25,7 +25,7 @@ interface GameLogProps {
 export function GameLog({ title, emptyText, lines, boardTheme }: GameLogProps) {
     return (
         <aside
-            className="flex max-h-44 flex-col overflow-hidden rounded-2xl p-3 lg:max-h-[60vh] lg:w-60 lg:self-start xl:w-72 xl:p-4 2xl:w-80"
+            className="flex h-44 flex-col overflow-hidden rounded-2xl p-3 lg:h-auto lg:min-h-0 lg:w-60 lg:flex-3 lg:self-stretch xl:w-72 xl:p-4 2xl:w-80"
             style={buildSurfaceStyle(boardTheme)}
             aria-label={title}
         >
@@ -35,7 +35,7 @@ export function GameLog({ title, emptyText, lines, boardTheme }: GameLogProps) {
             >
                 {title}
             </h2>
-            <ol className="flex flex-col gap-1.5 overflow-y-auto pr-1 text-xs xl:text-sm">
+            <ol className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1 text-xs xl:text-sm">
                 {lines.length === 0 ? (
                     <li className="text-white/50">{emptyText}</li>
                 ) : (

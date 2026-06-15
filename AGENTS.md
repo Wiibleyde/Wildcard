@@ -141,6 +141,8 @@ Ce projet doit fonctionner correctement de **mobile** (375px) jusqu'aux **écran
 - **Padding horizontal** : `px-4 xl:px-10` pour respirer sur grand écran
 - **Sidebar** : `w-55 xl:w-64` + layout offset `md:pl-[220px] xl:pl-64`
 - **Textes** : utiliser des variants responsive sur les titres (`text-2xl xl:text-3xl`)
+- **Panneaux scrollables** (chat, log, feeds latéraux) : hauteur **bornée** — soit `h-*`/`lg:h-[..vh]`, soit `flex-1 min-h-0` dans un parent de hauteur fixe — + `overflow-y-auto` sur la liste interne. **Jamais `max-h-*`**. Taille pleine par défaut, le contenu défile à l'intérieur, le layout ne saute pas quand le contenu grandit.
+- **Écran de jeu en une page** : à partir de `lg:`, board + rail doivent tenir dans le viewport **sans scroll de page**. Board et rail bornés à la même hauteur (`lg:h-[70vh]`) ; les panneaux du rail se partagent cette hauteur (`lg:flex-[n] lg:min-h-0`), pas d'empilement de `vh` fixes qui dépasse l'écran. Sur mobile, le rail passe sous le board et le scroll de page reste normal.
 - Tester visuellement à **375px, 768px, 1280px, 1920px, 2560px** avant de valider
 
 ### Breakpoints Tailwind utilisés
