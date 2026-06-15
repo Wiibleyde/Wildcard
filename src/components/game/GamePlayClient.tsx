@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useCallback, useRef, useState } from "react";
+import { GameChat } from "@/components/game/GameChat";
 import { GameTable } from "@/components/game/GameTable";
 import { ReconnectingBanner } from "@/components/realtime/ReconnectingBanner";
 import { BOARD_THEMES } from "@/lib/board/themes";
@@ -89,6 +90,8 @@ export function GamePlayClient({
         [initial.gameId, payload.version, refetch],
     );
 
+    const boardTheme = BOARD_THEMES[boardStyleId] ?? greenFeltTheme;
+
     const table = getGameTable(payload.moduleId);
     if (!table) {
         return (
@@ -120,9 +123,18 @@ export function GamePlayClient({
                 payload={payload}
                 currentUserId={currentUserId}
                 deckTheme={THEMES[deckStyleId] ?? freeTheme}
-                boardTheme={BOARD_THEMES[boardStyleId] ?? greenFeltTheme}
+                boardTheme={boardTheme}
                 pending={pending}
                 onAction={onAction}
+                chat={
+                    <GameChat
+                        gameId={initial.gameId}
+                        currentUserId={currentUserId}
+                        players={payload.players}
+                        boardTheme={boardTheme}
+                        isOver={payload.isOver}
+                    />
+                }
             />
         </div>
     );

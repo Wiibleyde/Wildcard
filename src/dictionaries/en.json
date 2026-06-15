@@ -180,5 +180,13 @@
     },
     "realtime": {
         "reconnecting": "Reconnecting…"
+    },
+    "chat": {
+        "title": "Chat",
+        "placeholder": "Type a message…",
+        "send": "Send",
+        "empty": "No messages yet",
+        "you": "You",
+        "rate_limited": "Slow down…"
     }
 }
