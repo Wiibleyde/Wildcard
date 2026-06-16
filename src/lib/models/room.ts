@@ -114,18 +114,23 @@ export async function joinRoom(
     for (let attempt = 0; attempt < 3; attempt++) {
         const { data: seats } = await admin
             .from("room_players")
-            .select("user_id, seat")
+            .select("user_id, seat, role")
             .eq("room_id", room.id);
         const rows = seats ?? [];
 
         if (rows.some((s) => s.user_id === userId)) {
-            return { ok: true, roomId: room.id }; // already seated
+            return { ok: true, roomId: room.id }; // already in the lobby
         }
-        if (rows.length >= module.maxPlayers) {
+        // Only players hold seats and count toward the cap — spectators don't.
+        const playerSeats = rows
+            .filter((s) => s.role === "player")
+            .map((s) => s.seat)
+            .filter((n): n is number => n !== null);
+        if (playerSeats.length >= module.maxPlayers) {
             return { ok: false, error: "room_full" };
         }
 
-        const seat = nextFreeSeat(rows.map((s) => s.seat));
+        const seat = nextFreeSeat(playerSeats);
         const { error } = await admin
             .from("room_players")
             .insert({ room_id: room.id, user_id: userId, seat });
@@ -134,6 +139,84 @@ export async function joinRoom(
             return { ok: false, error: "db_error", message: error.message };
         }
         // 23505 — someone claimed the seat (or we double-joined) → re-read.
+    }
+
+    return { ok: false, error: "room_full" };
+}
+
+/**
+ * Switch a lobby member between `player` (dealt in, holds a seat) and
+ * `spectator` (watches read-only, no seat). Idempotent. Becoming a player
+ * claims the lowest free seat and fails with `room_full` if the table is full;
+ * the same seat race as {@link joinRoom} is retried. Only allowed in the lobby.
+ */
+export async function setRoomRole(
+    admin: Admin,
+    userId: string,
+    code: string,
+    role: "player" | "spectator",
+): Promise<Result<{ role: "player" | "spectator" }>> {
+    const { data: room } = await admin
+        .from("rooms")
+        .select("id, module_id, status")
+        .eq("code", code.toUpperCase())
+        .maybeSingle();
+    if (!room) return { ok: false, error: "not_found" };
+    if (room.status !== "lobby") return { ok: false, error: "already_started" };
+
+    const module = getGameModule(room.module_id);
+    if (!module) return { ok: false, error: "unknown_game" };
+
+    if (role === "spectator") {
+        // Drop the seat; upsert preserves host membership and is a no-op if the
+        // user is already spectating.
+        const { error } = await admin.from("room_players").upsert(
+            {
+                room_id: room.id,
+                user_id: userId,
+                seat: null,
+                role: "spectator",
+            },
+            { onConflict: "room_id,user_id" },
+        );
+        if (error) {
+            return { ok: false, error: "db_error", message: error.message };
+        }
+        return { ok: true, role: "spectator" };
+    }
+
+    // Becoming a player: claim a free seat, capped at maxPlayers, retrying the
+    // seat race like joinRoom.
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const { data: members } = await admin
+            .from("room_players")
+            .select("user_id, seat, role")
+            .eq("room_id", room.id);
+        const rows = members ?? [];
+
+        const me = rows.find((s) => s.user_id === userId);
+        if (me?.role === "player") return { ok: true, role: "player" };
+
+        const playerSeats = rows
+            .filter((s) => s.role === "player")
+            .map((s) => s.seat)
+            .filter((n): n is number => n !== null);
+        if (playerSeats.length >= module.maxPlayers) {
+            return { ok: false, error: "room_full" };
+        }
+
+        const seat = nextFreeSeat(playerSeats);
+        const { error } = await admin
+            .from("room_players")
+            .upsert(
+                { room_id: room.id, user_id: userId, seat, role: "player" },
+                { onConflict: "room_id,user_id" },
+            );
+        if (!error) return { ok: true, role: "player" };
+        if (error.code !== "23505") {
+            return { ok: false, error: "db_error", message: error.message };
+        }
+        // 23505 — seat taken in the race → re-read and try the next one.
     }
 
     return { ok: false, error: "room_full" };
@@ -216,7 +299,8 @@ export async function setBotCount(
     const { count: humanCount } = await admin
         .from("room_players")
         .select("user_id", { count: "exact", head: true })
-        .eq("room_id", room.id);
+        .eq("room_id", room.id)
+        .eq("role", "player");
 
     if ((humanCount ?? 0) + count > module.maxPlayers) {
         return { ok: false, error: "invalid_bot_count" };
@@ -282,12 +366,17 @@ export async function startGame(
         return { ok: false, error, message };
     };
 
+    // Only players are dealt into the game; spectators stay in the room and
+    // watch once it flips to `playing`.
     const { data: seats } = await admin
         .from("room_players")
         .select("user_id, seat")
         .eq("room_id", room.id)
+        .eq("role", "player")
         .order("seat", { ascending: true });
-    const rows = seats ?? [];
+    const rows = (seats ?? []).filter(
+        (s): s is { user_id: string; seat: number } => s.seat !== null,
+    );
 
     const { data: profiles } = await admin
         .from("profiles")

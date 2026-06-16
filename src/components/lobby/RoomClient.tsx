@@ -13,6 +13,13 @@ export interface SeatRow {
     seat: number;
 }
 
+export interface SpectatorRow {
+    userId: string;
+    username: string;
+}
+
+type Role = "player" | "spectator";
+
 interface Props {
     roomId: string;
     code: string;
@@ -21,9 +28,11 @@ interface Props {
     maxPlayers: number;
     currentUserId: string;
     initialSeats: SeatRow[];
+    initialSpectators: SpectatorRow[];
     initialHostId: string;
     initialBotCount: number;
     seated: boolean;
+    initialRole: Role;
 }
 
 type Slot =
@@ -39,13 +48,18 @@ export function RoomClient({
     maxPlayers,
     currentUserId,
     initialSeats,
+    initialSpectators,
     initialHostId,
     initialBotCount,
     seated,
+    initialRole,
 }: Props) {
     const t = useTranslations("room");
     const router = useRouter();
     const [seats, setSeats] = useState<SeatRow[]>(initialSeats);
+    const [spectators, setSpectators] =
+        useState<SpectatorRow[]>(initialSpectators);
+    const [role, setRole] = useState<Role>(initialRole);
     const [hostId, setHostId] = useState(initialHostId);
     const [botCount, setBotCount] = useState(initialBotCount);
     const [busy, setBusy] = useState(false);
@@ -72,7 +86,7 @@ export function RoomClient({
                 .maybeSingle(),
             supabase
                 .from("room_players")
-                .select("user_id, seat")
+                .select("user_id, seat, role")
                 .eq("room_id", roomId)
                 .order("seat", { ascending: true }),
         ]);
@@ -96,13 +110,25 @@ export function RoomClient({
         const nameOf = new Map((profiles ?? []).map((p) => [p.id, p.username]));
         if (closedRef.current) return;
         setSeats(
-            rows.map((r) => ({
-                userId: r.user_id,
-                seat: r.seat,
-                username: nameOf.get(r.user_id) ?? "Joueur",
-            })),
+            rows
+                .filter((r) => r.role === "player" && r.seat !== null)
+                .map((r) => ({
+                    userId: r.user_id,
+                    seat: r.seat as number,
+                    username: nameOf.get(r.user_id) ?? "Joueur",
+                })),
         );
-    }, [roomId, router]);
+        setSpectators(
+            rows
+                .filter((r) => r.role === "spectator")
+                .map((r) => ({
+                    userId: r.user_id,
+                    username: nameOf.get(r.user_id) ?? "Joueur",
+                })),
+        );
+        const mine = rows.find((r) => r.user_id === currentUserId);
+        setRole(mine?.role === "spectator" ? "spectator" : "player");
+    }, [roomId, router, currentUserId]);
 
     // Auto-join when arriving via a shared link, then sync.
     useEffect(() => {
@@ -121,6 +147,9 @@ export function RoomClient({
     const isHost = hostId === currentUserId;
     const total = seats.length + botCount;
     const canStart = isHost && total >= minPlayers && total <= maxPlayers;
+    const isSpectator = role === "spectator";
+    // No free player slot — a spectator can't claim a seat until one opens.
+    const roomFull = total >= maxPlayers;
 
     async function setBots(next: number) {
         const clamped = Math.max(0, Math.min(next, maxPlayers - seats.length));
@@ -166,6 +195,29 @@ export function RoomClient({
         }
         closedRef.current = true;
         router.push("/lobby");
+    }
+
+    async function toggleRole() {
+        const next: Role = role === "spectator" ? "player" : "spectator";
+        setBusy(true);
+        setError(null);
+        const res = await fetch(`/api/rooms/${code}/role`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ role: next }),
+        });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            setError(
+                data.error === "room_full"
+                    ? t("error_room_full")
+                    : t("error_generic"),
+            );
+            setBusy(false);
+            return;
+        }
+        setRole(next); // optimistic; Realtime reconciles the rosters
+        setBusy(false);
     }
 
     async function copyCode() {
@@ -358,6 +410,48 @@ export function RoomClient({
                 </ul>
             </div>
 
+            {/* Spectators — watch the live game, never dealt in */}
+            <div className="flex flex-col gap-3">
+                <h3
+                    className="text-xs font-bold uppercase tracking-widest"
+                    style={{ color: "#7a6a50" }}
+                >
+                    {t("spectators")} · {spectators.length}
+                </h3>
+                {spectators.length === 0 ? (
+                    <p
+                        className="text-xs font-bold"
+                        style={{ color: "#4a3820" }}
+                    >
+                        {t("no_spectators")}
+                    </p>
+                ) : (
+                    <ul className="flex flex-wrap gap-2">
+                        {spectators.map((s) => (
+                            <li
+                                key={s.userId}
+                                className="flex items-center gap-2 rounded-xl px-3 py-2"
+                                style={{
+                                    background: "#1c1510",
+                                    border: "1px solid #3d2d18",
+                                }}
+                            >
+                                <span aria-hidden>👁</span>
+                                <span
+                                    className="truncate font-bold text-sm"
+                                    style={{ color: "#9a8870" }}
+                                >
+                                    {s.username}
+                                    {s.userId === hostId
+                                        ? ` · ${t("host_badge")}`
+                                        : ""}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+
             {error && (
                 <p
                     className="text-sm font-semibold"
@@ -366,6 +460,31 @@ export function RoomClient({
                     {error}
                 </p>
             )}
+
+            {/* Spectator toggle — switch your own role between player and watcher */}
+            <button
+                type="button"
+                onClick={toggleRole}
+                disabled={busy || (isSpectator && roomFull)}
+                className="rounded-xl py-3 font-bold text-sm disabled:opacity-50"
+                style={{
+                    background: isSpectator
+                        ? "rgba(245,197,22,0.12)"
+                        : "rgba(167,139,250,0.12)",
+                    color: isSpectator ? "#f5c516" : "#a78bfa",
+                    border: `1px solid ${
+                        isSpectator
+                            ? "rgba(245,197,22,0.4)"
+                            : "rgba(167,139,250,0.4)"
+                    }`,
+                }}
+            >
+                {isSpectator
+                    ? roomFull
+                        ? t("room_full_short")
+                        : t("join_as_player")
+                    : t("spectate")}
+            </button>
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-3">

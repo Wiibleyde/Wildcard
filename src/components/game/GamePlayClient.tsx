@@ -5,6 +5,9 @@ import { useCallback, useRef, useState } from "react";
 import { GameChat } from "@/components/game/GameChat";
 import { GameTable } from "@/components/game/GameTable";
 import { ReconnectingBanner } from "@/components/realtime/ReconnectingBanner";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
+import { GameButton } from "@/components/ui/GameButton";
+import { useRouter } from "@/i18n/navigation";
 import { BOARD_THEMES } from "@/lib/board/themes";
 import { greenFeltTheme } from "@/lib/board/themes/green_felt";
 import { THEMES } from "@/lib/card/themes";
@@ -43,6 +46,8 @@ export function GamePlayClient({
     boardStyleId,
 }: Props) {
     const t = useTranslations("game");
+    const router = useRouter();
+    const confirm = useConfirm();
     const [payload, setPayload] = useState<GameClientPayload>(initial);
     const [pending, setPending] = useState(false);
     const [actionError, setActionError] = useState<ActionErrorKey | null>(null);
@@ -62,6 +67,19 @@ export function GamePlayClient({
 
     const conn = useGameChannel(initial.gameId, refetch);
 
+    // A refused or blocked move must not fail silently — flash a short,
+    // localized notice that clears itself.
+    const showError = useCallback((key: ActionErrorKey) => {
+        setActionError(key);
+        if (errorTimer.current !== null) {
+            clearTimeout(errorTimer.current);
+        }
+        errorTimer.current = window.setTimeout(
+            () => setActionError(null),
+            3500,
+        );
+    }, []);
+
     const onAction = useCallback(
         async (action: GameAction) => {
             setPending(true);
@@ -70,25 +88,38 @@ export function GamePlayClient({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ version: payload.version, action }),
             });
-            // A refused action (illegal move, version conflict) must not fail
-            // silently — show a short, localized notice.
             if (!res.ok) {
-                setActionError(statusToErrorKey(res.status));
-                if (errorTimer.current !== null) {
-                    clearTimeout(errorTimer.current);
-                }
-                errorTimer.current = window.setTimeout(
-                    () => setActionError(null),
-                    3500,
-                );
+                showError(statusToErrorKey(res.status));
             }
             // Whether it committed or hit a version conflict, resync now;
             // other clients are notified via Realtime.
             await refetch();
             setPending(false);
         },
-        [initial.gameId, payload.version, refetch],
+        [initial.gameId, payload.version, refetch, showError],
     );
+
+    // Clicking a card you can't legally play never reaches the server — it's
+    // refused right here, with the same notice an illegal server reply gives.
+    const onIllegal = useCallback(
+        () => showError("error_illegal"),
+        [showError],
+    );
+
+    // Leaving mid-game abandons your seat and affects the other players, so
+    // confirm first. Once it's over there's nothing to abandon — just go.
+    const leave = useCallback(async () => {
+        if (!payload.isOver) {
+            const ok = await confirm({
+                title: t("leave"),
+                message: t("leave_confirm"),
+                confirmLabel: t("leave"),
+                variant: "red",
+            });
+            if (!ok) return;
+        }
+        router.push("/lobby");
+    }, [confirm, payload.isOver, router, t]);
 
     const boardTheme = BOARD_THEMES[boardStyleId] ?? greenFeltTheme;
 
@@ -104,6 +135,11 @@ export function GamePlayClient({
     return (
         <div className="flex flex-col gap-2">
             <ReconnectingBanner status={conn} />
+            <div className="mx-auto flex w-full max-w-3xl justify-end xl:max-w-5xl 2xl:max-w-7xl">
+                <GameButton variant="ghost" size="sm" onClick={leave}>
+                    {t("leave")}
+                </GameButton>
+            </div>
             {actionError && (
                 <div
                     className="mx-auto w-full max-w-3xl rounded-xl px-4 py-2 text-center text-sm font-bold xl:max-w-5xl 2xl:max-w-7xl"
@@ -126,6 +162,7 @@ export function GamePlayClient({
                 boardTheme={boardTheme}
                 pending={pending}
                 onAction={onAction}
+                onIllegal={onIllegal}
                 chat={
                     <GameChat
                         gameId={initial.gameId}

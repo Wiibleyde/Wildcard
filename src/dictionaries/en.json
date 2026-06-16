@@ -29,7 +29,9 @@
         "error": "An error occurred",
         "save": "Save",
         "saving": "Saving...",
-        "saved": "Saved!"
+        "saved": "Saved!",
+        "cancel": "Cancel",
+        "confirm": "Confirm"
     },
     "auth": {
         "login": {
@@ -127,7 +129,13 @@
         "error_not_host": "Only the host can start",
         "error_not_enough": "Not enough players to start",
         "error_already_started": "This game has already started",
-        "error_generic": "Something went wrong"
+        "error_generic": "Something went wrong",
+        "error_room_full": "The room is full",
+        "spectators": "Spectators",
+        "no_spectators": "No spectators",
+        "spectate": "Watch as spectator",
+        "join_as_player": "Join as player",
+        "room_full_short": "Room full"
     },
     "game": {
         "your_turn": "Your turn",
@@ -155,6 +163,7 @@
         "finished": "Finished {place}",
         "passed": "passed",
         "leave": "Leave game",
+        "leave_confirm": "Leave the game in progress? It will keep going without you.",
         "error_conflict": "The game advanced — refreshing",
         "error_illegal": "Illegal move",
         "error_generic": "Something went wrong",

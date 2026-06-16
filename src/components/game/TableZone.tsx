@@ -1,11 +1,18 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import {
+    type CSSProperties,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import { Card } from "@/components/card/Card";
 import { BoardPill } from "@/components/ui/BoardPill";
+import { GameButton } from "@/components/ui/GameButton";
 import { buildZoneStyle, tableTilt } from "@/lib/board/styles";
 import type { BoardTheme } from "@/lib/board/types";
-import { CARD_WIDTH_CLASS, HAND_OVERLAP_CLASS } from "@/lib/card/sizes";
+import { CARD_WIDTH_CLASS, type CardSize } from "@/lib/card/sizes";
 import type { CardTheme } from "@/lib/card/types";
 import type { GameAction } from "@/lib/engine/types";
 import type {
@@ -27,6 +34,8 @@ export interface ZoneContext {
     /** Ref registrar — lets the table run entry animations per card. */
     registerCard: (id: string) => (el: HTMLDivElement | null) => void;
     onAction: (action: GameAction) => void;
+    /** Surface an "illegal move" notice when a blocked card is clicked. */
+    onIllegal?: () => void;
 }
 
 interface TableZoneProps {
@@ -99,24 +108,7 @@ function ZoneCards({ instance, template, ctx }: TableZoneProps) {
     }
 
     if (template.arrangement === "fan") {
-        return (
-            <div className="flex w-full max-w-full items-end overflow-x-auto">
-                <div className="mx-auto flex items-end px-2 pt-3">
-                    {instance.cards.map((item) => (
-                        <div
-                            key={item.id}
-                            className={`${HAND_OVERLAP_CLASS[size]} relative shrink-0 transition-transform duration-150 hover:z-10 hover:-translate-y-2 focus-within:z-10`}
-                        >
-                            <ZoneCard
-                                item={item}
-                                template={template}
-                                ctx={ctx}
-                            />
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
+        return <HandFan instance={instance} template={template} ctx={ctx} />;
     }
 
     if (template.arrangement === "stack") {
@@ -177,6 +169,200 @@ function ZoneCards({ instance, template, ctx }: TableZoneProps) {
     );
 }
 
+/** Mobile-base card widths (px), used as the pre-measure overlap estimate so
+ * the fan paints at a sensible overlap before the ResizeObserver kicks in. */
+const CARD_PX_ESTIMATE: Record<CardSize, number> = {
+    xs: 48,
+    sm: 48,
+    md: 80,
+    lg: 96,
+    xl: 128,
+};
+
+const DEG = Math.PI / 180;
+/** Whole-fan half-angle ceiling and the max tilt between two neighbours. */
+const FAN_MAX_HALF = 28 * DEG;
+const FAN_MAX_STEP = 7 * DEG;
+/** How far a selected card lifts out of the fan (px). */
+const SELECT_LIFT = 26;
+
+/**
+ * The viewer's hand as a single-pivot arc fan: every card rotates about one
+ * shared point well below the row, so the spread stays even and reads like a
+ * real hand at any count. The fan is both angle-bounded and width-fitted, so
+ * it never scrolls or overflows from mobile (375px) to 2K.
+ *
+ * With a {@link HandSelection} the hand becomes a combo picker: tap cards of
+ * one group (e.g. same rank) to select them — the fan lifts each — and once
+ * the picked set matches a legal play the commit button arms and lays it.
+ * Without it, cards simply dispatch their own `action` on click.
+ */
+function HandFan({ instance, template, ctx }: TableZoneProps) {
+    const size = template.cardSize ?? "md";
+    const cards = instance.cards;
+    const n = cards.length;
+    const selection = instance.selection ?? null;
+
+    const rowRef = useRef<HTMLDivElement>(null);
+    const [box, setBox] = useState(() => {
+        const cardW = CARD_PX_ESTIMATE[size];
+        return { cardW, cardH: cardW * 1.4, avail: 9999 };
+    });
+    const [picked, setPicked] = useState<readonly string[]>([]);
+
+    // Measure in layout px — offset*/client* ignore the fan rotation, so the
+    // geometry never compounds the tilt. Re-measure on resize (375px → 2K).
+    useEffect(() => {
+        const el = rowRef.current;
+        if (!el) return;
+        const measure = () => {
+            const first = el.querySelector<HTMLElement>("[data-fan-card]");
+            const cardW = first?.offsetWidth || CARD_PX_ESTIMATE[size];
+            const cardH = first?.offsetHeight || cardW * 1.4;
+            const avail = el.clientWidth;
+            // A row of absolute-positioned cards can momentarily report a
+            // collapsed width (its parent has no in-flow content to size to).
+            // Never accept a width narrower than a single card — that would
+            // flip the fan angle negative and stack every card behind the first.
+            if (cardW > 0 && avail > cardW) setBox({ cardW, cardH, avail });
+        };
+        measure();
+        const ro = new ResizeObserver(measure);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [size]);
+
+    // A selection only holds for cards still in hand; committing a play (the
+    // cards leave the hand) empties it on its own.
+    const handIds = useMemo(() => new Set(cards.map((c) => c.id)), [cards]);
+    const sel = useMemo(
+        () => (selection ? picked.filter((id) => handIds.has(id)) : []),
+        [picked, handIds, selection],
+    );
+    useEffect(() => {
+        if (sel.length !== picked.length) setPicked(sel);
+    }, [sel, picked.length]);
+
+    const groupOf = (id: string) => cards.find((c) => c.id === id)?.group;
+    const selGroup = sel.length > 0 ? groupOf(sel[0]) : undefined;
+    const armed =
+        selection && selGroup
+            ? (selection.plays.find(
+                  (p) => p.group === selGroup && p.count === sel.length,
+              ) ?? null)
+            : null;
+
+    const toggle = (item: TableCardItem) => {
+        if (!item.group) {
+            ctx.onIllegal?.();
+            return;
+        }
+        setPicked((prev) => {
+            const cur = prev.filter((id) => handIds.has(id));
+            if (cur.includes(item.id))
+                return cur.filter((id) => id !== item.id);
+            // A card from another group starts a fresh pick — one combo at a time.
+            if (cur.length > 0 && groupOf(cur[0]) !== item.group)
+                return [item.id];
+            return [...cur, item.id];
+        });
+    };
+
+    const commit = () => {
+        if (!armed) return;
+        ctx.onAction(armed.action);
+        setPicked([]);
+    };
+
+    const clickFor = (item: TableCardItem): (() => void) | undefined => {
+        if (ctx.pending) return undefined;
+        if (selection)
+            return item.group || item.illegal ? () => toggle(item) : undefined;
+        if (item.action) {
+            const a = item.action;
+            return () => ctx.onAction(a);
+        }
+        if (item.illegal) return () => ctx.onIllegal?.();
+        return undefined;
+    };
+
+    // ── Geometry: one pivot below the row, even angular steps both bounded ──
+    const mid = (n - 1) / 2;
+    const pivotY = box.cardH + box.cardW * 1.6; // pivot depth from the card top
+    const rho = pivotY - box.cardH / 2; // pivot → card centre
+    const fitHalf =
+        n > 1 ? Math.asin(Math.min(1, (box.avail - box.cardW) / (2 * rho))) : 0;
+    const stepRad =
+        n > 1
+            ? Math.min(
+                  (2 * Math.min(FAN_MAX_HALF, fitHalf)) / (n - 1),
+                  FAN_MAX_STEP,
+              )
+            : 0;
+
+    return (
+        <div className="flex w-full flex-col items-center gap-2">
+            {/* Reserve the commit row whenever the hand is a picker, so the
+                fan never jumps the moment the first card is selected. */}
+            {selection && (
+                <div className="flex h-9 items-center justify-center">
+                    {sel.length > 0 && (
+                        <GameButton
+                            size="sm"
+                            variant="green"
+                            disabled={!armed || ctx.pending}
+                            onClick={commit}
+                        >
+                            {selection.playLabel}
+                            {sel.length > 1 ? ` ×${sel.length}` : ""}
+                        </GameButton>
+                    )}
+                </div>
+            )}
+            <div
+                ref={rowRef}
+                className="relative w-full"
+                style={{ height: box.cardH + SELECT_LIFT + 8 }}
+            >
+                {cards.map((item, i) => {
+                    const deg = ((i - mid) * stepRad) / DEG;
+                    const isSel = sel.includes(item.id);
+                    return (
+                        <div
+                            key={item.id}
+                            data-fan-card
+                            className={`${CARD_WIDTH_CLASS[size]} absolute bottom-0 left-1/2 transition-transform duration-150`}
+                            style={{
+                                transformOrigin: `50% ${pivotY}px`,
+                                transform: `translateY(${
+                                    isSel ? -SELECT_LIFT : 0
+                                }px) translateX(-50%) rotate(${deg}deg)`,
+                                // Keep the natural left-to-right stacking — a
+                                // selected card only lifts, it never jumps above
+                                // its neighbours.
+                                zIndex: i,
+                            }}
+                        >
+                            <div
+                                ref={ctx.registerCard(item.id)}
+                                className="w-full will-change-transform"
+                            >
+                                <Card
+                                    card={item.card}
+                                    faceDown={item.faceDown}
+                                    theme={ctx.themeFor(item.ownerId)}
+                                    disableTransitions
+                                    onClick={clickFor(item)}
+                                />
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 function ZoneCard({
     item,
     template,
@@ -194,6 +380,16 @@ function ZoneCard({
     const { action } = item;
     const width = fill ? "w-full" : CARD_WIDTH_CLASS[template.cardSize ?? "md"];
 
+    // A legal card plays; a blocked card explains itself instead of going
+    // silent. Both stay inert while an action is in flight.
+    const onClick = ctx.pending
+        ? undefined
+        : action !== undefined
+          ? () => ctx.onAction(action)
+          : item.illegal
+            ? () => ctx.onIllegal?.()
+            : undefined;
+
     return (
         <div
             ref={ctx.registerCard(item.id)}
@@ -205,11 +401,7 @@ function ZoneCard({
                 faceDown={item.faceDown}
                 theme={ctx.themeFor(item.ownerId)}
                 disableTransitions={template.arrangement !== "fan"}
-                onClick={
-                    action !== undefined && !ctx.pending
-                        ? () => ctx.onAction(action)
-                        : undefined
-                }
+                onClick={onClick}
             />
         </div>
     );

@@ -6,6 +6,7 @@ import { getMessages, setRequestLocale } from "next-intl/server";
 import "../globals.css";
 import { AppNav } from "@/components/nav/AppNav";
 import { AppShell } from "@/components/nav/AppShell";
+import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 import { routing } from "@/i18n/routing";
 
 const nunito = Nunito({
@@ -42,7 +43,9 @@ export default async function RootLayout({
         <html lang={lang} className={`${nunito.variable} h-full antialiased`}>
             <body className="min-h-screen bg-wc-surface text-wc-text">
                 <NextIntlClientProvider locale={lang} messages={messages}>
-                    <AppShell appNav={<AppNav />}>{children}</AppShell>
+                    <ConfirmProvider>
+                        <AppShell appNav={<AppNav />}>{children}</AppShell>
+                    </ConfirmProvider>
                 </NextIntlClientProvider>
             </body>
         </html>

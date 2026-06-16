@@ -34,6 +34,8 @@ interface GameTableProps {
     boardTheme: BoardTheme;
     pending: boolean;
     onAction: (action: GameAction) => void;
+    /** Surface an "illegal move" notice when a blocked card is clicked. */
+    onIllegal?: () => void;
     /** Optional right-rail slot rendered under the history feed (e.g. chat). */
     chat?: ReactNode;
 }
@@ -54,6 +56,7 @@ export function GameTable({
     boardTheme,
     pending,
     onAction,
+    onIllegal,
     chat,
 }: GameTableProps) {
     const t = useTranslations("game");
@@ -133,6 +136,7 @@ export function GameTable({
         themeFor,
         registerCard,
         onAction,
+        onIllegal,
     };
 
     const zonesAt = (placement: ZonePlacement) =>
@@ -196,7 +200,7 @@ export function GameTable({
                     </div>
 
                     {(bottom.length > 0 || controls.length > 0) && (
-                        <div className="flex flex-col items-center gap-3">
+                        <div className="flex w-full flex-col items-center gap-3">
                             {bottom}
                             <TableControls
                                 controls={controls}

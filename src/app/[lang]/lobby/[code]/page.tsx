@@ -1,7 +1,11 @@
 import { redirect } from "next/navigation";
 import type { Locale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { RoomClient, type SeatRow } from "@/components/lobby/RoomClient";
+import {
+    RoomClient,
+    type SeatRow,
+    type SpectatorRow,
+} from "@/components/lobby/RoomClient";
 import { GAMES } from "@/lib/games";
 import { createClient } from "@/lib/supabase/server";
 
@@ -37,12 +41,12 @@ export default async function Page({
 
     const module = GAMES[room.module_id];
 
-    const { data: seatRows } = await supabase
+    const { data: memberRows } = await supabase
         .from("room_players")
-        .select("user_id, seat")
+        .select("user_id, seat, role")
         .eq("room_id", room.id)
         .order("seat", { ascending: true });
-    const rows = seatRows ?? [];
+    const rows = memberRows ?? [];
 
     const { data: profiles } = await supabase
         .from("profiles")
@@ -53,12 +57,23 @@ export default async function Page({
         );
     const nameOf = new Map((profiles ?? []).map((p) => [p.id, p.username]));
 
-    const initialSeats: SeatRow[] = rows.map((r) => ({
-        userId: r.user_id,
-        seat: r.seat,
-        username: nameOf.get(r.user_id) ?? "Joueur",
-    }));
-    const seated = rows.some((r) => r.user_id === user.id);
+    const initialSeats: SeatRow[] = rows
+        .filter((r) => r.role === "player" && r.seat !== null)
+        .map((r) => ({
+            userId: r.user_id,
+            seat: r.seat as number,
+            username: nameOf.get(r.user_id) ?? "Joueur",
+        }));
+    const initialSpectators: SpectatorRow[] = rows
+        .filter((r) => r.role === "spectator")
+        .map((r) => ({
+            userId: r.user_id,
+            username: nameOf.get(r.user_id) ?? "Joueur",
+        }));
+    const me = rows.find((r) => r.user_id === user.id);
+    const seated = me !== undefined;
+    const initialRole: "player" | "spectator" =
+        me?.role === "spectator" ? "spectator" : "player";
 
     return (
         <div
@@ -80,9 +95,11 @@ export default async function Page({
                     maxPlayers={module?.maxPlayers ?? 8}
                     currentUserId={user.id}
                     initialSeats={initialSeats}
+                    initialSpectators={initialSpectators}
                     initialHostId={room.host_id}
                     initialBotCount={room.bot_count}
                     seated={seated}
+                    initialRole={initialRole}
                 />
             </div>
         </div>

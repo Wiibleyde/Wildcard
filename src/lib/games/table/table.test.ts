@@ -170,11 +170,30 @@ describe("president table", () => {
         expect(spectator.banner.label).toBe("spectating");
     });
 
-    it("turns legal moves into controls on the viewer's turn only", () => {
+    it("builds combos from the hand and keeps only pass as a control", () => {
         const mine = presidentTable.mapView(view, ctx({ legalActions: legal }));
-        expect(mine.controls).toHaveLength(2);
-        expect(mine.controls?.[0]?.cards).toEqual([card("J")]);
-        expect(mine.controls?.[1]?.variant).toBe("danger");
+
+        // No combo is pre-proposed — pass is the only control left.
+        expect(mine.controls).toHaveLength(1);
+        expect(mine.controls?.[0]?.variant).toBe("danger");
+
+        const hand = mine.zones.find((z) => z.key === "hand");
+        // The hand is a tap-to-build picker advertising the legal combos.
+        expect(hand?.selection?.playLabel).toBe("play");
+        expect(hand?.selection?.plays).toEqual([
+            { group: "J", count: 1, action: legal[0] },
+        ]);
+
+        // A card whose rank has a legal play is selectable; the other is
+        // flagged illegal so a click can explain itself.
+        const byRank = (r: Rank) =>
+            hand?.cards.find(
+                (c) => c.card.type === "suited" && c.card.rank === r,
+            );
+        expect(byRank("J")?.group).toBe("J");
+        expect(byRank("J")?.illegal).toBeFalsy();
+        expect(byRank("Q")?.group).toBeUndefined();
+        expect(byRank("Q")?.illegal).toBe(true);
 
         const waiting = presidentTable.mapView(
             { ...view, currentPlayerId: "b" },
@@ -182,6 +201,10 @@ describe("president table", () => {
         );
         expect(waiting.controls).toHaveLength(0);
         expect(waiting.banner.label).toBe("waiting_for|Bob");
+        // Not your turn → no picker, cards inert and never flagged illegal.
+        const waitingHand = waiting.zones.find((z) => z.key === "hand");
+        expect(waitingHand?.selection).toBeUndefined();
+        expect(waitingHand?.cards.every((c) => !c.illegal)).toBe(true);
     });
 
     it("labels seats: passed opponents and demoted players", () => {

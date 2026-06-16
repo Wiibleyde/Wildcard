@@ -58,8 +58,42 @@ export interface TableCardItem {
      * Omitted → the viewer's own deck.
      */
     readonly ownerId?: string;
-    /** Dispatched when the card is clicked. */
+    /** Dispatched when the card is clicked (direct-play zones). */
     readonly action?: GameAction;
+    /**
+     * Selection group, for hands that build a combo by tapping cards (see
+     * {@link HandSelection}). Cards sharing a `group` can be picked together
+     * (e.g. same rank); a card with no `group` cannot be selected.
+     */
+    readonly group?: string;
+    /**
+     * A blocked move for the viewer right now — their turn, but this card
+     * cannot be played legally. Carries no `action`/`group`; a click surfaces
+     * an "illegal move" notice instead of doing anything.
+     */
+    readonly illegal?: boolean;
+}
+
+/** One legal combo a hand can commit, keyed by selection group + size. */
+export interface TableHandPlay {
+    /** Matches the {@link TableCardItem.group} of the cards it consumes. */
+    readonly group: string;
+    /** How many cards of that group this play lays. */
+    readonly count: number;
+    /** Dispatched when the matching selection is committed. */
+    readonly action: GameAction;
+}
+
+/**
+ * Tap-to-build-a-combo config for a hand zone. The viewer selects cards (the
+ * fan lifts them); when the selection matches one of `plays` by group + size,
+ * the commit button (labelled `playLabel`) arms and dispatches that play.
+ * Present only on the viewer's hand and only on their turn.
+ */
+export interface HandSelection {
+    readonly plays: readonly TableHandPlay[];
+    /** Localized label for the commit button ("Jouer"). */
+    readonly playLabel: string;
 }
 
 /** A rendered occurrence of a zone template, filled by `mapView`. */
@@ -75,6 +109,8 @@ export interface TableZoneInstance {
     readonly badge?: string;
     /** Placeholder text when the zone is empty. */
     readonly emptyHint?: string;
+    /** Turns a `fan` hand into a tap-to-build-a-combo picker. */
+    readonly selection?: HandSelection;
 }
 
 /** Opponent chip rendered in the seats bar. */

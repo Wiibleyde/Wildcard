@@ -1,0 +1,103 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+import { GameButton, type GameButtonVariant } from "./GameButton";
+
+export interface ConfirmDialogProps {
+    open: boolean;
+    /** Optional bold heading above the message. */
+    title?: string;
+    message: string;
+    confirmLabel: string;
+    cancelLabel: string;
+    /** Colour of the confirm button — use "red" for destructive actions. */
+    variant?: GameButtonVariant;
+    onConfirm: () => void;
+    onCancel: () => void;
+}
+
+/**
+ * Presentational confirmation modal. Renders nothing on its own — drive it
+ * through {@link useConfirm} for the imperative `await confirm({...})` API, or
+ * mount it directly with controlled `open`. Portals to `<body>` so it escapes
+ * any clipped/transformed ancestor, traps Escape, and locks body scroll.
+ */
+export function ConfirmDialog({
+    open,
+    title,
+    message,
+    confirmLabel,
+    cancelLabel,
+    variant = "gold",
+    onConfirm,
+    onCancel,
+}: ConfirmDialogProps) {
+    const panelRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!open) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") onCancel();
+        };
+        document.addEventListener("keydown", onKey);
+        // The modal owns the screen — stop the page scrolling behind it.
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        // Move focus into the dialog so keyboard users land inside it; the
+        // panel (not the confirm button) so a destructive action isn't one
+        // stray Enter away.
+        panelRef.current?.focus();
+        return () => {
+            document.removeEventListener("keydown", onKey);
+            document.body.style.overflow = prevOverflow;
+        };
+    }, [open, onCancel]);
+
+    // createPortal needs the DOM — bail during SSR and while closed.
+    if (!open || typeof document === "undefined") return null;
+
+    return createPortal(
+        <div
+            className="wc-fade-in fixed inset-0 z-[1000] flex items-center justify-center p-4"
+            style={{
+                background: "rgba(13,10,5,0.72)",
+                backdropFilter: "blur(2px)",
+            }}
+        >
+            {/* Backdrop as a button: click-to-dismiss without an interactive
+                <div> (a11y) and without stealing the tab order. */}
+            <button
+                type="button"
+                aria-label={cancelLabel}
+                tabIndex={-1}
+                onClick={onCancel}
+                className="absolute inset-0 h-full w-full cursor-default"
+            />
+            <div
+                ref={panelRef}
+                role="alertdialog"
+                aria-modal="true"
+                aria-label={title ?? message}
+                tabIndex={-1}
+                className="wc-pop-in relative flex w-full max-w-sm flex-col gap-4 rounded-wc-panel border-2 border-wc-border bg-wc-panel p-6 text-center outline-none"
+            >
+                {title && (
+                    <h2 className="text-lg font-black text-wc-heading">
+                        {title}
+                    </h2>
+                )}
+                <p className="text-sm font-semibold text-wc-muted">{message}</p>
+                <div className="mt-2 flex flex-col-reverse gap-3 sm:flex-row sm:justify-center">
+                    <GameButton variant="ghost" size="sm" onClick={onCancel}>
+                        {cancelLabel}
+                    </GameButton>
+                    <GameButton variant={variant} size="sm" onClick={onConfirm}>
+                        {confirmLabel}
+                    </GameButton>
+                </div>
+            </div>
+        </div>,
+        document.body,
+    );
+}

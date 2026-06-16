@@ -1,15 +1,33 @@
+import type { CardDescriptor } from "@/lib/card/types";
 import { cardKey } from "@/lib/card/utils";
 import {
     registerTable,
     type TableContext,
     type TableControl,
+    type TableHandPlay,
     type TableZoneInstance,
 } from "../table/types";
-import type {
-    PresidentAction,
-    PresidentPlayerView,
-    PresidentView,
+import {
+    type PresidentAction,
+    type PresidentPlayerView,
+    type PresidentView,
+    RANK_VALUE,
 } from "./president";
+
+/** Suit tiebreak for hand order — keeps same-rank cards in a stable run. */
+const SUIT_ORDER: Record<string, number> = {
+    spades: 0,
+    hearts: 1,
+    clubs: 2,
+    diamonds: 3,
+};
+
+/** Hand sort key: Président strength (3 low → 2 high), suit as tiebreak — so
+ * the hand reads low→high and same-rank cards sit together for easy combos. */
+function handOrder(card: CardDescriptor): number {
+    if (card.type !== "suited") return -1;
+    return RANK_VALUE[card.rank] * 10 + (SUIT_ORDER[card.suit] ?? 0);
+}
 
 function nameOf(ctx: TableContext, playerId: string | null): string {
     if (!playerId) return "?";
@@ -110,31 +128,59 @@ export const presidentTable = registerTable<PresidentView>({
             },
         ];
 
+        // The payload's legal actions came from this module — safe narrow.
+        const legal = ctx.legalActions as readonly PresidentAction[];
+
+        // The hand is a combo picker: tap same-rank cards, then commit. Every
+        // legal play is offered as a (rank, count) combo — leading exposes each
+        // size 1…k, answering only the forced count. Cards of a rank with no
+        // legal play at any size are flagged illegal.
+        const plays: TableHandPlay[] = [];
+        const seen = new Set<string>();
+        const playableRanks = new Set<string>();
+        for (const action of legal) {
+            if (action.type !== "play") continue;
+            const first = action.cards[0];
+            const rank = first?.type === "suited" ? first.rank : null;
+            if (rank === null) continue;
+            playableRanks.add(rank);
+            const key = `${rank}:${action.cards.length}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            plays.push({ group: rank, count: action.cards.length, action });
+        }
+
         if (self?.hand) {
+            const hand = [...self.hand].sort(
+                (a, b) => handOrder(a) - handOrder(b),
+            );
             zones.push({
                 key: "hand",
                 zone: "hand",
-                cards: self.hand.map((card) => ({
-                    id: `hand:${cardKey(card)}`,
-                    card,
-                })),
+                cards: hand.map((card) => {
+                    const rank = card.type === "suited" ? card.rank : undefined;
+                    const playable =
+                        rank !== undefined && playableRanks.has(rank);
+                    return {
+                        id: `hand:${cardKey(card)}`,
+                        card,
+                        group: playable ? rank : undefined,
+                        // Your turn but this rank can't be played at any size:
+                        // a blocked move, not an inert card — a click says why.
+                        illegal: isYourTurn && !playable,
+                    };
+                }),
                 badge: placeLabel(ctx, self) ?? undefined,
+                selection: isYourTurn
+                    ? { plays, playLabel: ctx.t("play") }
+                    : undefined,
             });
         }
 
-        // The payload's legal actions came from this module — safe narrow.
-        const legal = ctx.legalActions as readonly PresidentAction[];
+        // Pass stays: the verb you need when you can't or won't beat the trick,
+        // not a card to lay. Combos are built by tapping the hand, not proposed.
         const controls: TableControl[] = [];
         if (isYourTurn) {
-            for (const action of legal) {
-                if (action.type !== "play") continue;
-                controls.push({
-                    key: `play:${action.cards.map(cardKey).join("+")}`,
-                    cards: action.cards,
-                    action,
-                    variant: "success",
-                });
-            }
             const pass = legal.find((a) => a.type === "pass");
             if (pass) {
                 controls.push({
