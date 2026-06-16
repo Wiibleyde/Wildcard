@@ -34,6 +34,7 @@ export default async function Page({
         ? await supabase
               .from("room_players")
               .select("room_id")
+              .eq("role", "player")
               .in(
                   "room_id",
                   roomRows.map((r) => r.id),

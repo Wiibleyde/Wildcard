@@ -214,8 +214,13 @@ function chooseBotAction(legal: readonly GameAction[]): GameAction {
     return pool[Math.floor(Math.random() * pool.length)];
 }
 
-/** Hard cap so a misbehaving module can never spin the bot loop forever. */
-const MAX_BOT_STEPS = 500;
+/**
+ * Hard cap so a misbehaving module can never spin the bot loop forever. Sized
+ * for the longest realistic auto-played game: an all-bot Bataille resolves one
+ * round per step and a fair game of War can run several hundred rounds, so the
+ * ceiling sits well above that while still bounding a runaway module.
+ */
+const MAX_BOT_STEPS = 2000;
 
 /**
  * Pause before each bot move so every move lands as its own Realtime version
@@ -226,6 +231,32 @@ const BOT_TURN_DELAY_MS = 900;
 
 function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Pick the bot that should make the next move, or `null` if a human owns it.
+ *
+ * Sequential games expose whose turn it is via `currentPlayerId`; we act only
+ * when that player is a bot. Simultaneous / engine-driven games leave it `null`
+ * (e.g. Bataille, where a single `flip` resolves the round for everyone) — there
+ * we drive the round only when *every* player who still has a legal move is a
+ * bot, so an all-computer table plays itself while any table with a human waits
+ * for that human to act.
+ */
+function nextBotMover(
+    module: AnyGameModule,
+    state: GameState,
+    botSet: ReadonlySet<string>,
+): string | null {
+    if (state.currentPlayerId !== null) {
+        return botSet.has(state.currentPlayerId) ? state.currentPlayerId : null;
+    }
+    const actors = state.players.filter(
+        (p) => module.legalActions(state, p.id).length > 0,
+    );
+    if (actors.length === 0) return null;
+    if (!actors.every((p) => botSet.has(p.id))) return null;
+    return actors[0].id;
 }
 
 /**
@@ -256,13 +287,10 @@ export async function advanceBots(
     const botSet = new Set(botIds);
     let steps = 0;
 
-    while (
-        steps++ < MAX_BOT_STEPS &&
-        !module.isOver(state) &&
-        state.currentPlayerId !== null &&
-        botSet.has(state.currentPlayerId)
-    ) {
-        const botId = state.currentPlayerId;
+    while (steps++ < MAX_BOT_STEPS && !module.isOver(state)) {
+        const botId = nextBotMover(module, state, botSet);
+        if (botId === null) break;
+
         const legal = module.legalActions(state, botId);
         if (legal.length === 0) break;
 

@@ -68,12 +68,23 @@ function checkTableData(
                 false,
             );
             cardIds.add(item.id);
+            // A clickable card must dispatch one of the viewer's legal actions.
+            if (item.action) {
+                expect(legalActions).toContain(item.action);
+            }
         }
     }
 
     // Every control must dispatch one of the viewer's legal actions.
     for (const control of data.controls ?? []) {
         expect(legalActions).toContain(control.action);
+    }
+
+    // Every offered combo must dispatch one of the viewer's legal actions.
+    for (const zone of data.zones) {
+        for (const play of zone.selection?.plays ?? []) {
+            expect(legalActions).toContain(play.action);
+        }
     }
 }
 

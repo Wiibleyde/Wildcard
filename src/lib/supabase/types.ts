@@ -251,19 +251,22 @@ export type Database = {
                 Row: {
                     room_id: string;
                     user_id: string;
-                    seat: number;
+                    seat: number | null;
+                    role: "player" | "spectator";
                     joined_at: string;
                 };
                 Insert: {
                     room_id: string;
                     user_id: string;
-                    seat: number;
+                    seat?: number | null;
+                    role?: "player" | "spectator";
                     joined_at?: string;
                 };
                 Update: {
                     room_id?: string;
                     user_id?: string;
-                    seat?: number;
+                    seat?: number | null;
+                    role?: "player" | "spectator";
                     joined_at?: string;
                 };
                 Relationships: [

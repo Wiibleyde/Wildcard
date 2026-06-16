@@ -29,7 +29,9 @@
         "error": "Une erreur est survenue",
         "save": "Enregistrer",
         "saving": "Enregistrement...",
-        "saved": "Enregistré !"
+        "saved": "Enregistré !",
+        "cancel": "Annuler",
+        "confirm": "Confirmer"
     },
     "auth": {
         "login": {
@@ -127,7 +129,13 @@
         "error_not_host": "Seul l'hôte peut lancer",
         "error_not_enough": "Pas assez de joueurs pour lancer",
         "error_already_started": "Cette partie a déjà commencé",
-        "error_generic": "Une erreur est survenue"
+        "error_generic": "Une erreur est survenue",
+        "error_room_full": "Le salon est plein",
+        "spectators": "Spectateurs",
+        "no_spectators": "Aucun spectateur",
+        "spectate": "Passer spectateur",
+        "join_as_player": "Rejoindre les joueurs",
+        "room_full_short": "Salon plein"
     },
     "game": {
         "your_turn": "À toi de jouer",
@@ -155,6 +163,7 @@
         "finished": "Terminé {place}",
         "passed": "a passé",
         "leave": "Quitter la partie",
+        "leave_confirm": "Quitter la partie en cours ? Ta place sera abandonnée.",
         "error_conflict": "La partie a avancé — actualisation",
         "error_illegal": "Coup illégal",
         "error_generic": "Une erreur est survenue",

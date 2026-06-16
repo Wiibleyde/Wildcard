@@ -67,7 +67,7 @@ import type {
 
 /** Président ranking: 3 lowest → 2 highest. `C` (unused in french52) sits high.
  * Intentionally different from bataille.ts: 2 beats Ace here (Président rule). */
-const RANK_VALUE: Record<Rank, number> = {
+export const RANK_VALUE: Record<Rank, number> = {
     "3": 3,
     "4": 4,
     "5": 5,
