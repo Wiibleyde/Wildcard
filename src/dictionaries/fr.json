@@ -163,7 +163,7 @@
         "finished": "Terminé {place}",
         "passed": "a passé",
         "leave": "Quitter la partie",
-        "leave_confirm": "Quitter la partie en cours ? Ta place sera abandonnée.",
+        "leave_confirm": "Quitter la partie en cours ? Elle continuera sans toi.",
         "error_conflict": "La partie a avancé — actualisation",
         "error_illegal": "Coup illégal",
         "error_generic": "Une erreur est survenue",

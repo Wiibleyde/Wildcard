@@ -163,7 +163,7 @@
         "finished": "Finished {place}",
         "passed": "passed",
         "leave": "Leave game",
-        "leave_confirm": "Leave the game in progress? Your seat will be abandoned.",
+        "leave_confirm": "Leave the game in progress? It will keep going without you.",
         "error_conflict": "The game advanced — refreshing",
         "error_illegal": "Illegal move",
         "error_generic": "Something went wrong",
