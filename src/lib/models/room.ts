@@ -170,17 +170,15 @@ export async function setRoomRole(
     if (role === "spectator") {
         // Drop the seat; upsert preserves host membership and is a no-op if the
         // user is already spectating.
-        const { error } = await admin
-            .from("room_players")
-            .upsert(
-                {
-                    room_id: room.id,
-                    user_id: userId,
-                    seat: null,
-                    role: "spectator",
-                },
-                { onConflict: "room_id,user_id" },
-            );
+        const { error } = await admin.from("room_players").upsert(
+            {
+                room_id: room.id,
+                user_id: userId,
+                seat: null,
+                role: "spectator",
+            },
+            { onConflict: "room_id,user_id" },
+        );
         if (error) {
             return { ok: false, error: "db_error", message: error.message };
         }
