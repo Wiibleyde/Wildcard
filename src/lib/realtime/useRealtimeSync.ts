@@ -53,6 +53,12 @@ export function useRealtimeSync(
         let active = true;
         let retry: ReturnType<typeof setTimeout> | undefined;
         let attempt = 0;
+        // Until the channel has SUBSCRIBED at least once, a failure means "still
+        // trying to connect", not "lost an established connection". We retry
+        // silently in that window instead of nagging with the reconnect banner —
+        // otherwise an environment where Realtime never establishes (e.g. the
+        // postgres_changes publication isn't live) shows the banner forever.
+        let hasConnected = false;
         // Each (re)join bumps the epoch; status callbacks from a superseded
         // channel carry a stale epoch and are ignored, so tearing an old
         // channel down never schedules a spurious re-join against the new one.
@@ -67,7 +73,8 @@ export function useRealtimeSync(
         // hides: flag it immediately, and on recovery force a prompt re-join
         // rather than waiting out the socket's backoff timer.
         const onOffline = () => {
-            if (active) setStatus("reconnecting");
+            // Only surface a drop once we've actually been connected.
+            if (active && hasConnected) setStatus("reconnecting");
         };
         const onOnline = () => {
             if (!active) return;
@@ -115,12 +122,16 @@ export function useRealtimeSync(
                 if (!active || myEpoch !== epoch) return;
                 const next = classifyChannelStatus(s);
                 if (!next) return;
-                setStatus(next.status);
                 if (next.status === "connected") {
+                    hasConnected = true;
                     attempt = 0;
+                    setStatus("connected");
                     // Resync to cover anything missed while detached.
                     onChange();
                 } else if (next.rejoin) {
+                    // Pre-first-connect failures stay "connecting" (silent);
+                    // only a dropped, established channel nags as "reconnecting".
+                    setStatus(hasConnected ? "reconnecting" : "connecting");
                     scheduleRejoin();
                 }
             });

@@ -117,10 +117,15 @@ function watchErrors(page, sink) {
 // ── Modes ──
 if (mode === "shoot") {
     const widths = opt("widths", ["375", "768", "1920", "2560"]).map(Number);
+    const moduleId = opt("module", ["president"])[0];
+    // Bots needed to reach min players: president 3, bataille 2, solitaire 1 (solo).
+    const BOTS = { president: 3, bataille: 1, solitaire: 0 };
     const lobbyRoom = await post("/api/rooms", { moduleId: "president" });
     await post(`/api/rooms/${lobbyRoom.code}/bots`, { count: 2 });
-    const gameRoom = await post("/api/rooms", { moduleId: "president" });
-    await post(`/api/rooms/${gameRoom.code}/bots`, { count: 3 });
+    const gameRoom = await post("/api/rooms", { moduleId });
+    const botCount = BOTS[moduleId] ?? 0;
+    if (botCount > 0)
+        await post(`/api/rooms/${gameRoom.code}/bots`, { count: botCount });
     const started = await post(`/api/rooms/${gameRoom.code}/start`);
 
     const ALL = {
@@ -202,6 +207,34 @@ if (mode === "play") {
         ),
     );
     console.log(`screenshots: ${SHOTS}play-before.png / play-after.png`);
+}
+
+if (mode === "solplay") {
+    const room = await post("/api/rooms", { moduleId: "solitaire" });
+    const { gameId } = await post(`/api/rooms/${room.code}/start`);
+
+    const page = await ctx.newPage();
+    const errors = [];
+    watchErrors(page, errors);
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto(`${BASE}/fr/game/${gameId}`, {
+        waitUntil: "load",
+        timeout: 45000,
+    });
+    await page.waitForTimeout(1800);
+
+    // Draw a few cards off the stock pile (zone-level click).
+    const stock = page.locator('[data-zone-key="stock"]');
+    for (let i = 0; i < 5; i++) {
+        await stock.click();
+        await page.waitForTimeout(600);
+    }
+    await page.screenshot({ path: `${SHOTS}sol-drawn.png`, fullPage: true });
+
+    console.log(
+        JSON.stringify({ gameId, consoleErrors: errors.slice(0, 8) }, null, 1),
+    );
+    console.log(`screenshots: ${SHOTS}sol-drawn.png`);
 }
 
 await browser.close();

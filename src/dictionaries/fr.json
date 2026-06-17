@@ -185,7 +185,13 @@
         "log_round_won": "{name} remporte la manche {n}",
         "log_round_draw": "Manche {n} : égalité",
         "log_or_nothing": "{name} annonce « {rank} ou rien ! »",
-        "or_nothing_status": "« {rank} ou rien » — joue {rank} ou passe"
+        "or_nothing_status": "« {rank} ou rien » — joue {rank} ou passe",
+        "draw": "Piocher",
+        "recycle": "Recycler",
+        "moves": "{n} coups",
+        "empty_column": "Roi",
+        "log_to_foundation": "{rank}{suit} monte en fondation",
+        "log_recycle": "La pioche est recyclée"
     },
     "realtime": {
         "reconnecting": "Reconnexion en cours…"

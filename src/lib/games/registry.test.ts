@@ -13,12 +13,12 @@ function seats(n: number): Player[] {
 }
 
 describe("game registry", () => {
-    it("exposes both native games", () => {
+    it("exposes every native game", () => {
         expect(
             gameCatalog()
                 .map((g) => g.id)
                 .sort(),
-        ).toEqual(["bataille", "president"]);
+        ).toEqual(["bataille", "president", "solitaire"]);
     });
 
     it("plays a full bataille through the type-erased registry", () => {

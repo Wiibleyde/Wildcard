@@ -3,6 +3,8 @@ import { bataille } from "./bataille/bataille";
 import { batailleTable } from "./bataille/table";
 import { president } from "./president/president";
 import { presidentTable } from "./president/table";
+import { solitaire } from "./solitaire/solitaire";
+import { solitaireTable } from "./solitaire/table";
 import type { AnyGameTableConfig } from "./table/types";
 
 /**
@@ -13,6 +15,7 @@ import type { AnyGameTableConfig } from "./table/types";
 export const GAMES: Record<string, AnyGameModule> = {
     [bataille.id]: registerGame(bataille),
     [president.id]: registerGame(president),
+    [solitaire.id]: registerGame(solitaire),
 };
 
 /**
@@ -23,6 +26,7 @@ export const GAMES: Record<string, AnyGameModule> = {
 export const GAME_TABLES: Record<string, AnyGameTableConfig> = {
     [bataille.id]: batailleTable,
     [president.id]: presidentTable,
+    [solitaire.id]: solitaireTable,
 };
 
 /** Resolve a module by id, or `undefined` for an unknown game. */

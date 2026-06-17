@@ -185,7 +185,13 @@
         "log_round_won": "{name} wins round {n}",
         "log_round_draw": "Round {n}: tie",
         "log_or_nothing": "{name} calls “{rank} or nothing!”",
-        "or_nothing_status": "“{rank} or nothing” — play {rank} or pass"
+        "or_nothing_status": "“{rank} or nothing” — play {rank} or pass",
+        "draw": "Draw",
+        "recycle": "Recycle",
+        "moves": "{n} moves",
+        "empty_column": "King",
+        "log_to_foundation": "{rank}{suit} goes up to the foundation",
+        "log_recycle": "The stock is recycled"
     },
     "realtime": {
         "reconnecting": "Reconnecting…"
