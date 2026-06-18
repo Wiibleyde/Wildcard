@@ -34,7 +34,7 @@ const env = Object.fromEntries(
         .filter((l) => l.includes("=") && !l.startsWith("#"))
         .map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]),
 );
-const SB = env.NEXT_PUBLIC_SUPABASE_URL;
+const SB = env.SUPABASE_URL;
 
 async function authCookies() {
     const EMAIL = "ui-test@wildcard.local";
@@ -56,7 +56,7 @@ async function authCookies() {
     const res = await fetch(`${SB}/auth/v1/token?grant_type=password`, {
         method: "POST",
         headers: {
-            apikey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+            apikey: env.SUPABASE_ANON_KEY,
             "Content-Type": "application/json",
         },
         body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
@@ -66,7 +66,7 @@ async function authCookies() {
 
     // Let @supabase/ssr serialize the session into its own cookie format
     let captured = [];
-    const sb = createServerClient(SB, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+    const sb = createServerClient(SB, env.SUPABASE_ANON_KEY, {
         cookies: {
             getAll: () => [],
             setAll: (cs) => {

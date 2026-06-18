@@ -38,7 +38,7 @@ cp .env.docker.example .env.docker
 
 # Application Next.js
 cp .env.local.example .env.local
-# → Remplir NEXT_PUBLIC_SUPABASE_URL et NEXT_PUBLIC_SUPABASE_ANON_KEY
+# → Remplir SUPABASE_URL et SUPABASE_ANON_KEY (lues au runtime)
 #   (valeurs disponibles après l'étape 2)
 ```
 
@@ -203,6 +203,73 @@ Ajouter une clé de traduction :
 
 ---
 
+## Monitoring & Analytics
+
+Stack 100 % open source, self-host, RGPD-compliant. Trois services, profil
+Docker `monitoring` :
+
+| Service        | Rôle                                            | URL locale              |
+| -------------- | ----------------------------------------------- | ----------------------- |
+| **Umami**      | Analytics web cookieless (pages vues, sessions) | http://localhost:54325  |
+| **Prometheus** | Métriques applicatives (scrape `/api/metrics`)  | http://localhost:54326  |
+| **Grafana**    | Visualisation unifiée des deux sources          | http://localhost:54327  |
+
+```bash
+# Renseigner d'abord la section monitoring de .env.docker
+docker compose --env-file .env.docker --profile monitoring up -d
+```
+
+### Métriques Prometheus exposées (`/api/metrics`)
+
+`prom-client` expose un registre singleton (voir `src/lib/metrics/registry.ts`) :
+
+- `wildcard_active_games{module}` — parties en cours (gauge, lu en base au scrape)
+- `wildcard_move_duration_ms{module}` — latence serveur d'application d'un coup (histogram)
+- `wildcard_moves_total{module,result}` — débit / erreurs des actions (counter)
+- `wildcard_games_started_total{module}` / `wildcard_games_finished_total{module}` — démarrées vs terminées → **taux d'abandon**
+- `wildcard_game_duration_seconds{module}` — durée d'une partie (histogram) → **durée moyenne par jeu**
+- métriques Node/process (`wildcard_*` : CPU, heap, event-loop)
+
+> **Accès protégé** — le port de l'app est publié, donc `/api/metrics` est
+> joignable de l'extérieur. Définir `METRICS_TOKEN` (`.env.docker`) : la route
+> exige alors un `Authorization: Bearer <token>`, que Prometheus envoie
+> automatiquement. Laissé vide en dev local (pas de Prometheus), la route reste
+> ouverte.
+
+### Grafana
+
+Datasources et dashboards **provisionnés** au démarrage (`monitoring/grafana/`) :
+
+- **Prometheus** + **Umami (PostgreSQL)** — les deux sources.
+- Dashboard *Wildcard — Métier (jeux)* : parties actives, durée moyenne par jeu,
+  taux d'abandon, latence des coups, débit/erreurs.
+- Dashboard *Wildcard — Analytics web (Umami)* : pages vues, sessions, top pages.
+
+Login admin : `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` (`.env.docker`).
+
+### Activer le tag Umami dans l'app
+
+1. Ouvrir Umami (http://localhost:54325), login par défaut `admin` / `umami`.
+2. Créer un site « Wildcard » → copier son **Website ID**.
+3. Coller dans `.env.docker` (ou `.env.local` pour `next dev`) → `UMAMI_WEBSITE_ID`,
+   redémarrer l'app.
+
+Sans `UMAMI_WEBSITE_ID`, le tag ne se charge pas — aucun impact sur les runs
+locaux sans monitoring.
+
+> **Config publique au runtime** — `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `UMAMI_URL`
+> et `UMAMI_WEBSITE_ID` ne sont **pas** des `NEXT_PUBLIC_*` : elles sont lues
+> côté serveur à la requête et injectées au navigateur via `window.__PUBLIC_ENV__`
+> (`src/lib/public-env.ts`). Une seule image construite par la CI tourne dans
+> n'importe quel environnement — aucune valeur figée au build, donc aucun rebuild
+> par déploiement.
+
+> **RGPD** : Umami est cookieless et ne stocke aucune donnée personnelle (IP +
+> user-agent hachés par jour → visiteur anonyme), donc pas de bannière de
+> consentement. Toutes les données restent dans notre propre Postgres (`umami-db`).
+
+---
+
 ## Déploiement — On-Premise (tout Docker)
 
 L'application Next.js et la stack Supabase tournent dans le même `docker compose`.
@@ -258,7 +325,7 @@ docker compose --env-file .env.docker up -d --build
 ```
 
 Ce que fait ce seul `up` :
-1. Build l'image Next.js avec `NEXT_PUBLIC_SUPABASE_URL=API_EXTERNAL_URL`
+1. Build l'image Next.js (aucune config publique figée — lue au runtime via l'env du conteneur)
 2. Démarre PostgreSQL, Auth, REST, Realtime, Kong, Inbucket
 3. Applique les migrations (`db-migrate` one-shot)
 4. Lance l'app Next.js

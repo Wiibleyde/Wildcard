@@ -1,0 +1,32 @@
+# Prometheus — scrape config Wildcard
+# Cible : l'endpoint /api/metrics de l'app Next.js (prom-client).
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  external_labels:
+    project: wildcard
+
+scrape_configs:
+  # Métriques applicatives Wildcard. Deux cibles :
+  #   - app:3000              → l'app conteneurisée (profil `up`)
+  #   - host.docker.internal  → `next dev` lancé sur l'hôte (profil `dev`)
+  # La cible inactive remonte simplement up=0 ; aucune des deux n'est requise.
+  - job_name: wildcard-app
+    metrics_path: /api/metrics
+    # Bearer token attendu par /api/metrics quand METRICS_TOKEN est défini.
+    # Prometheus ne sait pas interpoler l'env : l'entrypoint du conteneur écrit
+    # METRICS_TOKEN dans ce fichier au démarrage (cf. docker-compose.yml). Vide
+    # en dev → la route reste ouverte.
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/token
+    static_configs:
+      - targets:
+          - app:3000
+          - host.docker.internal:3000
+
+  # Prometheus s'auto-scrape (santé de la collecte elle-même).
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090

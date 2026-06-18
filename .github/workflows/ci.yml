@@ -85,9 +85,12 @@ jobs:
     name: Build Next app
     needs: setup
     runs-on: ubuntu-latest
+    # Config publique lue au runtime, pas au build — ces valeurs ne sont là que
+    # pour satisfaire un éventuel appel pendant le prerender. L'image réelle est
+    # paramétrée au démarrage du conteneur.
     env:
-      NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key
+      SUPABASE_URL: http://localhost:54321
+      SUPABASE_ANON_KEY: dummy-anon-key
       SUPABASE_SERVICE_ROLE_KEY: dummy-service-role-key
     steps:
       - uses: actions/checkout@v4

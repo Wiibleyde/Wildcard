@@ -1,0 +1,13 @@
+# Charge tous les dashboards JSON du dossier monté.
+apiVersion: 1
+
+providers:
+  - name: Wildcard
+    type: file
+    folder: Wildcard
+    disableDeletion: false
+    allowUiUpdates: true
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

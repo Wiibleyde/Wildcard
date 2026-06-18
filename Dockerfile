@@ -13,11 +13,10 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# NEXT_PUBLIC_* sont embarqués au build — passer via --build-arg
-ARG NEXT_PUBLIC_SUPABASE_URL
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
-ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
-ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+# Aucune config publique embarquée au build : SUPABASE_URL / SUPABASE_ANON_KEY /
+# UMAMI_* sont lues au RUNTIME (src/lib/public-env.ts → window.__PUBLIC_ENV__).
+# Une seule image CI tourne dans n'importe quel environnement, configurée au
+# démarrage du conteneur — rien à passer en --build-arg.
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN bun run build

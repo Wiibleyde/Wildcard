@@ -1,0 +1,30 @@
+# Datasources Grafana provisionnées au démarrage.
+# Deux sources, comme prévu dans la stack : Prometheus + Umami (PostgreSQL).
+apiVersion: 1
+
+datasources:
+  # ── Métriques applicatives ────────────────────────────────
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      httpMethod: POST
+      timeInterval: 15s
+
+  # ── Analytics web Umami (lecture directe de sa base) ──────
+  - name: Umami (PostgreSQL)
+    uid: umami-postgres
+    type: postgres
+    access: proxy
+    url: umami-db:5432
+    user: umami
+    jsonData:
+      database: umami
+      sslmode: disable
+      postgresVersion: 1500
+    # Grafana interpole la variable d'env (passée au conteneur grafana).
+    secureJsonData:
+      password: ${UMAMI_DB_PASSWORD}
