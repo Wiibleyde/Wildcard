@@ -234,6 +234,7 @@
         "send": "Send",
         "empty": "No messages yet",
         "you": "You",
-        "rate_limited": "Slow down…"
+        "rate_limited": "Slow down…",
+        "disconnected": "Chat offline — reconnecting…"
     }
 }

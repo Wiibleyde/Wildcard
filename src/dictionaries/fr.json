@@ -234,6 +234,7 @@
         "send": "Envoyer",
         "empty": "Pas encore de messages",
         "you": "Toi",
-        "rate_limited": "Doucement…"
+        "rate_limited": "Doucement…",
+        "disconnected": "Chat hors ligne — reconnexion…"
     }
 }

@@ -152,39 +152,70 @@ export function useGameChat(
 
     useEffect(() => {
         const supabase = createClient();
-        const channel = supabase
-            .channel(`chat:game:${gameId}`, {
-                config: { broadcast: { self: false } },
-            })
-            .on("broadcast", { event: "message" }, ({ payload }) => {
-                const p = payload as Partial<ChatWire> | null;
-                if (
-                    !p ||
-                    typeof p.id !== "string" ||
-                    typeof p.text !== "string"
-                ) {
-                    return;
-                }
-                append({
-                    id: p.id,
-                    userId: typeof p.userId === "string" ? p.userId : "?",
-                    // Empty when a peer omits it → the UI falls back to the
-                    // seated-roster lookup (works for players, not spectators).
-                    name: typeof p.name === "string" ? p.name : "",
-                    // Clamp defensively — a peer could broadcast an oversized string.
-                    text: p.text.slice(0, MAX_CHAT_LENGTH),
-                    at: typeof p.at === "number" ? p.at : Date.now(),
-                });
-            })
-            .subscribe((status) => {
-                readyRef.current = status === "SUBSCRIBED";
+        let channel: RealtimeChannel | undefined;
+        let active = true;
+
+        const onMessage = ({ payload }: { payload: unknown }) => {
+            const p = payload as Partial<ChatWire> | null;
+            if (!p || typeof p.id !== "string" || typeof p.text !== "string") {
+                return;
+            }
+            append({
+                id: p.id,
+                userId: typeof p.userId === "string" ? p.userId : "?",
+                // Empty when a peer omits it → the UI falls back to the
+                // seated-roster lookup (works for players, not spectators).
+                name: typeof p.name === "string" ? p.name : "",
+                // Clamp defensively — a peer could broadcast an oversized string.
+                text: p.text.slice(0, MAX_CHAT_LENGTH),
+                at: typeof p.at === "number" ? p.at : Date.now(),
             });
-        channelRef.current = channel;
+        };
+
+        // The session token MUST be set on the socket *before* subscribing, or
+        // the cookie-based SSR client connects as `anon`. On a stack whose
+        // Realtime authorization is `authenticated`-only (self-hosted default),
+        // an anon socket is rejected — the channel never reaches SUBSCRIBED, so
+        // every `send` below returns "disconnected" and the chat looks dead even
+        // though the game (which polls) keeps working. Same setAuth dance as
+        // {@link useRealtimeSync}; chat just never did it.
+        const join = async () => {
+            const {
+                data: { session },
+            } = await supabase.auth.getSession();
+            if (!active) return;
+            if (session?.access_token) {
+                supabase.realtime.setAuth(session.access_token);
+            }
+            channel = supabase
+                .channel(`chat:game:${gameId}`, {
+                    config: { broadcast: { self: false } },
+                })
+                .on("broadcast", { event: "message" }, onMessage)
+                .subscribe((status) => {
+                    readyRef.current = status === "SUBSCRIBED";
+                });
+            channelRef.current = channel;
+        };
+
+        // Keep the socket token fresh across the ~1h access-token refresh, so a
+        // long game doesn't silently drop back to anon mid-session.
+        const {
+            data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session?.access_token) {
+                supabase.realtime.setAuth(session.access_token);
+            }
+        });
+
+        join();
 
         return () => {
+            active = false;
             readyRef.current = false;
             channelRef.current = null;
-            supabase.removeChannel(channel);
+            subscription.unsubscribe();
+            if (channel) supabase.removeChannel(channel);
         };
     }, [gameId, append]);
 
