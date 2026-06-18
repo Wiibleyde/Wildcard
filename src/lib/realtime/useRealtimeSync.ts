@@ -15,16 +15,6 @@ export type { RealtimeStatus };
 type ChannelBuilder = (channel: RealtimeChannel) => RealtimeChannel;
 
 /**
- * How much to slow the fallback poll once the channel reports "connected".
- * We do NOT stop polling entirely on connect: a channel can subscribe
- * successfully (so broadcast/presence work) while `postgres_changes` silently
- * delivers nothing — a self-hosted Realtime CDC quirk we hit in practice. A
- * slow safety poll reconciles those missed changes; when CDC really is live
- * it's just an occasional, near-free refetch.
- */
-const CONNECTED_SAFETY_POLL_FACTOR = 4;
-
-/**
  * Shared resilience core for every Realtime subscription. Realtime is push-only
  * and lossy across gaps, so this hook turns "the socket came back" into "pull
  * the authoritative state again" and exposes the connection health for a UI
@@ -55,30 +45,28 @@ export function useRealtimeSync(
     build: ChannelBuilder,
     onChange: () => void,
     /**
-     * Fallback poll interval (ms). While the channel is **not** connected —
-     * including an environment where Realtime never establishes at all (the
-     * postgres_changes publication isn't live on the server) — refetch on this
-     * interval so bots, spectators and opponents still see updates. Costs
-     * nothing once subscribed: polling stops the moment the socket connects.
+     * Backstop poll interval (ms). The poll runs continuously at this rate,
+     * even while "connected": a channel can subscribe (broadcast works) while
+     * postgres_changes delivers nothing — a self-hosted Realtime CDC quirk — so
+     * "subscribed" can't be trusted to mean "receiving". Realtime, when it does
+     * deliver, just updates sooner than the next tick. Keep this at or below the
+     * fastest cadence the consumer must not miss (e.g. the bot-move pacing on
+     * the game channel) so no update is ever skipped.
      */
     pollMs?: number,
 ): RealtimeStatus {
     const [status, setStatus] = useState<RealtimeStatus>("connecting");
 
-    // Backstop polling. While detached we poll at `pollMs` to catch up fast.
-    // While "connected" we keep a SLOWER safety poll rather than stopping
-    // (see CONNECTED_SAFETY_POLL_FACTOR): the channel subscribing does not
-    // guarantee postgres_changes are actually arriving, and a frozen board /
-    // lobby is worse than an occasional redundant refetch.
+    // Backstop polling — runs continuously at `pollMs`, NOT gated on connection
+    // status. A channel can report "connected" while postgres_changes silently
+    // delivers nothing (self-hosted Realtime CDC quirk), which would otherwise
+    // freeze the board/lobby on its last snapshot. Realtime, when it works, just
+    // updates sooner; the poll guarantees every change is eventually caught.
     useEffect(() => {
         if (!pollMs) return;
-        const interval =
-            status === "connected"
-                ? pollMs * CONNECTED_SAFETY_POLL_FACTOR
-                : pollMs;
-        const id = setInterval(onChange, interval);
+        const id = setInterval(onChange, pollMs);
         return () => clearInterval(id);
-    }, [pollMs, status, onChange]);
+    }, [pollMs, onChange]);
 
     useEffect(() => {
         const supabase = createClient();

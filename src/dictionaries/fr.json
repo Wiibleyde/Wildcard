@@ -149,6 +149,7 @@
         "draw_round": "Manche nulle",
         "cards_left": "{n} cartes",
         "in_play": "En jeu",
+        "trick_won": "Pli remporté par {name}",
         "your_hand": "Ta main",
         "game_over": "Partie terminée",
         "you_win": "Tu gagnes !",

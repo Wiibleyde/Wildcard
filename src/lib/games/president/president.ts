@@ -143,6 +143,12 @@ export interface PresidentState extends GameState {
     readonly demoted: readonly string[];
     /** Last player to lay the top combo — leads once the trick clears. */
     readonly lastPlayerId: string | null;
+    /**
+     * Cards of the trick that was just swept, kept for display so the closing
+     * play stays on the table until the next lead is laid — instead of
+     * vanishing the instant a carré/2 closes the pli. `null` while a trick runs.
+     */
+    readonly lastTrick: readonly TrickPlay[] | null;
 }
 
 export type PresidentAction =
@@ -178,6 +184,8 @@ export interface PresidentView {
     /** True while « ou rien » locks the trick on the combo's rank. */
     readonly equalLock: boolean;
     readonly pile: readonly TrickPlay[];
+    /** The just-won trick, shown until the next lead (empty while a trick runs). */
+    readonly lastTrick: readonly TrickPlay[];
     readonly finished: readonly string[];
     readonly players: readonly PresidentPlayerView[];
     /** The viewer this projection was built for (`null` = spectator). */
@@ -276,6 +284,9 @@ function clearTrick(
     return {
         ...state,
         pile: [],
+        // Keep the swept cards for display until the next lead is laid, so a
+        // closing carré/2 is actually seen instead of vanishing on the spot.
+        lastTrick: state.pile,
         combo: null,
         revolution: false, // a revolution only holds for the trick
         equalLock: false, // « ou rien » dies with the trick
@@ -488,6 +499,8 @@ const base: Omit<
             finished,
             demoted,
             pile: [...state.pile, { playerId: action.playerId, cards }],
+            // A card is on the table now — drop the previous trick's snapshot.
+            lastTrick: null,
             combo: { rank, count: cards.length },
             revolution,
             equalLock,
@@ -585,6 +598,7 @@ const base: Omit<
             revolution: state.revolution,
             equalLock: state.equalLock,
             pile: state.pile,
+            lastTrick: state.lastTrick ?? [],
             finished: state.finished,
             self: viewerId,
             players: state.players.map((p): PresidentPlayerView => {
@@ -655,6 +669,7 @@ export function createPresident(
                 finished: [],
                 demoted: [],
                 lastPlayerId: null,
+                lastTrick: null,
             };
         },
     };

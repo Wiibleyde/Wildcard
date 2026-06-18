@@ -149,6 +149,7 @@
         "draw_round": "Tied round",
         "cards_left": "{n} cards",
         "in_play": "In play",
+        "trick_won": "Trick won by {name}",
         "your_hand": "Your hand",
         "game_over": "Game over",
         "you_win": "You win!",

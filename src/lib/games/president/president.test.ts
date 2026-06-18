@@ -44,6 +44,7 @@ function state3(
         finished: [],
         demoted: [],
         lastPlayerId: null,
+        lastTrick: null,
         ...overrides,
     };
 }
@@ -333,6 +334,9 @@ describe("president french table rules", () => {
         if (!res.ok) return;
         expect(res.state.combo).toBeNull();
         expect(res.state.pile).toHaveLength(0);
+        // Swept cards are kept for display (the closing 2 + c's K) until the
+        // next lead — so the winning play is actually seen, not blinked away.
+        expect(res.state.lastTrick).toHaveLength(2);
         expect(res.state.passed).toHaveLength(0);
         expect(res.state.currentPlayerId).toBe("b"); // leads again
         expect(res.events).toContainEqual({

@@ -62,13 +62,24 @@ export function GamePlayClient({
         });
         if (res.ok) {
             const next = (await res.json()) as GameClientPayload;
-            // Concurrent refetches can resolve out of order — never let a
-            // stale snapshot overwrite a newer one.
-            setPayload((prev) => (next.version >= prev.version ? next : prev));
+            // Adopt only a STRICTLY newer version. Equal-version refetches (the
+            // backstop poll re-reading an unchanged game) keep the SAME object,
+            // so React skips the re-render — otherwise the hand fan would churn
+            // on every poll tick and fight you mid-selection. Stale/out-of-order
+            // snapshots are dropped the same way.
+            setPayload((prev) => (next.version > prev.version ? next : prev));
         }
     }, [initial.gameId]);
 
-    const conn = useGameChannel(initial.gameId, refetch);
+    // While it's YOUR turn nobody else can act, so the board can't change under
+    // you — poll slowly to avoid needless refetches/churn while you pick cards.
+    // When it's another player's or a bot's turn, poll fast to catch each move
+    // (Realtime would push this instantly, but postgres_changes is unreliable on
+    // self-hosted stacks, so the poll is the dependable path).
+    const myTurn =
+        payload.currentPlayerId !== null &&
+        payload.currentPlayerId === currentUserId;
+    const conn = useGameChannel(initial.gameId, refetch, myTurn ? 4000 : 800);
 
     // A refused or blocked move must not fail silently — flash a short,
     // localized notice that clears itself.

@@ -117,6 +117,7 @@ describe("president table", () => {
             { playerId: "c", cards: [card("8")] },
             { playerId: "b", cards: [card("9")] },
         ],
+        lastTrick: [],
         finished: [],
         self: "a",
         players: [

@@ -106,13 +106,17 @@ export const presidentTable = registerTable<PresidentView>({
             });
 
         // The whole uncleared trick stays on the table — every play visible,
-        // each card skinned with the deck style of the player who laid it.
-        const topPlay = view.pile.at(-1);
+        // each card skinned with the deck style of the player who laid it. Once
+        // a trick is swept we keep showing it (view.lastTrick) until the next
+        // lead is laid, so a closing carré/2 is seen landing, not blinked away.
+        const showingLast = view.pile.length === 0 && view.lastTrick.length > 0;
+        const trickPlays = showingLast ? view.lastTrick : view.pile;
+        const topPlay = trickPlays.at(-1);
         const zones: TableZoneInstance[] = [
             {
                 key: "trick",
                 zone: "trick",
-                cards: view.pile.flatMap((play) =>
+                cards: trickPlays.flatMap((play) =>
                     play.cards.map((card) => ({
                         id: `trick:${cardKey(card)}`,
                         card,
@@ -120,7 +124,11 @@ export const presidentTable = registerTable<PresidentView>({
                     })),
                 ),
                 caption: topPlay
-                    ? playerName(ctx, topPlay.playerId)
+                    ? showingLast
+                        ? ctx.t("trick_won", {
+                              name: playerName(ctx, topPlay.playerId),
+                          })
+                        : playerName(ctx, topPlay.playerId)
                     : undefined,
                 emptyHint: ctx.t("in_play"),
             },
