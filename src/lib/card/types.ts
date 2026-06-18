@@ -56,6 +56,9 @@ export type CardDescriptor =
     | { type: "fool" } // Tarot L'Excuse
     | { type: "joker"; variant?: JokerVariant };
 
+/** A standard suit+rank card — the `suited` arm of {@link CardDescriptor}. */
+export type SuitedCard = Extract<CardDescriptor, { type: "suited" }>;
+
 export const SUITS: readonly Suit[] = ["spades", "hearts", "diamonds", "clubs"];
 
 /** Universe of all ranks across all supported deck types */

@@ -11,6 +11,9 @@ import { nameOf } from "./GameChrome";
 interface GameChatProps {
     gameId: string;
     currentUserId: string;
+    /** Viewer's own display name — stamped on the messages they send so
+     * spectators (absent from `players`) still show a name, not "?". */
+    currentUserName: string;
     players: readonly GamePlayer[];
     boardTheme: BoardTheme;
     /** Game finished — stops persisting and wipes the reload cache. */
@@ -26,12 +29,18 @@ interface GameChatProps {
 export function GameChat({
     gameId,
     currentUserId,
+    currentUserName,
     players,
     boardTheme,
     isOver,
 }: GameChatProps) {
     const t = useTranslations("chat");
-    const { messages, send } = useGameChat(gameId, currentUserId, isOver);
+    const { messages, send } = useGameChat(
+        gameId,
+        currentUserId,
+        currentUserName,
+        isOver,
+    );
     const [draft, setDraft] = useState("");
     const [warn, setWarn] = useState(false);
     const listRef = useRef<HTMLOListElement>(null);
@@ -96,7 +105,7 @@ export function GameChat({
                                 >
                                     {mine
                                         ? t("you")
-                                        : nameOf(players, m.userId)}
+                                        : m.name || nameOf(players, m.userId)}
                                 </span>
                                 <span className="text-white/40">: </span>
                                 <span className="wrap-break-word">

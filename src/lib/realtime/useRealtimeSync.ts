@@ -15,6 +15,16 @@ export type { RealtimeStatus };
 type ChannelBuilder = (channel: RealtimeChannel) => RealtimeChannel;
 
 /**
+ * How much to slow the fallback poll once the channel reports "connected".
+ * We do NOT stop polling entirely on connect: a channel can subscribe
+ * successfully (so broadcast/presence work) while `postgres_changes` silently
+ * delivers nothing — a self-hosted Realtime CDC quirk we hit in practice. A
+ * slow safety poll reconciles those missed changes; when CDC really is live
+ * it's just an occasional, near-free refetch.
+ */
+const CONNECTED_SAFETY_POLL_FACTOR = 4;
+
+/**
  * Shared resilience core for every Realtime subscription. Realtime is push-only
  * and lossy across gaps, so this hook turns "the socket came back" into "pull
  * the authoritative state again" and exposes the connection health for a UI
@@ -55,11 +65,18 @@ export function useRealtimeSync(
 ): RealtimeStatus {
     const [status, setStatus] = useState<RealtimeStatus>("connecting");
 
-    // Backstop polling while detached: a broken/unauthorised Realtime channel
-    // would otherwise leave the client frozen on its last snapshot.
+    // Backstop polling. While detached we poll at `pollMs` to catch up fast.
+    // While "connected" we keep a SLOWER safety poll rather than stopping
+    // (see CONNECTED_SAFETY_POLL_FACTOR): the channel subscribing does not
+    // guarantee postgres_changes are actually arriving, and a frozen board /
+    // lobby is worse than an occasional redundant refetch.
     useEffect(() => {
-        if (!pollMs || status === "connected") return;
-        const id = setInterval(onChange, pollMs);
+        if (!pollMs) return;
+        const interval =
+            status === "connected"
+                ? pollMs * CONNECTED_SAFETY_POLL_FACTOR
+                : pollMs;
+        const id = setInterval(onChange, interval);
         return () => clearInterval(id);
     }, [pollMs, status, onChange]);
 

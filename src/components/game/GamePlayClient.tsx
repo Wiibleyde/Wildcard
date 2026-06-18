@@ -29,6 +29,8 @@ function statusToErrorKey(status: number): ActionErrorKey {
 interface Props {
     initial: GameClientPayload;
     currentUserId: string;
+    /** Viewer's display name — passed to chat so spectators aren't shown as "?". */
+    currentUserName: string;
     deckStyleId: string;
     boardStyleId: string;
 }
@@ -42,6 +44,7 @@ interface Props {
 export function GamePlayClient({
     initial,
     currentUserId,
+    currentUserName,
     deckStyleId,
     boardStyleId,
 }: Props) {
@@ -167,6 +170,7 @@ export function GamePlayClient({
                     <GameChat
                         gameId={initial.gameId}
                         currentUserId={currentUserId}
+                        currentUserName={currentUserName}
                         players={payload.players}
                         boardTheme={boardTheme}
                         isOver={payload.isOver}

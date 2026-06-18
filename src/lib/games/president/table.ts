@@ -1,5 +1,6 @@
 import type { CardDescriptor } from "@/lib/card/types";
 import { cardKey } from "@/lib/card/utils";
+import { playerName } from "../table/helpers";
 import {
     registerTable,
     type TableContext,
@@ -27,11 +28,6 @@ const SUIT_ORDER: Record<string, number> = {
 function handOrder(card: CardDescriptor): number {
     if (card.type !== "suited") return -1;
     return RANK_VALUE[card.rank] * 10 + (SUIT_ORDER[card.suit] ?? 0);
-}
-
-function nameOf(ctx: TableContext, playerId: string | null): string {
-    if (!playerId) return "?";
-    return ctx.players.find((p) => p.userId === playerId)?.username ?? "?";
 }
 
 /** Court cards get their localized name ("Dame"), pips stay as digits. */
@@ -88,7 +84,7 @@ export const presidentTable = registerTable<PresidentView>({
               ? ctx.t("your_turn")
               : self
                 ? ctx.t("waiting_for", {
-                      name: nameOf(ctx, view.currentPlayerId),
+                      name: playerName(ctx, view.currentPlayerId),
                   })
                 : ctx.t("spectating");
 
@@ -123,7 +119,9 @@ export const presidentTable = registerTable<PresidentView>({
                         ownerId: play.playerId,
                     })),
                 ),
-                caption: topPlay ? nameOf(ctx, topPlay.playerId) : undefined,
+                caption: topPlay
+                    ? playerName(ctx, topPlay.playerId)
+                    : undefined,
                 emptyHint: ctx.t("in_play"),
             },
         ];
@@ -209,7 +207,7 @@ export const presidentTable = registerTable<PresidentView>({
 
     logLine(event, ctx) {
         const p = event.payload ?? {};
-        const name = nameOf(
+        const name = playerName(
             ctx,
             typeof p.playerId === "string" ? p.playerId : null,
         );
@@ -243,7 +241,7 @@ export const presidentTable = registerTable<PresidentView>({
                     : ctx.t("log_counter_revolution");
             case "trick_cleared":
                 return ctx.t("log_trick_cleared", {
-                    name: nameOf(
+                    name: playerName(
                         ctx,
                         typeof p.leadPlayerId === "string"
                             ? p.leadPlayerId

@@ -1,13 +1,10 @@
 import { french52 } from "@/lib/card/decks";
-import type { CardDescriptor, Rank } from "@/lib/card/types";
+import { buildRankOrder, rankOf } from "@/lib/card/rank";
+import type { CardDescriptor } from "@/lib/card/types";
 import { buildDeck } from "@/lib/engine/deck";
 import type { Rng } from "@/lib/engine/rng";
-import type {
-    ApplyResult,
-    GameEvent,
-    GameModule,
-    GameState,
-} from "@/lib/engine/types";
+import { fail } from "@/lib/engine/rules";
+import type { GameEvent, GameModule, GameState } from "@/lib/engine/types";
 
 /**
  * Bataille (War) — the foundational two-player game.
@@ -18,24 +15,25 @@ import type {
  * and the entire outcome is derived on the server from hidden piles.
  */
 
-/** Ace-high ranking. The unused `C` (Cavalier) sits between J and Q.
- * Intentionally different from president.ts: here 2 is lowest, Ace is highest. */
-const RANK_VALUE: Record<Rank, number> = {
-    "2": 2,
-    "3": 3,
-    "4": 4,
-    "5": 5,
-    "6": 6,
-    "7": 7,
-    "8": 8,
-    "9": 9,
-    "10": 10,
-    J: 11,
-    C: 12,
-    Q: 13,
-    K: 14,
-    A: 15,
-};
+/** Ace-high ranking (2 lowest → Ace highest). Bataille's own order: Président
+ * ranks the 2 above the Ace, Solitaire ranks the Ace low — each game owns its
+ * order, so the map is built from an explicit list (see `buildRankOrder`). */
+const RANK_VALUE = buildRankOrder([
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "J",
+    "C",
+    "Q",
+    "K",
+    "A",
+]);
 
 /** Cards laid face-down by each player on a tie before the deciding flip. */
 const WAR_STAKE = 3;
@@ -45,7 +43,8 @@ const WAR_STAKE = 3;
 const MAX_WAR_STEPS = 64;
 
 function cardValue(card: CardDescriptor): number {
-    return card.type === "suited" ? RANK_VALUE[card.rank] : 0;
+    const rank = rankOf(card);
+    return rank === null ? 0 : RANK_VALUE[rank];
 }
 
 export interface BataillePiles {
@@ -236,10 +235,6 @@ function resolveRound(state: BatailleState, rng: Rng): BatailleState {
         phase: over ? "done" : "reveal",
         rngState: rng.state,
     };
-}
-
-function fail(code: string, message: string): ApplyResult<BatailleState> {
-    return { ok: false, error: { code, message } };
 }
 
 export const bataille: GameModule<BatailleState, BatailleAction, BatailleView> =

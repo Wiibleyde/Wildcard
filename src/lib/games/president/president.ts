@@ -1,15 +1,12 @@
 import { french52 } from "@/lib/card/decks";
+import { dealRoundRobin, removeCards } from "@/lib/card/hand";
+import { buildRankOrder, groupByRank, rankOf } from "@/lib/card/rank";
 import type { CardDescriptor, Rank } from "@/lib/card/types";
 import { cardKey } from "@/lib/card/utils";
 import { buildDeck } from "@/lib/engine/deck";
 import type { Rng } from "@/lib/engine/rng";
-import type {
-    ApplyResult,
-    GameEvent,
-    GameModule,
-    GameState,
-    Player,
-} from "@/lib/engine/types";
+import { fail, seatOrder } from "@/lib/engine/rules";
+import type { GameEvent, GameModule, GameState } from "@/lib/engine/types";
 
 /**
  * Président (Trou du cul) — one round of the climbing/shedding game, after
@@ -65,24 +62,25 @@ import type {
  * single rounds, which is what a `games` row represents here.
  */
 
-/** Président ranking: 3 lowest → 2 highest. `C` (unused in french52) sits high.
- * Intentionally different from bataille.ts: 2 beats Ace here (Président rule). */
-export const RANK_VALUE: Record<Rank, number> = {
-    "3": 3,
-    "4": 4,
-    "5": 5,
-    "6": 6,
-    "7": 7,
-    "8": 8,
-    "9": 9,
-    "10": 10,
-    J: 11,
-    C: 12,
-    Q: 13,
-    K: 14,
-    A: 15,
-    "2": 16,
-};
+/** Président ranking: 3 lowest → 2 highest (the 2 beats the Ace). Built from an
+ * explicit order — Bataille and Solitaire rank the same cards differently, so
+ * the map is per-game, not shared. `C` is unused in french52. */
+export const RANK_VALUE = buildRankOrder([
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "J",
+    "C",
+    "Q",
+    "K",
+    "A",
+    "2",
+]);
 
 /** Optional French table rules — see the module doc for what each enables. */
 export interface PresidentRules {
@@ -186,10 +184,6 @@ export interface PresidentView {
     readonly self: string | null;
 }
 
-function rankOf(card: CardDescriptor): Rank | null {
-    return card.type === "suited" ? card.rank : null;
-}
-
 /** Comparable strength under the current hierarchy — negated by revolution. */
 function strength(rank: Rank, revolution: boolean): number {
     return revolution ? -RANK_VALUE[rank] : RANK_VALUE[rank];
@@ -213,10 +207,6 @@ function beatsCombo(
     return rules.equalRank && rank === combo.rank;
 }
 
-function seatOrder(players: readonly Player[]): Player[] {
-    return [...players].sort((a, b) => a.seat - b.seat);
-}
-
 /** Out of the round — went out cleanly (ranked) or was demoted on a 2. */
 function isOut(state: PresidentState, id: string): boolean {
     return state.finished.includes(id) || state.demoted.includes(id);
@@ -231,21 +221,6 @@ function comboRank(cards: readonly CardDescriptor[]): Rank | null {
         if (rankOf(card) !== first) return null;
     }
     return first;
-}
-
-/** Remove one occurrence of each card from `hand`, or `null` if any is absent. */
-function removeCards(
-    hand: readonly CardDescriptor[],
-    cards: readonly CardDescriptor[],
-): readonly CardDescriptor[] | null {
-    const remaining = [...hand];
-    for (const card of cards) {
-        const key = cardKey(card);
-        const index = remaining.findIndex((c) => cardKey(c) === key);
-        if (index === -1) return null;
-        remaining.splice(index, 1);
-    }
-    return remaining;
 }
 
 /** Next seat after `afterId` that may still act this trick (in play, not passed). */
@@ -330,10 +305,6 @@ function settle(state: PresidentState, actorId: string): PresidentState {
     return { ...state, currentPlayerId: next };
 }
 
-function fail(code: string, message: string): ApplyResult<PresidentState> {
-    return { ok: false, error: { code, message } };
-}
-
 const base: Omit<
     GameModule<PresidentState, PresidentAction, PresidentView>,
     "setup"
@@ -349,16 +320,7 @@ const base: Omit<
         if (playerId !== state.currentPlayerId) return [];
         if (isOut(state, playerId)) return [];
 
-        const hand = state.hands[playerId];
-        const groups = new Map<Rank, CardDescriptor[]>();
-        for (const card of hand) {
-            const rank = rankOf(card);
-            if (rank === null) continue;
-            const group = groups.get(rank) ?? [];
-            group.push(card);
-            groups.set(rank, group);
-        }
-
+        const groups = groupByRank(state.hands[playerId]);
         const actions: PresidentAction[] = [];
 
         if (state.combo === null) {
@@ -655,10 +617,10 @@ export function createPresident(
         setup(players, rng, seed, gameId) {
             const order = seatOrder(players);
             const deck = rng.shuffle(buildDeck(french52));
-            const hands: Record<string, CardDescriptor[]> = {};
-            for (const p of order) hands[p.id] = [];
-            deck.forEach((card, i) => {
-                hands[order[i % order.length].id].push(card);
+            const dealt = dealRoundRobin(deck, order.length);
+            const hands: Record<string, readonly CardDescriptor[]> = {};
+            order.forEach((p, i) => {
+                hands[p.id] = dealt[i];
             });
 
             // « La dame de cœur commence » — her holder leads the first trick.

@@ -8,6 +8,15 @@ import { createClient } from "@/lib/supabase/client";
 export interface ChatMessage {
     readonly id: string;
     readonly userId: string;
+    /**
+     * Sender's display name, carried on the message itself. The chat channel
+     * is open to spectators too, who are NOT in the game's seated `players`
+     * list — so resolving names from that list dropped every spectator to "?".
+     * A self-describing message needs no roster lookup and works for anyone on
+     * the channel. (Chat is already client-trusted broadcast, so embedding the
+     * name adds no new trust surface.)
+     */
+    readonly name: string;
     readonly text: string;
     readonly at: number;
 }
@@ -16,6 +25,7 @@ export interface ChatMessage {
 interface ChatWire {
     id: string;
     userId: string;
+    name: string;
     text: string;
     at: number;
 }
@@ -61,6 +71,7 @@ function isChatMessage(v: unknown): v is ChatMessage {
     return (
         typeof m.id === "string" &&
         typeof m.userId === "string" &&
+        typeof m.name === "string" &&
         typeof m.text === "string" &&
         typeof m.at === "number"
     );
@@ -120,6 +131,7 @@ function clearCache(gameId: string): void {
 export function useGameChat(
     gameId: string,
     currentUserId: string,
+    currentUserName: string,
     isOver: boolean,
 ) {
     const [messages, setMessages] = useState<readonly ChatMessage[]>([]);
@@ -156,6 +168,9 @@ export function useGameChat(
                 append({
                     id: p.id,
                     userId: typeof p.userId === "string" ? p.userId : "?",
+                    // Empty when a peer omits it → the UI falls back to the
+                    // seated-roster lookup (works for players, not spectators).
+                    name: typeof p.name === "string" ? p.name : "",
                     // Clamp defensively — a peer could broadcast an oversized string.
                     text: p.text.slice(0, MAX_CHAT_LENGTH),
                     at: typeof p.at === "number" ? p.at : Date.now(),
@@ -219,6 +234,7 @@ export function useGameChat(
             const msg: ChatMessage = {
                 id: crypto.randomUUID(),
                 userId: currentUserId,
+                name: currentUserName,
                 text,
                 at: now,
             };
@@ -233,7 +249,7 @@ export function useGameChat(
             });
             return "sent";
         },
-        [currentUserId, append],
+        [currentUserId, currentUserName, append],
     );
 
     return { messages, send };

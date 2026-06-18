@@ -7,6 +7,7 @@ import {
     type SpectatorRow,
 } from "@/components/lobby/RoomClient";
 import { GAMES } from "@/lib/games";
+import { usernamesByIds } from "@/lib/models/usernames";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function Page({
@@ -48,14 +49,10 @@ export default async function Page({
         .order("seat", { ascending: true });
     const rows = memberRows ?? [];
 
-    const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, username")
-        .in(
-            "id",
-            rows.map((r) => r.user_id),
-        );
-    const nameOf = new Map((profiles ?? []).map((p) => [p.id, p.username]));
+    const nameOf = await usernamesByIds(
+        supabase,
+        rows.map((r) => r.user_id),
+    );
 
     const initialSeats: SeatRow[] = rows
         .filter((r) => r.role === "player" && r.seat !== null)

@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/api/auth";
 import { createRoom, ROOM_ERROR_STATUS } from "@/lib/models/room";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
-    const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
 
     const body = (await request.json().catch(() => ({}))) as {
         moduleId?: unknown;
@@ -23,7 +18,7 @@ export async function POST(request: Request) {
     }
 
     const admin = createAdminClient();
-    const result = await createRoom(admin, user.id, body.moduleId);
+    const result = await createRoom(admin, auth.user.id, body.moduleId);
     if (!result.ok) {
         return NextResponse.json(
             { error: result.error },

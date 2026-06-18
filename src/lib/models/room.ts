@@ -5,6 +5,7 @@ import type { Player } from "@/lib/engine/types";
 import { getGameModule } from "@/lib/games";
 import type { Database } from "@/lib/supabase/types";
 import { advanceBots } from "./game";
+import { usernamesByIds } from "./usernames";
 
 type Admin = SupabaseClient<Database>;
 
@@ -126,8 +127,24 @@ export async function joinRoom(
             .filter((s) => s.role === "player")
             .map((s) => s.seat)
             .filter((n): n is number => n !== null);
+
+        // Table full → seat them as a spectator rather than refusing. A solo
+        // game (Solitaire, max 1) is "full" the instant the host sits, so this
+        // is the path that lets anyone with the invite link *watch* it; it also
+        // turns a late arrival at a full multiplayer lobby into a spectator
+        // instead of a dead end. They can claim a seat later if one frees up
+        // (see {@link setRoomRole}). Spectators hold no seat (`seat: null`).
         if (playerSeats.length >= module.maxPlayers) {
-            return { ok: false, error: "room_full" };
+            const { error } = await admin.from("room_players").insert({
+                room_id: room.id,
+                user_id: userId,
+                seat: null,
+                role: "spectator",
+            });
+            if (!error || error.code === "23505") {
+                return { ok: true, roomId: room.id };
+            }
+            return { ok: false, error: "db_error", message: error.message };
         }
 
         const seat = nextFreeSeat(playerSeats);
@@ -378,14 +395,10 @@ export async function startGame(
         (s): s is { user_id: string; seat: number } => s.seat !== null,
     );
 
-    const { data: profiles } = await admin
-        .from("profiles")
-        .select("id, username")
-        .in(
-            "id",
-            rows.map((s) => s.user_id),
-        );
-    const nameOf = new Map((profiles ?? []).map((p) => [p.id, p.username]));
+    const nameOf = await usernamesByIds(
+        admin,
+        rows.map((s) => s.user_id),
+    );
 
     const humans: Player[] = rows.map((s) => ({
         id: s.user_id,

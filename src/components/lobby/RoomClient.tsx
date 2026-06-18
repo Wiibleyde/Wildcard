@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ReconnectingBanner } from "@/components/realtime/ReconnectingBanner";
 import { useRouter } from "@/i18n/navigation";
+import { usernamesByIds } from "@/lib/models/usernames";
 import { useRoomChannel } from "@/lib/realtime/useRoomChannel";
 import { createClient } from "@/lib/supabase/client";
 
@@ -100,14 +101,10 @@ export function RoomClient({
         if (typeof room?.bot_count === "number") setBotCount(room.bot_count);
 
         const rows = players ?? [];
-        const { data: profiles } = await supabase
-            .from("profiles")
-            .select("id, username")
-            .in(
-                "id",
-                rows.map((r) => r.user_id),
-            );
-        const nameOf = new Map((profiles ?? []).map((p) => [p.id, p.username]));
+        const nameOf = await usernamesByIds(
+            supabase,
+            rows.map((r) => r.user_id),
+        );
         if (closedRef.current) return;
         setSeats(
             rows
@@ -216,7 +213,12 @@ export function RoomClient({
             setBusy(false);
             return;
         }
-        setRole(next); // optimistic; Realtime reconciles the rosters
+        setRole(next); // optimistic button state
+        // Reconcile the rosters NOW rather than waiting on Realtime/the poll:
+        // postgres_changes can be silent on self-hosted stacks, which would
+        // otherwise leave you in the wrong column (still in seats / not yet in
+        // spectators) until the next safety poll. One round-trip, instant.
+        await refresh();
         setBusy(false);
     }
 

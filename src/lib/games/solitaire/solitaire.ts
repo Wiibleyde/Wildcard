@@ -1,12 +1,9 @@
 import { french52 } from "@/lib/card/decks";
-import {
-    type CardDescriptor,
-    type Rank,
-    SUITS,
-    type Suit,
-} from "@/lib/card/types";
+import { buildRankOrder, isSuited, suitColor } from "@/lib/card/rank";
+import { type CardDescriptor, SUITS, type Suit } from "@/lib/card/types";
 import { buildDeck } from "@/lib/engine/deck";
 import type { Rng } from "@/lib/engine/rng";
+import { fail } from "@/lib/engine/rules";
 import type {
     ApplyResult,
     GameEvent,
@@ -31,40 +28,26 @@ import type {
  * all 52 cards reach the foundations.
  */
 
-/** A→K low-to-high. `C` (Cavalier) never appears in a french52 deck — kept at
- *  0 only to satisfy the exhaustive `Record<Rank, …>`. */
-const ORDER: Record<Rank, number> = {
-    A: 1,
-    "2": 2,
-    "3": 3,
-    "4": 4,
-    "5": 5,
-    "6": 6,
-    "7": 7,
-    "8": 8,
-    "9": 9,
-    "10": 10,
-    J: 11,
-    C: 0,
-    Q: 12,
-    K: 13,
-};
-
-const COLOR: Record<Suit, "red" | "black"> = {
-    spades: "black",
-    clubs: "black",
-    hearts: "red",
-    diamonds: "red",
-};
+/** A→K low-to-high (Ace low here — each game owns its order; see `buildRankOrder`).
+ *  The Cavalier never appears in a french52 deck, so it stays 0. */
+const ORDER = buildRankOrder([
+    "A",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "J",
+    "Q",
+    "K",
+]);
 
 const COLUMNS = 7;
 const FULL_FOUNDATION = 13;
-
-type SuitedCard = { type: "suited"; suit: Suit; rank: Rank };
-
-function isSuited(card: CardDescriptor): card is SuitedCard {
-    return card.type === "suited";
-}
 
 /** One tableau column: hidden `down` cards under the visible `up` run. */
 export interface SolitaireColumn {
@@ -160,7 +143,7 @@ function acceptsTableau(col: SolitaireColumn, card: CardDescriptor): boolean {
     if (!parent) return ORDER[card.rank] === FULL_FOUNDATION;
     if (!isSuited(parent)) return false;
     return (
-        COLOR[card.suit] !== COLOR[parent.suit] &&
+        suitColor(card.suit) !== suitColor(parent.suit) &&
         ORDER[card.rank] === ORDER[parent.rank] - 1
     );
 }
@@ -172,7 +155,7 @@ function isValidRun(cards: readonly CardDescriptor[]): boolean {
         const cur = cards[i];
         if (!isSuited(prev) || !isSuited(cur)) return false;
         if (
-            COLOR[cur.suit] === COLOR[prev.suit] ||
+            suitColor(cur.suit) === suitColor(prev.suit) ||
             ORDER[cur.rank] !== ORDER[prev.rank] - 1
         ) {
             return false;
@@ -200,10 +183,6 @@ function withColumn(
     const next = [...tableau];
     next[index] = col;
     return next;
-}
-
-function fail(code: string, message: string): ApplyResult<SolitaireState> {
-    return { ok: false, error: { code, message } };
 }
 
 /**
