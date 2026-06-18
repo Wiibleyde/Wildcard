@@ -73,6 +73,7 @@ interface LoadedGame {
         room_id: string;
         module_id: string;
         version: number;
+        is_over: boolean;
         bot_ids: string[];
         created_at: string | null;
     };
@@ -86,7 +87,7 @@ async function loadGame(
 ): Promise<{ ok: true; game: LoadedGame } | { ok: false; error: LoadError }> {
     const { data: meta } = await admin
         .from("games")
-        .select("id, room_id, module_id, version, bot_ids, created_at")
+        .select("id, room_id, module_id, version, is_over, bot_ids, created_at")
         .eq("id", gameId)
         .maybeSingle();
     if (!meta) return { ok: false, error: "not_found" };
@@ -174,7 +175,9 @@ export async function getGameClientState(
             moduleId: meta.module_id,
             version: meta.version,
             phase: state.phase,
-            isOver: cs.isOver,
+            // An admin force-end flips the column without touching `state`, so
+            // `module.isOver(state)` stays false — the DB flag is the override.
+            isOver: cs.isOver || meta.is_over,
             currentPlayerId: state.currentPlayerId,
             view: cs.view,
             legalActions: cs.legalActions,
@@ -405,6 +408,19 @@ export async function applyAction(
     const record = (result: string) =>
         recordMove(meta.module_id, result, performance.now() - startedAt);
 
+    // An admin abort sets `is_over` on the row without mutating `state`, so the
+    // module would still accept moves — refuse them here, before dispatch.
+    if (meta.is_over) {
+        record("rule_violation");
+        return {
+            ok: false,
+            error: "rule_violation",
+            violation: {
+                code: "game_over",
+                message: "The game has already finished.",
+            },
+        };
+    }
     if (meta.version !== expectedVersion) {
         record("version_conflict");
         return { ok: false, error: "version_conflict" };
@@ -519,4 +535,62 @@ export async function applyAction(
     }
 
     return { ok: true, version: newVersion, events: result.events };
+}
+
+export type EndGameResult =
+    | { ok: true; version: number }
+    | { ok: false; error: ApplyErrorCode };
+
+/**
+ * Administrative force-end (admin dashboard "end game" button).
+ *
+ * This is an out-of-band override, NOT a game action: it never runs the module
+ * and writes no `game_actions` row (a synthetic action would break replay,
+ * which re-dispatches every logged action through the module). Instead it just
+ * flips `is_over` on the row and bumps `version` so every connected client
+ * refetches and lands on the game-over screen, finishes the room, and records
+ * the finish metric.
+ *
+ * The version bump is a compare-and-set against the loaded version, so a
+ * force-end races cleanly against a concurrent player/bot move — exactly one
+ * wins, the loser is a no-op. A game already over is an idempotent success.
+ */
+export async function endGame(
+    admin: Admin,
+    gameId: string,
+): Promise<EndGameResult> {
+    const { data: meta } = await admin
+        .from("games")
+        .select("id, room_id, module_id, version, is_over, created_at")
+        .eq("id", gameId)
+        .maybeSingle();
+    if (!meta) return { ok: false, error: "not_found" };
+    if (meta.is_over) return { ok: true, version: meta.version };
+
+    const newVersion = meta.version + 1;
+    const now = new Date().toISOString();
+
+    const { data: claimed, error } = await admin
+        .from("games")
+        .update({
+            version: newVersion,
+            is_over: true,
+            winner_ids: [],
+            updated_at: now,
+        })
+        .eq("id", gameId)
+        .eq("version", meta.version)
+        .select("id")
+        .maybeSingle();
+    if (error) return { ok: false, error: "db_error" };
+    // Lost the race to a player/bot move — that move owns the state now.
+    if (!claimed) return { ok: false, error: "version_conflict" };
+
+    await admin
+        .from("rooms")
+        .update({ status: "finished" })
+        .eq("id", meta.room_id);
+    recordGameFinished(meta.module_id, durationSeconds(meta.created_at));
+
+    return { ok: true, version: newVersion };
 }

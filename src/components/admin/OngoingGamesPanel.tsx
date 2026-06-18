@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { GameButton } from "@/components/ui/GameButton";
 import { Link } from "@/i18n/navigation";
 import type { OngoingGame } from "@/lib/models/admin";
@@ -23,6 +24,8 @@ function relativeTime(locale: string, iso: string, now: number): string {
 
 type Props = {
     games: OngoingGame[];
+    /** Only admins may force-end a game; moderators see a read-only list. */
+    canEnd: boolean;
 };
 
 /**
@@ -31,12 +34,15 @@ type Props = {
  * polling `router.refresh()` on an interval and ticks a clock so the "started"
  * times stay relative without re-fetching.
  */
-export function OngoingGamesPanel({ games }: Props) {
+export function OngoingGamesPanel({ games, canEnd }: Props) {
     const t = useTranslations("admin");
+    const tCommon = useTranslations("common");
     const locale = useLocale();
     const router = useRouter();
+    const confirm = useConfirm();
     const [now, setNow] = useState(() => Date.now());
     const [refreshing, setRefreshing] = useState(false);
+    const [endingId, setEndingId] = useState<string | null>(null);
 
     useEffect(() => {
         const clock = setInterval(() => setNow(Date.now()), 1000);
@@ -51,6 +57,29 @@ export function OngoingGamesPanel({ games }: Props) {
         setRefreshing(true);
         router.refresh();
         setTimeout(() => setRefreshing(false), 600);
+    }
+
+    // Aborting a live game affects every seated player, so confirm first. The
+    // server re-checks the admin role and bumps the game version, so every open
+    // client refetches and lands on the game-over screen.
+    async function endGame(game: OngoingGame) {
+        const ok = await confirm({
+            title: t("end_title"),
+            message: t("end_confirm", { game: game.moduleName }),
+            confirmLabel: t("end_game"),
+            variant: "red",
+        });
+        if (!ok) return;
+
+        setEndingId(game.gameId);
+        try {
+            await fetch(`/api/admin/games/${game.gameId}/end`, {
+                method: "POST",
+            });
+            router.refresh();
+        } finally {
+            setEndingId(null);
+        }
     }
 
     return (
@@ -160,17 +189,36 @@ export function OngoingGamesPanel({ games }: Props) {
                                     </span>
                                 </div>
                             </div>
-                            <Link
-                                href={`/game/${g.gameId}`}
-                                className="shrink-0 text-xs font-black px-4 py-2 rounded-lg transition-colors"
-                                style={{
-                                    background: "rgba(72,201,122,0.12)",
-                                    color: "#48c97a",
-                                    border: "1px solid rgba(72,201,122,0.25)",
-                                }}
-                            >
-                                {t("watch")}
-                            </Link>
+                            <div className="flex shrink-0 items-center gap-2">
+                                <Link
+                                    href={`/game/${g.gameId}`}
+                                    className="text-xs font-black px-4 py-2 rounded-lg transition-colors"
+                                    style={{
+                                        background: "rgba(72,201,122,0.12)",
+                                        color: "#48c97a",
+                                        border: "1px solid rgba(72,201,122,0.25)",
+                                    }}
+                                >
+                                    {t("watch")}
+                                </Link>
+                                {canEnd && (
+                                    <button
+                                        type="button"
+                                        onClick={() => endGame(g)}
+                                        disabled={endingId === g.gameId}
+                                        className="text-xs font-black px-4 py-2 rounded-lg transition-colors disabled:opacity-60"
+                                        style={{
+                                            background: "rgba(224,64,64,0.12)",
+                                            color: "#e04040",
+                                            border: "1px solid rgba(224,64,64,0.3)",
+                                        }}
+                                    >
+                                        {endingId === g.gameId
+                                            ? tCommon("saving")
+                                            : t("end_game")}
+                                    </button>
+                                )}
+                            </div>
                         </li>
                     ))}
                 </ul>

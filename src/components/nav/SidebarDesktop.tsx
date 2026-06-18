@@ -147,6 +147,7 @@ export function SidebarDesktop({
                                     sizes="36px"
                                     className="object-cover"
                                     loading="eager"
+                                    unoptimized
                                 />
                             ) : (
                                 <div

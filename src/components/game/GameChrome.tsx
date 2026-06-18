@@ -70,11 +70,14 @@ export function GameOverOverlay({
                 className="text-4xl xl:text-5xl font-black"
                 style={{ color: won ? "#48c97a" : "#f5c516" }}
             >
-                {won
-                    ? t("you_win")
-                    : t("winner", {
-                          name: nameOf(players, outcome?.winners[0] ?? null),
-                      })}
+                {/* No outcome ⇒ the game was force-ended by an admin (no winner). */}
+                {!outcome
+                    ? t("game_aborted")
+                    : won
+                      ? t("you_win")
+                      : t("winner", {
+                            name: nameOf(players, outcome.winners[0] ?? null),
+                        })}
             </h2>
 
             {outcome && outcome.rankings.length > 0 && (

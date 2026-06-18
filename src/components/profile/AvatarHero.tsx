@@ -27,6 +27,7 @@ export function AvatarHero({ profile, avatarUrl }: Props) {
                         sizes="80px"
                         className="object-cover"
                         loading="eager"
+                        unoptimized
                     />
                 ) : (
                     <div

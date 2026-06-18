@@ -72,7 +72,7 @@ export default async function AdminPage({
                 </header>
 
                 <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_400px] gap-6 items-start">
-                    <OngoingGamesPanel games={games} />
+                    <OngoingGamesPanel games={games} canEnd={isAdmin} />
 
                     {isAdmin && settings && (
                         <MaintenanceControl

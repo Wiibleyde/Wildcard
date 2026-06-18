@@ -1,5 +1,5 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-import { getServiceRoleKey, getSupabaseEnv } from "./env";
+import { getServerSupabaseEnv, getServiceRoleKey } from "./env";
 import type { Database } from "./types";
 
 /**
@@ -14,7 +14,7 @@ import type { Database } from "./types";
  * allowed to act?) are enforced in the API route before calling into it.
  */
 export function createAdminClient() {
-    const { url } = getSupabaseEnv();
+    const { url } = getServerSupabaseEnv();
     const serviceRoleKey = getServiceRoleKey();
     return createSupabaseClient<Database>(url, serviceRoleKey, {
         auth: {

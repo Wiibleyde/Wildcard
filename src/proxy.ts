@@ -2,7 +2,10 @@ import { type CookieOptions, createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import createMiddleware from "next-intl/middleware";
 import { getAppSettings } from "@/lib/models/settings";
-import { getSupabaseEnv } from "@/lib/supabase/env";
+import {
+    getServerSupabaseEnv,
+    getSupabaseStorageKey,
+} from "@/lib/supabase/env";
 import type { Database } from "@/lib/supabase/types";
 import { routing } from "./i18n/routing";
 
@@ -27,8 +30,10 @@ function localeFromPath(pathname: string): string {
 export async function proxy(request: NextRequest) {
     const pendingCookies: PendingCookie[] = [];
 
-    const { url, anonKey } = getSupabaseEnv();
+    const { url, anonKey } = getServerSupabaseEnv();
     const supabase = createServerClient<Database>(url, anonKey, {
+        // Same cookie name as the browser/server clients (see getSupabaseStorageKey).
+        cookieOptions: { name: getSupabaseStorageKey() },
         cookies: {
             getAll: () => request.cookies.getAll(),
             setAll: (cookiesToSet) => {
