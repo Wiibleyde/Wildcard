@@ -1,80 +1,147 @@
 {
-  "uid": "wildcard-web",
-  "title": "Wildcard — Analytics web (Umami)",
-  "tags": ["wildcard", "umami", "web"],
-  "timezone": "browser",
-  "schemaVersion": 39,
-  "version": 1,
-  "editable": true,
-  "refresh": "1m",
-  "time": { "from": "now-7d", "to": "now" },
-  "templating": { "list": [] },
-  "annotations": { "list": [] },
-  "panels": [
-    {
-      "id": 1,
-      "type": "stat",
-      "title": "Pages vues (plage)",
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
-      "datasource": { "type": "postgres", "uid": "umami-postgres" },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "targets": [
-        { "refId": "A", "datasource": { "type": "postgres", "uid": "umami-postgres" }, "format": "table", "rawSql": "SELECT count(*) AS \"pages vues\" FROM website_event WHERE event_type = 1 AND $__timeFilter(created_at)" }
-      ]
-    },
-    {
-      "id": 2,
-      "type": "stat",
-      "title": "Sessions (plage)",
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
-      "datasource": { "type": "postgres", "uid": "umami-postgres" },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "targets": [
-        { "refId": "A", "datasource": { "type": "postgres", "uid": "umami-postgres" }, "format": "table", "rawSql": "SELECT count(DISTINCT session_id) AS sessions FROM website_event WHERE $__timeFilter(created_at)" }
-      ]
-    },
-    {
-      "id": 3,
-      "type": "stat",
-      "title": "Événements custom (plage)",
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
-      "datasource": { "type": "postgres", "uid": "umami-postgres" },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
-      "targets": [
-        { "refId": "A", "datasource": { "type": "postgres", "uid": "umami-postgres" }, "format": "table", "rawSql": "SELECT count(*) AS evenements FROM website_event WHERE event_type = 2 AND $__timeFilter(created_at)" }
-      ]
-    },
-    {
-      "id": 4,
-      "type": "timeseries",
-      "title": "Pages vues & sessions / heure",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 4 },
-      "datasource": { "type": "postgres", "uid": "umami-postgres" },
-      "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 40 } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
-      "targets": [
-        { "refId": "A", "datasource": { "type": "postgres", "uid": "umami-postgres" }, "format": "time_series", "rawSql": "SELECT $__timeGroup(created_at, '1h') AS time, count(*) FILTER (WHERE event_type = 1) AS \"pages vues\", count(DISTINCT session_id) AS sessions FROM website_event WHERE $__timeFilter(created_at) GROUP BY 1 ORDER BY 1" }
-      ]
-    },
-    {
-      "id": 5,
-      "type": "table",
-      "title": "Top pages",
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 12 },
-      "datasource": { "type": "postgres", "uid": "umami-postgres" },
-      "targets": [
-        { "refId": "A", "datasource": { "type": "postgres", "uid": "umami-postgres" }, "format": "table", "rawSql": "SELECT url_path AS page, count(*) AS vues FROM website_event WHERE event_type = 1 AND $__timeFilter(created_at) GROUP BY url_path ORDER BY vues DESC LIMIT 25" }
-      ]
-    },
-    {
-      "id": 6,
-      "type": "table",
-      "title": "Top événements",
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 12 },
-      "datasource": { "type": "postgres", "uid": "umami-postgres" },
-      "targets": [
-        { "refId": "A", "datasource": { "type": "postgres", "uid": "umami-postgres" }, "format": "table", "rawSql": "SELECT event_name AS evenement, count(*) AS total FROM website_event WHERE event_type = 2 AND event_name IS NOT NULL AND $__timeFilter(created_at) GROUP BY event_name ORDER BY total DESC LIMIT 25" }
-      ]
-    }
-  ]
+    "uid": "wildcard-web",
+    "title": "Wildcard — Analytics web (Umami)",
+    "tags": ["wildcard", "umami", "web"],
+    "timezone": "browser",
+    "schemaVersion": 39,
+    "version": 1,
+    "editable": true,
+    "refresh": "1m",
+    "time": { "from": "now-7d", "to": "now" },
+    "templating": { "list": [] },
+    "annotations": { "list": [] },
+    "panels": [
+        {
+            "id": 1,
+            "type": "stat",
+            "title": "Pages vues (plage)",
+            "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+            "datasource": { "type": "postgres", "uid": "umami-postgres" },
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "reduceOptions": { "calcs": ["lastNotNull"] }
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "umami-postgres"
+                    },
+                    "format": "table",
+                    "rawSql": "SELECT count(*) AS \"pages vues\" FROM website_event WHERE event_type = 1 AND $__timeFilter(created_at)"
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "type": "stat",
+            "title": "Sessions (plage)",
+            "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+            "datasource": { "type": "postgres", "uid": "umami-postgres" },
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "reduceOptions": { "calcs": ["lastNotNull"] }
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "umami-postgres"
+                    },
+                    "format": "table",
+                    "rawSql": "SELECT count(DISTINCT session_id) AS sessions FROM website_event WHERE $__timeFilter(created_at)"
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "type": "stat",
+            "title": "Événements custom (plage)",
+            "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+            "datasource": { "type": "postgres", "uid": "umami-postgres" },
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "reduceOptions": { "calcs": ["lastNotNull"] }
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "umami-postgres"
+                    },
+                    "format": "table",
+                    "rawSql": "SELECT count(*) AS evenements FROM website_event WHERE event_type = 2 AND $__timeFilter(created_at)"
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "type": "timeseries",
+            "title": "Pages vues & sessions / heure",
+            "gridPos": { "h": 8, "w": 24, "x": 0, "y": 4 },
+            "datasource": { "type": "postgres", "uid": "umami-postgres" },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": { "drawStyle": "bars", "fillOpacity": 40 }
+                },
+                "overrides": []
+            },
+            "options": {
+                "legend": { "displayMode": "list", "placement": "bottom" }
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "umami-postgres"
+                    },
+                    "format": "time_series",
+                    "rawSql": "SELECT $__timeGroup(created_at, '1h') AS time, count(*) FILTER (WHERE event_type = 1) AS \"pages vues\", count(DISTINCT session_id) AS sessions FROM website_event WHERE $__timeFilter(created_at) GROUP BY 1 ORDER BY 1"
+                }
+            ]
+        },
+        {
+            "id": 5,
+            "type": "table",
+            "title": "Top pages",
+            "gridPos": { "h": 9, "w": 12, "x": 0, "y": 12 },
+            "datasource": { "type": "postgres", "uid": "umami-postgres" },
+            "targets": [
+                {
+                    "refId": "A",
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "umami-postgres"
+                    },
+                    "format": "table",
+                    "rawSql": "SELECT url_path AS page, count(*) AS vues FROM website_event WHERE event_type = 1 AND $__timeFilter(created_at) GROUP BY url_path ORDER BY vues DESC LIMIT 25"
+                }
+            ]
+        },
+        {
+            "id": 6,
+            "type": "table",
+            "title": "Top événements",
+            "gridPos": { "h": 9, "w": 12, "x": 12, "y": 12 },
+            "datasource": { "type": "postgres", "uid": "umami-postgres" },
+            "targets": [
+                {
+                    "refId": "A",
+                    "datasource": {
+                        "type": "postgres",
+                        "uid": "umami-postgres"
+                    },
+                    "format": "table",
+                    "rawSql": "SELECT event_name AS evenement, count(*) AS total FROM website_event WHERE event_type = 2 AND event_name IS NOT NULL AND $__timeFilter(created_at) GROUP BY event_name ORDER BY total DESC LIMIT 25"
+                }
+            ]
+        }
+    ]
 }
