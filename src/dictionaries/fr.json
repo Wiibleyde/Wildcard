@@ -219,6 +219,7 @@
         "or_nothing_status": "« {rank} ou rien » — joue {rank} ou passe",
         "draw": "Piocher",
         "recycle": "Recycler",
+        "auto_finish": "Terminer",
         "moves": "{n} coups",
         "empty_column": "Roi",
         "log_to_foundation": "{rank}{suit} monte en fondation",

@@ -1,6 +1,11 @@
 import { french52 } from "@/lib/card/decks";
 import { buildRankOrder, isSuited, suitColor } from "@/lib/card/rank";
-import { type CardDescriptor, SUITS, type Suit } from "@/lib/card/types";
+import {
+    type CardDescriptor,
+    type Rank,
+    SUITS,
+    type Suit,
+} from "@/lib/card/types";
 import { buildDeck } from "@/lib/engine/deck";
 import type { Rng } from "@/lib/engine/rng";
 import { fail } from "@/lib/engine/rules";
@@ -30,7 +35,7 @@ import type {
 
 /** A→K low-to-high (Ace low here — each game owns its order; see `buildRankOrder`).
  *  The Cavalier never appears in a french52 deck, so it stays 0. */
-const ORDER = buildRankOrder([
+const RANKS: readonly Rank[] = [
     "A",
     "2",
     "3",
@@ -44,7 +49,8 @@ const ORDER = buildRankOrder([
     "J",
     "Q",
     "K",
-]);
+];
+const ORDER = buildRankOrder(RANKS);
 
 const COLUMNS = 7;
 const FULL_FOUNDATION = 13;
@@ -94,7 +100,13 @@ export type SolitaireAction =
           readonly playerId: string;
           readonly suit: Suit;
           readonly column: number;
-      };
+      }
+    /**
+     * Auto-complete the deal in one shot. Legal *only* when the win is already
+     * assured (see {@link isWinAssured}); the server still re-checks, so a
+     * tampered client can never use it to skip a genuinely unsolved board.
+     */
+    | { readonly type: "autoFinish"; readonly playerId: string };
 
 export interface SolitaireColumnView {
     readonly downCount: number;
@@ -162,6 +174,28 @@ function isValidRun(cards: readonly CardDescriptor[]): boolean {
         }
     }
     return true;
+}
+
+/**
+ * Is the rest of the game a foregone conclusion? In draw-one Klondike with
+ * unlimited redeals, once no tableau card is still face-down every remaining
+ * card is reachable (tableau tops are each column's lowest card; the whole
+ * stock can be cycled freely to the waste), and the foundations only ever climb
+ * — so greedily sending the lowest playable card up always completes. That is
+ * exactly the gate for the one-click finish: the player has "already won", the
+ * remaining moves are pure busywork, so we let them skip straight to the end.
+ *
+ * Crucially this is *not* a shortcut past an unsolved board: a hidden card means
+ * an unknown future, so the win is not assured and the action stays illegal.
+ */
+function isWinAssured(state: SolitaireState): boolean {
+    if (state.phase !== "playing") return false;
+    return state.tableau.every((col) => col.down.length === 0);
+}
+
+/** A complete A→K foundation pile for `suit` (the finished state of each suit). */
+function fullFoundation(suit: Suit): CardDescriptor[] {
+    return RANKS.map((rank) => ({ type: "suited", suit, rank }) as const);
 }
 
 /** Reveal the top hidden card once a column's face-up run is emptied. */
@@ -256,6 +290,11 @@ export const solitaire: GameModule<
         if (state.players[0]?.id !== playerId) return [];
 
         const acts: SolitaireAction[] = [];
+
+        // One-click finish — offered only when the win is already locked in.
+        if (isWinAssured(state)) {
+            acts.push({ type: "autoFinish", playerId });
+        }
 
         // Draw one, or recycle the waste once the stock is empty.
         if (state.stock.length > 0 || state.waste.length > 0) {
@@ -530,6 +569,61 @@ export const solitaire: GameModule<
                     ],
                     rng,
                 );
+            }
+
+            case "autoFinish": {
+                // Server-side re-check: the client may offer the button, but the
+                // truth lives here — a hidden card forbids the shortcut.
+                if (!isWinAssured(state)) {
+                    return fail(
+                        "illegal_move",
+                        "The win is not assured — cards are still hidden.",
+                    );
+                }
+                // Every card not yet up there (no down cards remain, so this is
+                // every loose card) climbs to its foundation. We emit one event
+                // per card, ordered low-to-high, so the board animates a quick
+                // cascade and the move counter ticks up for each — same score as
+                // playing it out by hand.
+                const remaining = [
+                    ...state.stock,
+                    ...state.waste,
+                    ...state.tableau.flatMap((col) => col.up),
+                ]
+                    .filter(isSuited)
+                    .sort(
+                        (a, b) =>
+                            ORDER[a.rank] - ORDER[b.rank] ||
+                            SUITS.indexOf(a.suit) - SUITS.indexOf(b.suit),
+                    );
+                const events: GameEvent[] = remaining.map((card) => ({
+                    type: "to_foundation",
+                    payload: { suit: card.suit, rank: card.rank, auto: true },
+                }));
+                return {
+                    ok: true,
+                    state: {
+                        ...state,
+                        stock: [],
+                        waste: [],
+                        foundations: {
+                            spades: fullFoundation("spades"),
+                            hearts: fullFoundation("hearts"),
+                            diamonds: fullFoundation("diamonds"),
+                            clubs: fullFoundation("clubs"),
+                        },
+                        tableau: state.tableau.map(() => ({
+                            down: [],
+                            up: [],
+                        })),
+                        moves: state.moves + remaining.length,
+                        turn: state.turn + remaining.length,
+                        rngState: rng.state,
+                        phase: "won",
+                        currentPlayerId: null,
+                    },
+                    events: [...events, { type: "won" }],
+                };
             }
 
             default:

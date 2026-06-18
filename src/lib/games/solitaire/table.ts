@@ -3,6 +3,7 @@ import { cardKey, FACE_DOWN_CARD } from "@/lib/card/utils";
 import {
     registerTable,
     type TableCardItem,
+    type TableControl,
     type TableZoneInstance,
 } from "../table/types";
 import type { SolitaireAction, SolitaireView } from "./solitaire";
@@ -66,6 +67,21 @@ export const solitaireTable = registerTable<SolitaireView>({
         ): SolitaireAction | undefined => legal.find(match);
 
         const banner = ctx.isOver ? ctx.t("you_win") : ctx.t("your_turn");
+
+        // One-click finish — surfaced only when the engine deems the win
+        // assured (no face-down cards left). It plays the rest out in a quick
+        // cascade so the player skips the busywork once the outcome is settled.
+        const autoFinish = find((a) => a.type === "autoFinish");
+        const controls: TableControl[] = autoFinish
+            ? [
+                  {
+                      key: "auto-finish",
+                      label: ctx.t("auto_finish"),
+                      action: autoFinish,
+                      variant: "success",
+                  },
+              ]
+            : [];
 
         // ── Stock: a face-down pile. Clicking anywhere on it draws a card, or
         //    recycles the waste once empty (the click lives on the zone, so it
@@ -230,6 +246,7 @@ export const solitaireTable = registerTable<SolitaireView>({
                 ...foundationZones,
                 ...tableauZones,
             ],
+            controls: controls.length ? controls : undefined,
             status: ctx.t("moves", { n: view.moves }),
         };
     },
@@ -238,6 +255,9 @@ export const solitaireTable = registerTable<SolitaireView>({
         const p = event.payload ?? {};
         switch (event.type) {
             case "to_foundation":
+                // The auto-finish floods the foundations in one burst — logging
+                // each would bury the feed; the "won" line covers it.
+                if (p.auto) return null;
                 return ctx.t("log_to_foundation", {
                     rank: String(p.rank ?? "?"),
                     suit: SUIT_SYMBOL[(p.suit as Suit) ?? "spades"],

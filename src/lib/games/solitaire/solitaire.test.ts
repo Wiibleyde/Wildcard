@@ -231,6 +231,85 @@ describe("solitaire — winning", () => {
     });
 });
 
+describe("solitaire — auto-finish", () => {
+    /** Foundations one short of done, the four Kings exposed, nothing hidden. */
+    function almostWon(): SolitaireState {
+        const tableau = Array.from({ length: 7 }, () => EMPTY_COLUMN);
+        tableau[0] = { down: [], up: [suited("K", "spades")] };
+        tableau[1] = { down: [], up: [suited("K", "hearts")] };
+        tableau[2] = { down: [], up: [suited("K", "diamonds")] };
+        tableau[3] = { down: [], up: [suited("K", "clubs")] };
+        return makeState({
+            foundations: {
+                spades: pile("spades", 12),
+                hearts: pile("hearts", 12),
+                diamonds: pile("diamonds", 12),
+                clubs: pile("clubs", 12),
+            },
+            tableau,
+            moves: 10,
+        });
+    }
+
+    it("offers the finish action only when no card is still face-down", () => {
+        const ready = almostWon();
+        expect(
+            solitaire
+                .legalActions(ready, "solo")
+                .some((a) => a.type === "autoFinish"),
+        ).toBe(true);
+
+        // Bury a card: the future is unknown again, so the shortcut vanishes.
+        const tableau = [...ready.tableau];
+        tableau[4] = {
+            down: [suited("2", "hearts")],
+            up: [suited("3", "clubs")],
+        };
+        const hidden = makeState({ ...ready, tableau });
+        expect(
+            solitaire
+                .legalActions(hidden, "solo")
+                .some((a) => a.type === "autoFinish"),
+        ).toBe(false);
+    });
+
+    it("drains every loose card to the foundations and wins, counting each as a move", () => {
+        const res = dispatch(
+            solitaire,
+            almostWon(),
+            { type: "autoFinish", playerId: "solo" },
+            "solo",
+        );
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(res.state.phase).toBe("won");
+        for (const suit of ["spades", "hearts", "diamonds", "clubs"] as const) {
+            expect(res.state.foundations[suit]).toHaveLength(13);
+        }
+        expect(res.state.tableau.every((c) => c.up.length === 0)).toBe(true);
+        // Four Kings moved up → four moves added to the running score.
+        expect(res.state.moves).toBe(14);
+        const outcome = solitaire.outcome(res.state);
+        expect(outcome?.winners).toEqual(["solo"]);
+    });
+
+    it("refuses the shortcut while a card is still hidden", () => {
+        const tableau = Array.from({ length: 7 }, () => EMPTY_COLUMN);
+        tableau[0] = {
+            down: [suited("K", "clubs")],
+            up: [suited("Q", "hearts")],
+        };
+        const res = dispatch(
+            solitaire,
+            makeState({ tableau }),
+            { type: "autoFinish", playerId: "solo" },
+            "solo",
+        );
+        expect(res.ok).toBe(false);
+        if (!res.ok) expect(res.error.code).toBe("illegal_move");
+    });
+});
+
 describe("solitaire — view redaction", () => {
     it("leaks only counts for the stock and the hidden tableau cards", () => {
         const state = createGame(solitaire, players, 99);

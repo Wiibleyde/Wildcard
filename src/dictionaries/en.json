@@ -219,6 +219,7 @@
         "or_nothing_status": "“{rank} or nothing” — play {rank} or pass",
         "draw": "Draw",
         "recycle": "Recycle",
+        "auto_finish": "Finish",
         "moves": "{n} moves",
         "empty_column": "King",
         "log_to_foundation": "{rank}{suit} goes up to the foundation",
