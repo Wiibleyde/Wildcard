@@ -43,14 +43,22 @@ async function authCookies(email, password, username) {
     });
     const res = await fetch(`${SB}/auth/v1/token?grant_type=password`, {
         method: "POST",
-        headers: { apikey: env.SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+        headers: {
+            apikey: env.SUPABASE_ANON_KEY,
+            "Content-Type": "application/json",
+        },
         body: JSON.stringify({ email, password }),
     });
     if (!res.ok) throw new Error(`login ${res.status}: ${await res.text()}`);
     const session = await res.json();
     let captured = [];
     const sb = createServerClient(SB, env.SUPABASE_ANON_KEY, {
-        cookies: { getAll: () => [], setAll: (cs) => { captured = cs; } },
+        cookies: {
+            getAll: () => [],
+            setAll: (cs) => {
+                captured = cs;
+            },
+        },
     });
     const { error } = await sb.auth.setSession({
         access_token: session.access_token,
@@ -58,7 +66,10 @@ async function authCookies(email, password, username) {
     });
     if (error) throw new Error(`setSession: ${error.message}`);
     return captured.map((c) => ({
-        name: c.name, value: c.value, domain: "localhost", path: "/",
+        name: c.name,
+        value: c.value,
+        domain: "localhost",
+        path: "/",
     }));
 }
 
@@ -68,7 +79,11 @@ const browser = await chromium.launch({ args: ["--no-sandbox"] });
 // ── Admin context (ui-test was promoted to admin in the DB) ──
 const adminCtx = await browser.newContext();
 await adminCtx.addCookies(
-    await authCookies("ui-test@wildcard.local", "ui-test-password-1234", "Testeur"),
+    await authCookies(
+        "ui-test@wildcard.local",
+        "ui-test-password-1234",
+        "Testeur",
+    ),
 );
 
 // Seed one live game so the dashboard isn't empty.
@@ -89,7 +104,9 @@ await adminPage.goto(`${BASE}/fr/admin`, { waitUntil: "load", timeout: 45000 });
 await adminPage.waitForTimeout(1500);
 report.adminDashboard = {
     url: adminPage.url(),
-    visibleText: ((await visible(adminPage)) || "").slice(0, 160).replace(/\s+/g, " "),
+    visibleText: ((await visible(adminPage)) || "")
+        .slice(0, 160)
+        .replace(/\s+/g, " "),
 };
 await adminPage.screenshot({ path: `${SHOTS}admin-1920.png`, fullPage: true });
 await adminPage.setViewportSize({ width: 375, height: 812 });
@@ -106,7 +123,11 @@ report.enableMaintenance = await apost(adminCtx, "/api/admin/maintenance", {
 // ── Non-admin context ──
 const nonCtx = await browser.newContext();
 await nonCtx.addCookies(
-    await authCookies("ui-nonadmin@wildcard.local", "ui-nonadmin-pw-1234", "Lambda"),
+    await authCookies(
+        "ui-nonadmin@wildcard.local",
+        "ui-nonadmin-pw-1234",
+        "Lambda",
+    ),
 );
 const nonPage = await nonCtx.newPage();
 await nonPage.setViewportSize({ width: 1280, height: 800 });
@@ -118,7 +139,10 @@ report.nonAdminLockedOut = {
     showsMaintenance: nonText.includes("Maintenance en cours"),
     showsCustomMessage: nonText.includes("retour dans quelques minutes"),
 };
-await nonPage.screenshot({ path: `${SHOTS}maintenance-1280.png`, fullPage: true });
+await nonPage.screenshot({
+    path: `${SHOTS}maintenance-1280.png`,
+    fullPage: true,
+});
 
 // ── Admin still gets through during maintenance ──
 await adminPage.setViewportSize({ width: 1280, height: 800 });
@@ -127,7 +151,9 @@ await adminPage.waitForTimeout(800);
 report.adminBypassesMaintenance = {
     url: adminPage.url(),
     stillAdmin: ((await visible(adminPage)) || "").includes("Administration"),
-    notMaintenance: !((await visible(adminPage)) || "").includes("Maintenance en cours"),
+    notMaintenance: !((await visible(adminPage)) || "").includes(
+        "Maintenance en cours",
+    ),
 };
 
 // ── API guard: non-admin cannot toggle ──
@@ -142,11 +168,16 @@ report.disableMaintenance = await apost(adminCtx, "/api/admin/maintenance", {
 
 // ── Non-admin restored, but role gate redirects /admin -> home ──
 // Cache-bust: Chromium may reuse the prior same-URL maintenance document.
-await nonPage.goto(`${BASE}/fr/lobby?_=${Date.now()}`, { waitUntil: "load", timeout: 45000 });
+await nonPage.goto(`${BASE}/fr/lobby?_=${Date.now()}`, {
+    waitUntil: "load",
+    timeout: 45000,
+});
 await nonPage.waitForTimeout(800);
 report.nonAdminRestored = {
     url: nonPage.url(),
-    maintenanceGone: !((await visible(nonPage)) || "").includes("Maintenance en cours"),
+    maintenanceGone: !((await visible(nonPage)) || "").includes(
+        "Maintenance en cours",
+    ),
 };
 await nonPage.goto(`${BASE}/fr/admin`, { waitUntil: "load", timeout: 45000 });
 await nonPage.waitForTimeout(800);
