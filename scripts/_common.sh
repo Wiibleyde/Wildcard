@@ -13,10 +13,20 @@ if [[ ! -f "$ENV_FILE" ]]; then
   exit 1
 fi
 
-set -a
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-set +a
+# Load env WITHOUT `source`: values may contain spaces (e.g.
+# STUDIO_DEFAULT_PROJECT=Wildcard Dev), which `source` tries to execute as a
+# command ("Dev: command not found"). Parse KEY=VALUE line by line instead —
+# docker's own `--env-file` (used by $DC below) already handles spaces, this
+# just exposes the vars the scripts echo.
+while IFS= read -r line || [[ -n "$line" ]]; do
+  [[ "$line" =~ ^[[:space:]]*# ]] && continue   # comment
+  [[ "$line" == *=* ]] || continue              # skip blanks / non-assignments
+  key="${line%%=*}"
+  val="${line#*=}"
+  val="${val%\"}"; val="${val#\"}"              # strip surrounding double quotes
+  val="${val%\'}"; val="${val#\'}"              # …or single quotes
+  export "$key=$val"
+done < "$ENV_FILE"
 
 DC="docker compose --env-file $ENV_FILE"
 

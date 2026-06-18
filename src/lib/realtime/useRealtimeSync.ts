@@ -44,8 +44,29 @@ export function useRealtimeSync(
     topic: string,
     build: ChannelBuilder,
     onChange: () => void,
+    /**
+     * Backstop poll interval (ms). The poll runs continuously at this rate,
+     * even while "connected": a channel can subscribe (broadcast works) while
+     * postgres_changes delivers nothing — a self-hosted Realtime CDC quirk — so
+     * "subscribed" can't be trusted to mean "receiving". Realtime, when it does
+     * deliver, just updates sooner than the next tick. Keep this at or below the
+     * fastest cadence the consumer must not miss (e.g. the bot-move pacing on
+     * the game channel) so no update is ever skipped.
+     */
+    pollMs?: number,
 ): RealtimeStatus {
     const [status, setStatus] = useState<RealtimeStatus>("connecting");
+
+    // Backstop polling — runs continuously at `pollMs`, NOT gated on connection
+    // status. A channel can report "connected" while postgres_changes silently
+    // delivers nothing (self-hosted Realtime CDC quirk), which would otherwise
+    // freeze the board/lobby on its last snapshot. Realtime, when it works, just
+    // updates sooner; the poll guarantees every change is eventually caught.
+    useEffect(() => {
+        if (!pollMs) return;
+        const id = setInterval(onChange, pollMs);
+        return () => clearInterval(id);
+    }, [pollMs, onChange]);
 
     useEffect(() => {
         const supabase = createClient();
@@ -53,6 +74,12 @@ export function useRealtimeSync(
         let active = true;
         let retry: ReturnType<typeof setTimeout> | undefined;
         let attempt = 0;
+        // Until the channel has SUBSCRIBED at least once, a failure means "still
+        // trying to connect", not "lost an established connection". We retry
+        // silently in that window instead of nagging with the reconnect banner —
+        // otherwise an environment where Realtime never establishes (e.g. the
+        // postgres_changes publication isn't live) shows the banner forever.
+        let hasConnected = false;
         // Each (re)join bumps the epoch; status callbacks from a superseded
         // channel carry a stale epoch and are ignored, so tearing an old
         // channel down never schedules a spurious re-join against the new one.
@@ -67,7 +94,8 @@ export function useRealtimeSync(
         // hides: flag it immediately, and on recovery force a prompt re-join
         // rather than waiting out the socket's backoff timer.
         const onOffline = () => {
-            if (active) setStatus("reconnecting");
+            // Only surface a drop once we've actually been connected.
+            if (active && hasConnected) setStatus("reconnecting");
         };
         const onOnline = () => {
             if (!active) return;
@@ -115,12 +143,16 @@ export function useRealtimeSync(
                 if (!active || myEpoch !== epoch) return;
                 const next = classifyChannelStatus(s);
                 if (!next) return;
-                setStatus(next.status);
                 if (next.status === "connected") {
+                    hasConnected = true;
                     attempt = 0;
+                    setStatus("connected");
                     // Resync to cover anything missed while detached.
                     onChange();
                 } else if (next.rejoin) {
+                    // Pre-first-connect failures stay "connecting" (silent);
+                    // only a dropped, established channel nags as "reconnecting".
+                    setStatus(hasConnected ? "reconnecting" : "connecting");
                     scheduleRejoin();
                 }
             });

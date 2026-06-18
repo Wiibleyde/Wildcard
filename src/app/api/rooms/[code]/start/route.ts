@@ -1,23 +1,18 @@
 import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/api/auth";
 import { ROOM_ERROR_STATUS, startGame } from "@/lib/models/room";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 
 export async function POST(
     _request: Request,
     ctx: { params: Promise<{ code: string }> },
 ) {
     const { code } = await ctx.params;
-    const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
 
     const admin = createAdminClient();
-    const result = await startGame(admin, user.id, code);
+    const result = await startGame(admin, auth.user.id, code);
     if (!result.ok) {
         return NextResponse.json(
             { error: result.error },

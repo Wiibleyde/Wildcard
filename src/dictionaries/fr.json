@@ -135,7 +135,36 @@
         "no_spectators": "Aucun spectateur",
         "spectate": "Passer spectateur",
         "join_as_player": "Rejoindre les joueurs",
-        "room_full_short": "Salon plein"
+        "room_full_short": "Salon plein",
+        "rules_title": "Règles de la partie",
+        "rule_on": "Activée",
+        "rule_off": "Désactivée",
+        "rules": {
+            "twoClosesTrick": {
+                "label": "Le 2 ferme le pli",
+                "description": "Jouer un 2 balaie le pli et le même joueur relance."
+            },
+            "finishOnTwoPenalty": {
+                "label": "Finir par un 2",
+                "description": "Sortir sur un 2 rétrograde au dernier rang."
+            },
+            "equalRank": {
+                "label": "Carte égale autorisée",
+                "description": "Poser le même rang que la table est un coup légal."
+            },
+            "equalRankLock": {
+                "label": "Ou rien",
+                "description": "Une carte égale force le joueur suivant à poser ce rang ou passer."
+            },
+            "revolution": {
+                "label": "Révolution",
+                "description": "Un carré inverse l'ordre des cartes jusqu'à la fin du pli."
+            },
+            "quadClosesTrick": {
+                "label": "Le carré ferme le pli",
+                "description": "Compléter quatre cartes du même rang balaie le pli."
+            }
+        }
     },
     "game": {
         "your_turn": "À toi de jouer",
@@ -149,6 +178,7 @@
         "draw_round": "Manche nulle",
         "cards_left": "{n} cartes",
         "in_play": "En jeu",
+        "trick_won": "Pli remporté par {name}",
         "your_hand": "Ta main",
         "game_over": "Partie terminée",
         "you_win": "Tu gagnes !",
@@ -157,6 +187,7 @@
         "back_to_lobby": "Retour au lobby",
         "place_president": "Président",
         "place_vice_president": "Vice-Président",
+        "place_neutral": "Neutre",
         "place_vice_asshole": "Vice-Trou",
         "place_asshole": "Trou du cul",
         "revolution": "Révolution ! L'ordre des cartes est inversé",
@@ -185,7 +216,14 @@
         "log_round_won": "{name} remporte la manche {n}",
         "log_round_draw": "Manche {n} : égalité",
         "log_or_nothing": "{name} annonce « {rank} ou rien ! »",
-        "or_nothing_status": "« {rank} ou rien » — joue {rank} ou passe"
+        "or_nothing_status": "« {rank} ou rien » — joue {rank} ou passe",
+        "draw": "Piocher",
+        "recycle": "Recycler",
+        "auto_finish": "Terminer",
+        "moves": "{n} coups",
+        "empty_column": "Roi",
+        "log_to_foundation": "{rank}{suit} monte en fondation",
+        "log_recycle": "La pioche est recyclée"
     },
     "realtime": {
         "reconnecting": "Reconnexion en cours…"
@@ -196,6 +234,7 @@
         "send": "Envoyer",
         "empty": "Pas encore de messages",
         "you": "Toi",
-        "rate_limited": "Doucement…"
+        "rate_limited": "Doucement…",
+        "disconnected": "Chat hors ligne — reconnexion…"
     }
 }

@@ -1,20 +1,15 @@
 import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/api/auth";
 import { ROOM_ERROR_STATUS, setRoomRole } from "@/lib/models/room";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 
 export async function POST(
     request: Request,
     ctx: { params: Promise<{ code: string }> },
 ) {
     const { code } = await ctx.params;
-    const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireUser();
+    if (!auth.ok) return auth.response;
 
     const body = (await request.json().catch(() => ({}))) as {
         role?: unknown;
@@ -27,7 +22,7 @@ export async function POST(
     }
 
     const admin = createAdminClient();
-    const result = await setRoomRole(admin, user.id, code, body.role);
+    const result = await setRoomRole(admin, auth.user.id, code, body.role);
     if (!result.ok) {
         return NextResponse.json(
             { error: result.error },

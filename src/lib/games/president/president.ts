@@ -1,14 +1,16 @@
 import { french52 } from "@/lib/card/decks";
+import { dealRoundRobin, removeCards } from "@/lib/card/hand";
+import { buildRankOrder, groupByRank, rankOf } from "@/lib/card/rank";
 import type { CardDescriptor, Rank } from "@/lib/card/types";
 import { cardKey } from "@/lib/card/utils";
 import { buildDeck } from "@/lib/engine/deck";
 import type { Rng } from "@/lib/engine/rng";
+import { fail, seatOrder } from "@/lib/engine/rules";
 import type {
-    ApplyResult,
     GameEvent,
     GameModule,
+    GameRuleToggle,
     GameState,
-    Player,
 } from "@/lib/engine/types";
 
 /**
@@ -42,11 +44,11 @@ import type {
  *   player to last place (each new offender takes the bottom spot).
  * - `equalRank` — matching the table's rank exactly is a legal play (the
  *   entry point to « ou rien » and to completing a carré on the table).
- * - `equalRankLock` — « ou rien » : once a player matches the table's rank
- *   (an 8 on an 8), the trick locks on that rank — every following player
- *   must lay that exact rank or pass, each on their own turn (never an
- *   auto-pass). The lock holds until the table sweeps; chaining matches is
- *   how a carré gets completed.
+ * - `equalRankLock` — « ou rien » : a match (an 8 on an 8) binds only the
+ *   *next* player, who must lay that exact rank or pass on their own turn
+ *   (never an auto-pass). The lock lifts the moment someone passes or raises;
+ *   it re-arms each time a player matches, so an unbroken run of matches still
+ *   completes a carré.
  * - `revolution` — playing four of a kind inverts the ranking (3 strongest,
  *   2 weakest) for the rest of the trick; a counter-revolution (another
  *   quad) flips it back. The table sweeping ends it.
@@ -65,24 +67,25 @@ import type {
  * single rounds, which is what a `games` row represents here.
  */
 
-/** Président ranking: 3 lowest → 2 highest. `C` (unused in french52) sits high.
- * Intentionally different from bataille.ts: 2 beats Ace here (Président rule). */
-export const RANK_VALUE: Record<Rank, number> = {
-    "3": 3,
-    "4": 4,
-    "5": 5,
-    "6": 6,
-    "7": 7,
-    "8": 8,
-    "9": 9,
-    "10": 10,
-    J: 11,
-    C: 12,
-    Q: 13,
-    K: 14,
-    A: 15,
-    "2": 16,
-};
+/** Président ranking: 3 lowest → 2 highest (the 2 beats the Ace). Built from an
+ * explicit order — Bataille and Solitaire rank the same cards differently, so
+ * the map is per-game, not shared. `C` is unused in french52. */
+export const RANK_VALUE = buildRankOrder([
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "J",
+    "C",
+    "Q",
+    "K",
+    "A",
+    "2",
+]);
 
 /** Optional French table rules — see the module doc for what each enables. */
 export interface PresidentRules {
@@ -111,6 +114,21 @@ export const DEFAULT_PRESIDENT_RULES: PresidentRules = {
     quadClosesTrick: true,
 };
 
+/**
+ * Lobby-configurable toggles for Président — one per {@link PresidentRules}
+ * field, defaults mirroring {@link DEFAULT_PRESIDENT_RULES}. Drives the lobby
+ * UI and server-side validation generically (see `resolveRuleToggles`).
+ */
+export const PRESIDENT_RULE_TOGGLES: readonly GameRuleToggle[] = [
+    { key: "twoClosesTrick", default: true },
+    { key: "finishOnTwoPenalty", default: true },
+    { key: "equalRank", default: true },
+    // « Ou rien » only makes sense when matching the rank is allowed.
+    { key: "equalRankLock", default: true, requires: "equalRank" },
+    { key: "revolution", default: false },
+    { key: "quadClosesTrick", default: true },
+];
+
 export interface TrickPlay {
     readonly playerId: string;
     readonly cards: readonly CardDescriptor[];
@@ -135,7 +153,8 @@ export interface PresidentState extends GameState {
     readonly combo: ComboShape | null;
     /** Ranking inverted by a quad — holds until the trick clears. */
     readonly revolution: boolean;
-    /** « Ou rien » engaged — only the combo's rank may follow this trick. */
+    /** « Ou rien » armed by the last play — the next player must match the
+     * combo's rank or pass; a pass or a raise lifts it. */
     readonly equalLock: boolean;
     /** Players who passed this trick (locked out until it clears). */
     readonly passed: readonly string[];
@@ -145,6 +164,12 @@ export interface PresidentState extends GameState {
     readonly demoted: readonly string[];
     /** Last player to lay the top combo — leads once the trick clears. */
     readonly lastPlayerId: string | null;
+    /**
+     * Cards of the trick that was just swept, kept for display so the closing
+     * play stays on the table until the next lead is laid — instead of
+     * vanishing the instant a carré/2 closes the pli. `null` while a trick runs.
+     */
+    readonly lastTrick: readonly TrickPlay[] | null;
 }
 
 export type PresidentAction =
@@ -177,17 +202,15 @@ export interface PresidentView {
     readonly combo: ComboShape | null;
     /** True while a revolution holds — the UI should flag the inversion. */
     readonly revolution: boolean;
-    /** True while « ou rien » locks the trick on the combo's rank. */
+    /** True while « ou rien » binds the next player to the combo's rank. */
     readonly equalLock: boolean;
     readonly pile: readonly TrickPlay[];
+    /** The just-won trick, shown until the next lead (empty while a trick runs). */
+    readonly lastTrick: readonly TrickPlay[];
     readonly finished: readonly string[];
     readonly players: readonly PresidentPlayerView[];
     /** The viewer this projection was built for (`null` = spectator). */
     readonly self: string | null;
-}
-
-function rankOf(card: CardDescriptor): Rank | null {
-    return card.type === "suited" ? card.rank : null;
 }
 
 /** Comparable strength under the current hierarchy — negated by revolution. */
@@ -213,10 +236,6 @@ function beatsCombo(
     return rules.equalRank && rank === combo.rank;
 }
 
-function seatOrder(players: readonly Player[]): Player[] {
-    return [...players].sort((a, b) => a.seat - b.seat);
-}
-
 /** Out of the round — went out cleanly (ranked) or was demoted on a 2. */
 function isOut(state: PresidentState, id: string): boolean {
     return state.finished.includes(id) || state.demoted.includes(id);
@@ -231,21 +250,6 @@ function comboRank(cards: readonly CardDescriptor[]): Rank | null {
         if (rankOf(card) !== first) return null;
     }
     return first;
-}
-
-/** Remove one occurrence of each card from `hand`, or `null` if any is absent. */
-function removeCards(
-    hand: readonly CardDescriptor[],
-    cards: readonly CardDescriptor[],
-): readonly CardDescriptor[] | null {
-    const remaining = [...hand];
-    for (const card of cards) {
-        const key = cardKey(card);
-        const index = remaining.findIndex((c) => cardKey(c) === key);
-        if (index === -1) return null;
-        remaining.splice(index, 1);
-    }
-    return remaining;
 }
 
 /** Next seat after `afterId` that may still act this trick (in play, not passed). */
@@ -301,6 +305,9 @@ function clearTrick(
     return {
         ...state,
         pile: [],
+        // Keep the swept cards for display until the next lead is laid, so a
+        // closing carré/2 is actually seen instead of vanishing on the spot.
+        lastTrick: state.pile,
         combo: null,
         revolution: false, // a revolution only holds for the trick
         equalLock: false, // « ou rien » dies with the trick
@@ -330,10 +337,6 @@ function settle(state: PresidentState, actorId: string): PresidentState {
     return { ...state, currentPlayerId: next };
 }
 
-function fail(code: string, message: string): ApplyResult<PresidentState> {
-    return { ok: false, error: { code, message } };
-}
-
 const base: Omit<
     GameModule<PresidentState, PresidentAction, PresidentView>,
     "setup"
@@ -343,22 +346,14 @@ const base: Omit<
     deck: french52,
     minPlayers: 3,
     maxPlayers: 6,
+    ruleToggles: PRESIDENT_RULE_TOGGLES,
 
     legalActions(state, playerId) {
         if (state.phase === "done") return [];
         if (playerId !== state.currentPlayerId) return [];
         if (isOut(state, playerId)) return [];
 
-        const hand = state.hands[playerId];
-        const groups = new Map<Rank, CardDescriptor[]>();
-        for (const card of hand) {
-            const rank = rankOf(card);
-            if (rank === null) continue;
-            const group = groups.get(rank) ?? [];
-            group.push(card);
-            groups.set(rank, group);
-        }
-
+        const groups = groupByRank(state.hands[playerId]);
         const actions: PresidentAction[] = [];
 
         if (state.combo === null) {
@@ -417,6 +412,9 @@ const base: Omit<
                 {
                     ...state,
                     passed: [...state.passed, action.playerId],
+                    // « Ou rien » binds only the next player — passing breaks the
+                    // chain, so whoever follows is free to raise again.
+                    equalLock: false,
                     turn: state.turn + 1,
                 },
                 action.playerId,
@@ -514,11 +512,12 @@ const base: Omit<
             });
         }
 
-        // « Ou rien » — matching the table's rank freezes the trick on it;
-        // an existing lock simply carries (only matches were legal anyway).
+        // « Ou rien » — a match binds only the *next* player: arm the lock when
+        // this play matches the table's rank, drop it otherwise (a raise frees
+        // the field). A locked player can only have matched, so a run of
+        // matches re-arms the lock turn after turn and still completes a carré.
         const equalMatch = state.combo !== null && rank === state.combo.rank;
-        const equalLock =
-            state.equalLock || (state.rules.equalRankLock && equalMatch);
+        const equalLock = state.rules.equalRankLock && equalMatch;
 
         const played: PresidentState = {
             ...state,
@@ -526,6 +525,8 @@ const base: Omit<
             finished,
             demoted,
             pile: [...state.pile, { playerId: action.playerId, cards }],
+            // A card is on the table now — drop the previous trick's snapshot.
+            lastTrick: null,
             combo: { rank, count: cards.length },
             revolution,
             equalLock,
@@ -623,6 +624,7 @@ const base: Omit<
             revolution: state.revolution,
             equalLock: state.equalLock,
             pile: state.pile,
+            lastTrick: state.lastTrick ?? [],
             finished: state.finished,
             self: viewerId,
             players: state.players.map((p): PresidentPlayerView => {
@@ -652,13 +654,21 @@ export function createPresident(
 ): GameModule<PresidentState, PresidentAction, PresidentView> {
     return {
         ...base,
+        // Rebuild bound to a host-chosen set — the resolved map is merged over
+        // the defaults so any unspecified field keeps its standard value.
+        withRules(chosen) {
+            return createPresident({
+                ...DEFAULT_PRESIDENT_RULES,
+                ...chosen,
+            } as PresidentRules);
+        },
         setup(players, rng, seed, gameId) {
             const order = seatOrder(players);
             const deck = rng.shuffle(buildDeck(french52));
-            const hands: Record<string, CardDescriptor[]> = {};
-            for (const p of order) hands[p.id] = [];
-            deck.forEach((card, i) => {
-                hands[order[i % order.length].id].push(card);
+            const dealt = dealRoundRobin(deck, order.length);
+            const hands: Record<string, readonly CardDescriptor[]> = {};
+            order.forEach((p, i) => {
+                hands[p.id] = dealt[i];
             });
 
             // « La dame de cœur commence » — her holder leads the first trick.
@@ -693,6 +703,7 @@ export function createPresident(
                 finished: [],
                 demoted: [],
                 lastPlayerId: null,
+                lastTrick: null,
             };
         },
     };

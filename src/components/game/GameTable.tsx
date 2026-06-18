@@ -3,6 +3,7 @@
 import { useGSAP } from "@gsap/react";
 import { useTranslations } from "next-intl";
 import { type ReactNode, useRef } from "react";
+import { Card } from "@/components/card/Card";
 import { buildSurfaceStyle } from "@/lib/board/styles";
 import type { BoardTheme } from "@/lib/board/types";
 import { getPlayAnimation, prefersReducedMotion } from "@/lib/card/animations";
@@ -23,6 +24,7 @@ import { GameLog, type GameLogLine } from "./GameLog";
 import { TableControls } from "./TableControls";
 import { TableSeats } from "./TableSeats";
 import { TableZone, type ZoneContext } from "./TableZone";
+import { CLONE_OFFSET, useTableDrag } from "./useTableDrag";
 
 interface GameTableProps {
     table: AnyGameTableConfig;
@@ -130,6 +132,14 @@ export function GameTable({
         else cardRefs.current.delete(id);
     };
 
+    // Pointer drag-and-drop: a card (and its run) lifts out, a floating clone
+    // follows the cursor, and the drop is hit-tested against the board zones.
+    const { dragging, beginDrag } = useTableDrag({
+        onAction,
+        pending,
+        boundsRef: rootRef,
+    });
+
     const zoneCtx: ZoneContext = {
         boardTheme,
         pending,
@@ -137,6 +147,8 @@ export function GameTable({
         registerCard,
         onAction,
         onIllegal,
+        dragging,
+        beginDrag,
     };
 
     const zonesAt = (placement: ZonePlacement) =>
@@ -157,6 +169,18 @@ export function GameTable({
     const center = zonesAt("center");
     const bottom = zonesAt("bottom");
     const controls = data.controls ?? [];
+
+    // A `fill` center zone (solitaire's tableau columns) spans the board width:
+    // lay them in one non-wrapping row of flex-1 cells. Otherwise the classic
+    // centered, wrapping layout (a framed trick zone, two reveal piles…).
+    const centerFills = data.zones.some(
+        (z) =>
+            templates.get(z.zone)?.placement === "center" &&
+            templates.get(z.zone)?.fill,
+    );
+    const centerClass = centerFills
+        ? "flex w-full items-start justify-center gap-1 sm:gap-2 xl:gap-3"
+        : "flex flex-wrap items-start justify-center gap-4 sm:gap-6 xl:gap-10";
 
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 xl:max-w-5xl 2xl:max-w-7xl">
@@ -186,9 +210,7 @@ export function GameTable({
                     )}
 
                     <div className="flex flex-1 flex-col items-center justify-center gap-3">
-                        <div className="flex flex-wrap items-start justify-center gap-4 sm:gap-6 xl:gap-10">
-                            {center}
-                        </div>
+                        <div className={centerClass}>{center}</div>
                         {data.status && (
                             <span
                                 className="text-sm font-black xl:text-base"
@@ -216,6 +238,13 @@ export function GameTable({
                             outcome={payload.outcome}
                             players={payload.players}
                             currentUserId={currentUserId}
+                            titleOf={
+                                table.rankTitle
+                                    ? (rank, total) =>
+                                          table.rankTitle?.(rank, total, ctx) ??
+                                          null
+                                    : undefined
+                            }
                         />
                     )}
                 </div>
@@ -234,6 +263,35 @@ export function GameTable({
                     </div>
                 )}
             </div>
+
+            {/* Floating drag clone — fixed to the viewport (so the board's
+                overflow never clips it) and inert to hit-testing. */}
+            {dragging && (
+                <div
+                    className="pointer-events-none fixed z-[9999]"
+                    style={{ left: dragging.x, top: dragging.y }}
+                >
+                    {dragging.stack.map((s, i) => (
+                        <div
+                            key={s.id}
+                            className="absolute will-change-transform"
+                            style={{
+                                top: i * CLONE_OFFSET,
+                                left: 0,
+                                width: dragging.cardW,
+                                transform: "rotate(2deg)",
+                                filter: "drop-shadow(0 8px 20px rgba(0,0,0,0.4))",
+                            }}
+                        >
+                            <Card
+                                card={s.card}
+                                theme={themeFor(s.ownerId)}
+                                disableTransitions
+                            />
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

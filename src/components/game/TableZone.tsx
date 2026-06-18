@@ -2,6 +2,7 @@
 
 import {
     type CSSProperties,
+    type PointerEvent as ReactPointerEvent,
     useEffect,
     useMemo,
     useRef,
@@ -20,6 +21,7 @@ import type {
     TableZoneInstance,
     TableZoneTemplate,
 } from "@/lib/games/table/types";
+import type { DragState } from "./useTableDrag";
 
 /** Top cards a `stack` zone actually renders — the badge carries the rest. */
 const STACK_VISIBLE = 3;
@@ -36,6 +38,15 @@ export interface ZoneContext {
     onAction: (action: GameAction) => void;
     /** Surface an "illegal move" notice when a blocked card is clicked. */
     onIllegal?: () => void;
+    /** The in-flight drag, shared across every zone (`null` when idle). */
+    dragging: DragState | null;
+    /** Grab a card (and its run) to start a drag. */
+    beginDrag: (
+        item: TableCardItem,
+        clientX: number,
+        clientY: number,
+        rect: DOMRect,
+    ) => void;
 }
 
 interface TableZoneProps {
@@ -49,8 +60,36 @@ interface TableZoneProps {
  * arrangement (optionally framed in the themed panel), optional caption.
  */
 export function TableZone({ instance, template, ctx }: TableZoneProps) {
+    // A drop target when the in-flight drag lists this zone's key. `data-zone-key`
+    // lets the drag controller hit-test the pointer against this element.
+    const isDropTarget =
+        ctx.dragging?.targets.some((t) => t.zoneKey === instance.key) ?? false;
+
+    // Whole-zone click affordance (e.g. the stock pile): fires even when empty.
+    const zoneAction = instance.action;
+    const onZoneClick =
+        zoneAction && !ctx.pending ? () => ctx.onAction(zoneAction) : undefined;
+
     return (
-        <div className="flex flex-col items-center gap-1.5">
+        // biome-ignore lint/a11y/noStaticElementInteractions: pile click affordance — a zone with no single card to click (the stock pile draws/recycles); a mobile path is tracked separately.
+        // biome-ignore lint/a11y/useKeyWithClickEvents: pile click affordance — keyboard play is served by the per-card actions; a dedicated a11y path is tracked separately.
+        <div
+            className={`flex flex-col items-center gap-1.5 ${
+                template.fill ? "min-w-0 flex-1" : ""
+            }`}
+            data-zone-key={instance.key}
+            style={{
+                cursor: onZoneClick ? "pointer" : undefined,
+                ...(isDropTarget
+                    ? {
+                          outline: `2px dashed ${ctx.boardTheme.accentColor}`,
+                          outlineOffset: 4,
+                          borderRadius: 12,
+                      }
+                    : null),
+            }}
+            onClick={onZoneClick}
+        >
             {instance.badge && (
                 <BoardPill theme={ctx.boardTheme} tone="accent">
                     {instance.badge}
@@ -89,7 +128,7 @@ function ZoneCards({ instance, template, ctx }: TableZoneProps) {
     if (instance.cards.length === 0) {
         return (
             <div
-                className={`${CARD_WIDTH_CLASS[size]} flex aspect-[5/7] items-center justify-center rounded-md`}
+                className={`${template.fill ? "w-full" : CARD_WIDTH_CLASS[size]} flex aspect-[5/7] items-center justify-center rounded-md`}
                 style={{ border: "1px dashed rgba(255,255,255,0.2)" }}
             >
                 {instance.emptyHint && (
@@ -137,14 +176,30 @@ function ZoneCards({ instance, template, ctx }: TableZoneProps) {
 
     if (template.arrangement === "cascade") {
         return (
-            <div className="flex flex-col items-center">
+            <div
+                className={`flex flex-col items-center ${
+                    template.fill ? "w-full" : ""
+                }`}
+            >
                 {instance.cards.map((item, i) => (
                     <ZoneCard
                         key={item.id}
                         item={item}
                         template={template}
                         ctx={ctx}
-                        style={i === 0 ? undefined : { marginTop: "-105%" }}
+                        fill={template.fill}
+                        // Each card overlaps the one above; a face-up parent
+                        // peeks more (its rank stays readable) than a face-down
+                        // one. Offsets are % of card width (height = 140%).
+                        style={
+                            i === 0
+                                ? undefined
+                                : {
+                                      marginTop: instance.cards[i - 1].faceDown
+                                          ? "-122%"
+                                          : "-96%",
+                                  }
+                        }
                     />
                 ))}
             </div>
@@ -377,24 +432,58 @@ function ZoneCard({
     /** Fill the parent instead of sizing from the template (stack layers). */
     fill?: boolean;
 }) {
-    const { action } = item;
+    const { action, dropTargets } = item;
     const width = fill ? "w-full" : CARD_WIDTH_CLASS[template.cardSize ?? "md"];
 
-    // A legal card plays; a blocked card explains itself instead of going
-    // silent. Both stay inert while an action is in flight.
-    const onClick = ctx.pending
-        ? undefined
-        : action !== undefined
-          ? () => ctx.onAction(action)
-          : item.illegal
-            ? () => ctx.onIllegal?.()
+    // Draggable when the game gave it destinations and nothing's in flight.
+    const draggable = !ctx.pending && (dropTargets?.length ?? 0) > 0;
+    // While in flight the source cards lift out — the floating clone stands in.
+    const isHidden = ctx.dragging?.hiddenIds.includes(item.id) ?? false;
+
+    // Draggable cards keep single-click free for grabbing; their `action` is the
+    // double-click auto-move. Non-draggable cards play on a single click (and a
+    // blocked card explains itself). Everything is inert while an action lands.
+    const onClick =
+        ctx.pending || draggable
+            ? undefined
+            : action !== undefined
+              ? () => ctx.onAction(action)
+              : item.illegal
+                ? () => ctx.onIllegal?.()
+                : undefined;
+    const onDoubleClick =
+        draggable && action !== undefined
+            ? () => ctx.onAction(action)
             : undefined;
 
+    const onPointerDown = draggable
+        ? (e: ReactPointerEvent<HTMLDivElement>) => {
+              // No preventDefault: it can swallow the compatibility dblclick in
+              // some browsers (the auto-move). `touch-action: none` already stops
+              // touch scrolling; cards are `select-none` so no text selection.
+              if (e.button !== 0 && e.pointerType === "mouse") return;
+              ctx.beginDrag(
+                  item,
+                  e.clientX,
+                  e.clientY,
+                  e.currentTarget.getBoundingClientRect(),
+              );
+          }
+        : undefined;
+
     return (
+        // biome-ignore lint/a11y/noStaticElementInteractions: pointer drag source — draggable cards expose a double-click auto-move for non-pointer play; a mobile path is tracked separately.
         <div
             ref={ctx.registerCard(item.id)}
             className={`${width} will-change-transform`}
-            style={style}
+            style={{
+                ...style,
+                visibility: isHidden ? "hidden" : undefined,
+                touchAction: draggable ? "none" : undefined,
+                cursor: draggable ? "grab" : undefined,
+            }}
+            onPointerDown={onPointerDown}
+            onDoubleClick={onDoubleClick}
         >
             <Card
                 card={item.card}

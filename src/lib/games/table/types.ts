@@ -41,10 +41,17 @@ export interface TableZoneTemplate {
     readonly id: string;
     readonly placement: ZonePlacement;
     readonly arrangement: ZoneArrangement;
-    /** Card scale for this zone — defaults to "md". */
+    /** Card scale for this zone — defaults to "md". Ignored when `fill` is set. */
     readonly cardSize?: CardSize;
     /** Draw the themed zone panel behind the cards. */
     readonly framed?: boolean;
+    /**
+     * Stretch this zone to share its row's width (`flex-1`) instead of sizing to
+     * a fixed card scale — its cards then size to the column. Lets a game lay a
+     * fixed number of side-by-side columns that fill the board responsively
+     * (solitaire's seven tableau columns) from mobile to 2K, never wrapping.
+     */
+    readonly fill?: boolean;
 }
 
 /** One card on the table, ready to render. */
@@ -72,6 +79,28 @@ export interface TableCardItem {
      * an "illegal move" notice instead of doing anything.
      */
     readonly illegal?: boolean;
+    /**
+     * Drag-and-drop destinations for this card, keyed by the target zone's
+     * {@link TableZoneInstance.key}. Present → the card is draggable; dropping
+     * it on a listed zone dispatches that target's `action`. Lets a game offer
+     * an explicit "pick the destination" interaction (solitaire), with the
+     * `action` field acting as the double-click auto-move shortcut.
+     */
+    readonly dropTargets?: ReadonlyArray<{
+        readonly zoneKey: string;
+        readonly action: GameAction;
+    }>;
+    /**
+     * Cards that move *with* this one when dragged (top-to-bottom, this card
+     * first) — e.g. a solitaire tableau run. Drives the floating drag clone and
+     * tells the table which source cards to hide mid-drag. Omitted → just this
+     * card moves.
+     */
+    readonly dragStack?: ReadonlyArray<{
+        readonly id: string;
+        readonly card: CardDescriptor;
+        readonly ownerId?: string;
+    }>;
 }
 
 /** One legal combo a hand can commit, keyed by selection group + size. */
@@ -111,6 +140,12 @@ export interface TableZoneInstance {
     readonly emptyHint?: string;
     /** Turns a `fan` hand into a tap-to-build-a-combo picker. */
     readonly selection?: HandSelection;
+    /**
+     * Clicking anywhere in the zone — including when it is empty — dispatches
+     * this action. Used for pile affordances with no single card to click, e.g.
+     * the solitaire stock (draw a card, or recycle the waste when empty).
+     */
+    readonly action?: GameAction;
 }
 
 /** Opponent chip rendered in the seats bar. */
@@ -184,6 +219,14 @@ export interface GameTableConfig<V> {
      * table; omitting the hook hides the feed for that game.
      */
     logLine?(event: GameEvent, ctx: TableContext): string | null;
+    /**
+     * Localized rank title for the game-over standings — e.g. Président,
+     * Vice-Président, Neutre, Vice-Trou, Trou du cul. `rank` is 1-based,
+     * `total` the number of ranked players, so the ladder adjusts to the table
+     * size. `null` ⇒ no title (the overlay shows the bare position). Omitting
+     * the hook shows positions only.
+     */
+    rankTitle?(rank: number, total: number, ctx: TableContext): string | null;
 }
 
 /** Type-erased table config, as stored in the catalog. */

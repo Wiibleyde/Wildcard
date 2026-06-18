@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/api/auth";
-import { ROOM_ERROR_STATUS, setBotCount } from "@/lib/models/room";
+import { ROOM_ERROR_STATUS, setRules } from "@/lib/models/room";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(
@@ -12,17 +12,26 @@ export async function POST(
     if (!auth.ok) return auth.response;
 
     const body = (await request.json().catch(() => ({}))) as {
-        count?: unknown;
+        rules?: unknown;
     };
-    if (typeof body.count !== "number") {
+    if (
+        typeof body.rules !== "object" ||
+        body.rules === null ||
+        Array.isArray(body.rules)
+    ) {
         return NextResponse.json(
-            { error: "count (number) is required" },
+            { error: "rules (object) is required" },
             { status: 400 },
         );
     }
 
     const admin = createAdminClient();
-    const result = await setBotCount(admin, auth.user.id, code, body.count);
+    const result = await setRules(
+        admin,
+        auth.user.id,
+        code,
+        body.rules as Record<string, unknown>,
+    );
     if (!result.ok) {
         return NextResponse.json(
             { error: result.error },
@@ -30,5 +39,5 @@ export async function POST(
         );
     }
 
-    return NextResponse.json({ botCount: result.botCount });
+    return NextResponse.json({ rules: result.rules });
 }

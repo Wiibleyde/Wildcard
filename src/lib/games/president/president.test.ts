@@ -44,6 +44,7 @@ function state3(
         finished: [],
         demoted: [],
         lastPlayerId: null,
+        lastTrick: null,
         ...overrides,
     };
 }
@@ -244,6 +245,55 @@ describe("president move legality", () => {
         expect(res.error.code).toBe("too_low");
     });
 
+    it("« ou rien » binds only the next player — a pass lifts it", () => {
+        // a leads a 6, b matches (locks c). c holds no 6 → must pass, which
+        // breaks the chain: d is then free to raise, not stuck on the rank.
+        let s = state3(
+            {
+                a: [card("6", "spades"), card("K")],
+                b: [card("6", "hearts"), card("Q")],
+                c: [card("J"), card("10")],
+                d: [card("8"), card("9")],
+            },
+            { players: P4 },
+        );
+        s = ok(s, play("a", [card("6", "spades")]));
+        s = ok(s, play("b", [card("6", "hearts")])); // match → locks c
+        expect(s.equalLock).toBe(true);
+        expect(s.currentPlayerId).toBe("c");
+        expect(summary(president.legalActions(s, "c"))).toEqual(["pass"]);
+
+        s = ok(s, pass("c")); // chain breaks
+        expect(s.equalLock).toBe(false);
+        expect(s.currentPlayerId).toBe("d");
+        // d may climb again — the lock did not survive the pass.
+        expect(summary(president.legalActions(s, "d"))).toEqual([
+            "8x1",
+            "9x1",
+            "pass",
+        ]);
+        expect(step(s, play("d", [card("8")])).ok).toBe(true);
+    });
+
+    it("« ou rien » re-arms on each consecutive match", () => {
+        // a:6, b:6 (locks c), c:6 (re-locks d). d holds no 6 → only pass.
+        let s = state3(
+            {
+                a: [card("6", "spades"), card("K")],
+                b: [card("6", "hearts"), card("Q")],
+                c: [card("6", "diamonds"), card("A")],
+                d: [card("8"), card("9")],
+            },
+            { players: P4 },
+        );
+        s = ok(s, play("a", [card("6", "spades")]));
+        s = ok(s, play("b", [card("6", "hearts")]));
+        s = ok(s, play("c", [card("6", "diamonds")])); // match → re-arms for d
+        expect(s.equalLock).toBe(true);
+        expect(s.currentPlayerId).toBe("d");
+        expect(summary(president.legalActions(s, "d"))).toEqual(["pass"]);
+    });
+
     it("requires the same card count as the table", () => {
         const s = state3(
             { a: [], b: [card("9")], c: [] },
@@ -333,6 +383,9 @@ describe("president french table rules", () => {
         if (!res.ok) return;
         expect(res.state.combo).toBeNull();
         expect(res.state.pile).toHaveLength(0);
+        // Swept cards are kept for display (the closing 2 + c's K) until the
+        // next lead — so the winning play is actually seen, not blinked away.
+        expect(res.state.lastTrick).toHaveLength(2);
         expect(res.state.passed).toHaveLength(0);
         expect(res.state.currentPlayerId).toBe("b"); // leads again
         expect(res.events).toContainEqual({

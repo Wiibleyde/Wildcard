@@ -11,6 +11,9 @@ import { nameOf } from "./GameChrome";
 interface GameChatProps {
     gameId: string;
     currentUserId: string;
+    /** Viewer's own display name — stamped on the messages they send so
+     * spectators (absent from `players`) still show a name, not "?". */
+    currentUserName: string;
     players: readonly GamePlayer[];
     boardTheme: BoardTheme;
     /** Game finished — stops persisting and wipes the reload cache. */
@@ -26,14 +29,23 @@ interface GameChatProps {
 export function GameChat({
     gameId,
     currentUserId,
+    currentUserName,
     players,
     boardTheme,
     isOver,
 }: GameChatProps) {
     const t = useTranslations("chat");
-    const { messages, send } = useGameChat(gameId, currentUserId, isOver);
+    const { messages, send } = useGameChat(
+        gameId,
+        currentUserId,
+        currentUserName,
+        isOver,
+    );
     const [draft, setDraft] = useState("");
-    const [warn, setWarn] = useState(false);
+    // A rejected send must not vanish silently — surface why in the composer.
+    const [notice, setNotice] = useState<
+        "rate_limited" | "disconnected" | null
+    >(null);
     const listRef = useRef<HTMLOListElement>(null);
 
     // Pin to the newest line whenever the feed grows. Reading `messages.length`
@@ -49,12 +61,17 @@ export function GameChat({
         const result = send(draft);
         if (result === "sent") {
             setDraft("");
-            setWarn(false);
+            setNotice(null);
         } else if (result === "rate_limited") {
             // Brief visual nudge; input keeps its text so nothing is lost.
-            setWarn(true);
-            window.setTimeout(() => setWarn(false), 1500);
+            setNotice("rate_limited");
+            window.setTimeout(() => setNotice(null), 1500);
+        } else if (result === "disconnected") {
+            // The channel isn't live — say so instead of eating the message.
+            setNotice("disconnected");
+            window.setTimeout(() => setNotice(null), 2500);
         }
+        // "empty" / "too_long" can't occur — the input guards both.
     };
 
     return (
@@ -96,7 +113,7 @@ export function GameChat({
                                 >
                                     {mine
                                         ? t("you")
-                                        : nameOf(players, m.userId)}
+                                        : m.name || nameOf(players, m.userId)}
                                 </span>
                                 <span className="text-white/40">: </span>
                                 <span className="wrap-break-word">
@@ -114,10 +131,10 @@ export function GameChat({
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     maxLength={MAX_CHAT_LENGTH}
-                    placeholder={warn ? t("rate_limited") : t("placeholder")}
+                    placeholder={notice ? t(notice) : t("placeholder")}
                     aria-label={t("placeholder")}
                     className="min-w-0 flex-1 rounded-lg border bg-black/25 px-3 py-2 text-xs text-white/90 outline-none placeholder:text-white/40 xl:text-sm"
-                    style={{ borderColor: warn ? "#e04040" : "#3d2d18" }}
+                    style={{ borderColor: notice ? "#e04040" : "#3d2d18" }}
                 />
                 <button
                     type="submit"

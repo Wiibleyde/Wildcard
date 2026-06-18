@@ -23,6 +23,13 @@ import {
 export function useGameChannel(
     gameId: string,
     onChange: () => void,
+    /**
+     * Backstop poll interval (ms). Callers pass a larger value while the viewer
+     * is on turn (nothing external changes then) and a small one otherwise, to
+     * catch opponent/bot moves promptly without polling needlessly. Defaults to
+     * the bot-move pacing.
+     */
+    pollMs = 800,
 ): RealtimeStatus {
     const build = useCallback(
         (channel: RealtimeChannel) =>
@@ -39,5 +46,9 @@ export function useGameChannel(
         [gameId, onChange],
     );
 
-    return useRealtimeSync(`game:${gameId}`, build, onChange);
+    // Backstop poll (see pollMs). Kept at/below the bot-move pacing
+    // (BOT_TURN_DELAY_MS, 900ms) when others are acting, so the fallback catches
+    // one move per tick instead of a burst — otherwise three bots resolve
+    // between two polls and the board jumps "three moves at a time".
+    return useRealtimeSync(`game:${gameId}`, build, onChange, pollMs);
 }

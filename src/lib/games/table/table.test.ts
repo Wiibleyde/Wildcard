@@ -117,6 +117,7 @@ describe("president table", () => {
             { playerId: "c", cards: [card("8")] },
             { playerId: "b", cards: [card("9")] },
         ],
+        lastTrick: [],
         finished: [],
         self: "a",
         players: [
@@ -247,13 +248,14 @@ describe("history log lines", () => {
         );
     });
 
-    it("crowns finishers with their title when one applies", () => {
-        // 3 players: place 1 = Président, no vice titles.
+    it("crowns finishers with their title", () => {
+        // 3 players: place 1 = Président, the middle seat = Neutre (no vice
+        // titles before a 4th seat); the last seat never emits « finished ».
         expect(line("finished", { playerId: "b", place: 1 })).toBe(
             "log_finished_title|Bob,place_president",
         );
         expect(line("finished", { playerId: "b", place: 2 })).toBe(
-            "log_finished|Bob,2",
+            "log_finished_title|Bob,place_neutral",
         );
     });
 

@@ -71,6 +71,44 @@ export type ApplyResult<S extends GameState> =
       }
     | { readonly ok: false; readonly error: RuleViolation };
 
+/**
+ * A boolean rule the host can flip in the lobby before the deal. Games declare
+ * their toggles generically so the lobby UI, server validation, and storage
+ * stay game-agnostic — a new game ships its own list, nothing else changes.
+ */
+export interface GameRuleToggle {
+    /** Stable key — matches a field of the game's own rules object. */
+    readonly key: string;
+    /** Value used when the host hasn't chosen (and the lobby default). */
+    readonly default: boolean;
+    /** Another toggle that must be ON for this one to apply (UI greys it out,
+     * the server forces it OFF otherwise). */
+    readonly requires?: string;
+}
+
+/**
+ * Resolve a host's raw rule selection against a game's declared toggles:
+ * unknown keys are dropped, missing keys fall back to their default, and a
+ * toggle whose `requires` dependency is OFF is forced OFF. Pure — shared by the
+ * lobby page, the config route, and `startGame`, so every layer agrees.
+ */
+export function resolveRuleToggles(
+    toggles: readonly GameRuleToggle[] | undefined,
+    input: Record<string, unknown> | null | undefined,
+): Record<string, boolean> {
+    const out: Record<string, boolean> = {};
+    if (!toggles) return out;
+    for (const toggle of toggles) {
+        const value = input?.[toggle.key];
+        out[toggle.key] = typeof value === "boolean" ? value : toggle.default;
+    }
+    // Second pass: a dependency that ended up OFF disables its dependants.
+    for (const toggle of toggles) {
+        if (toggle.requires && !out[toggle.requires]) out[toggle.key] = false;
+    }
+    return out;
+}
+
 /** Final standings once the game is over. */
 export interface GameOutcome {
     /** Players ranked best-first; equal `rank` means a tie. */
@@ -102,6 +140,20 @@ export interface GameModule<S extends GameState, A extends GameAction, V = S> {
     readonly deck: DeckDefinition;
     readonly minPlayers: number;
     readonly maxPlayers: number;
+
+    /**
+     * Optional rules the host may toggle in the lobby; omitted = none. The
+     * chosen set is resolved with {@link resolveRuleToggles} and bound into a
+     * fresh module via {@link GameModule.withRules} at deal time.
+     */
+    readonly ruleToggles?: readonly GameRuleToggle[];
+
+    /**
+     * Rebuild this module bound to a host-chosen rule set (already resolved to
+     * a `key → boolean` map). Games with no `ruleToggles` may omit it; the
+     * runner then deals the module as-is.
+     */
+    withRules?(rules: Record<string, boolean>): GameModule<S, A, V>;
 
     /**
      * Build the opening state, using `rng` for the initial shuffle/deal.

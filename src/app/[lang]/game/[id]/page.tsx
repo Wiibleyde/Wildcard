@@ -26,11 +26,20 @@ export default async function Page({
     const result = await getGameClientState(admin, id, user.id);
     if (!result.ok) notFound();
 
-    const { data: custom } = await supabase
-        .from("player_customizations")
-        .select("deck_style_id, board_style_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
+    const [{ data: custom }, { data: profile }] = await Promise.all([
+        supabase
+            .from("player_customizations")
+            .select("deck_style_id, board_style_id")
+            .eq("user_id", user.id)
+            .maybeSingle(),
+        // The viewer's own name — needed for chat even when they are a
+        // spectator (and thus absent from the game's seated player list).
+        supabase
+            .from("profiles")
+            .select("username")
+            .eq("id", user.id)
+            .maybeSingle(),
+    ]);
 
     return (
         <div
@@ -40,6 +49,7 @@ export default async function Page({
             <GamePlayClient
                 initial={result.payload}
                 currentUserId={user.id}
+                currentUserName={profile?.username ?? "Joueur"}
                 deckStyleId={custom?.deck_style_id ?? "free"}
                 boardStyleId={custom?.board_style_id ?? "green_felt"}
             />

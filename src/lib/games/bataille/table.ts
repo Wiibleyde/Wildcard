@@ -1,15 +1,7 @@
 import { cardKey } from "@/lib/card/utils";
-import {
-    registerTable,
-    type TableContext,
-    type TableZoneInstance,
-} from "../table/types";
+import { playerName } from "../table/helpers";
+import { registerTable, type TableZoneInstance } from "../table/types";
 import type { BatailleView } from "./bataille";
-
-function nameOf(ctx: TableContext, playerId: unknown): string {
-    if (typeof playerId !== "string") return "?";
-    return ctx.players.find((p) => p.userId === playerId)?.username ?? "?";
-}
 
 /**
  * Bataille table — one `reveal` zone instance per player in the center
@@ -89,7 +81,7 @@ export const batailleTable = registerTable<BatailleView>({
                 const round = typeof p.round === "number" ? p.round : 0;
                 return p.winner
                     ? ctx.t("log_round_won", {
-                          name: nameOf(ctx, p.winner),
+                          name: playerName(ctx, p.winner),
                           n: round,
                       })
                     : ctx.t("log_round_draw", { n: round });
