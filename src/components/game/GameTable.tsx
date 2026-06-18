@@ -238,6 +238,13 @@ export function GameTable({
                             outcome={payload.outcome}
                             players={payload.players}
                             currentUserId={currentUserId}
+                            titleOf={
+                                table.rankTitle
+                                    ? (rank, total) =>
+                                          table.rankTitle?.(rank, total, ctx) ??
+                                          null
+                                    : undefined
+                            }
                         />
                     )}
                 </div>

@@ -216,6 +216,7 @@ export type Database = {
                     status: "lobby" | "playing" | "finished";
                     current_game_id: string | null;
                     bot_count: number;
+                    rules: Record<string, boolean>;
                     created_at: string;
                 };
                 Insert: {
@@ -226,6 +227,7 @@ export type Database = {
                     status?: "lobby" | "playing" | "finished";
                     current_game_id?: string | null;
                     bot_count?: number;
+                    rules?: Record<string, boolean>;
                     created_at?: string;
                 };
                 Update: {
@@ -236,6 +238,7 @@ export type Database = {
                     status?: "lobby" | "playing" | "finished";
                     current_game_id?: string | null;
                     bot_count?: number;
+                    rules?: Record<string, boolean>;
                     created_at?: string;
                 };
                 Relationships: [

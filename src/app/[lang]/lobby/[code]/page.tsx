@@ -6,6 +6,7 @@ import {
     type SeatRow,
     type SpectatorRow,
 } from "@/components/lobby/RoomClient";
+import { resolveRuleToggles } from "@/lib/engine/types";
 import { GAMES } from "@/lib/games";
 import { usernamesByIds } from "@/lib/models/usernames";
 import { createClient } from "@/lib/supabase/server";
@@ -29,7 +30,7 @@ export default async function Page({
     const { data: room } = await supabase
         .from("rooms")
         .select(
-            "id, code, module_id, host_id, status, current_game_id, bot_count",
+            "id, code, module_id, host_id, status, current_game_id, bot_count, rules",
         )
         .eq("code", normalized)
         .maybeSingle();
@@ -41,6 +42,8 @@ export default async function Page({
     if (room.status === "finished") redirect(`/${lang}/lobby`);
 
     const module = GAMES[room.module_id];
+    const ruleToggles = module?.ruleToggles ?? [];
+    const initialRules = resolveRuleToggles(module?.ruleToggles, room.rules);
 
     const { data: memberRows } = await supabase
         .from("room_players")
@@ -97,6 +100,8 @@ export default async function Page({
                     initialBotCount={room.bot_count}
                     seated={seated}
                     initialRole={initialRole}
+                    ruleToggles={ruleToggles}
+                    initialRules={initialRules}
                 />
             </div>
         </div>

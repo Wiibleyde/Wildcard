@@ -6,7 +6,12 @@ import { cardKey } from "@/lib/card/utils";
 import { buildDeck } from "@/lib/engine/deck";
 import type { Rng } from "@/lib/engine/rng";
 import { fail, seatOrder } from "@/lib/engine/rules";
-import type { GameEvent, GameModule, GameState } from "@/lib/engine/types";
+import type {
+    GameEvent,
+    GameModule,
+    GameRuleToggle,
+    GameState,
+} from "@/lib/engine/types";
 
 /**
  * Président (Trou du cul) — one round of the climbing/shedding game, after
@@ -39,11 +44,11 @@ import type { GameEvent, GameModule, GameState } from "@/lib/engine/types";
  *   player to last place (each new offender takes the bottom spot).
  * - `equalRank` — matching the table's rank exactly is a legal play (the
  *   entry point to « ou rien » and to completing a carré on the table).
- * - `equalRankLock` — « ou rien » : once a player matches the table's rank
- *   (an 8 on an 8), the trick locks on that rank — every following player
- *   must lay that exact rank or pass, each on their own turn (never an
- *   auto-pass). The lock holds until the table sweeps; chaining matches is
- *   how a carré gets completed.
+ * - `equalRankLock` — « ou rien » : a match (an 8 on an 8) binds only the
+ *   *next* player, who must lay that exact rank or pass on their own turn
+ *   (never an auto-pass). The lock lifts the moment someone passes or raises;
+ *   it re-arms each time a player matches, so an unbroken run of matches still
+ *   completes a carré.
  * - `revolution` — playing four of a kind inverts the ranking (3 strongest,
  *   2 weakest) for the rest of the trick; a counter-revolution (another
  *   quad) flips it back. The table sweeping ends it.
@@ -109,6 +114,21 @@ export const DEFAULT_PRESIDENT_RULES: PresidentRules = {
     quadClosesTrick: true,
 };
 
+/**
+ * Lobby-configurable toggles for Président — one per {@link PresidentRules}
+ * field, defaults mirroring {@link DEFAULT_PRESIDENT_RULES}. Drives the lobby
+ * UI and server-side validation generically (see `resolveRuleToggles`).
+ */
+export const PRESIDENT_RULE_TOGGLES: readonly GameRuleToggle[] = [
+    { key: "twoClosesTrick", default: true },
+    { key: "finishOnTwoPenalty", default: true },
+    { key: "equalRank", default: true },
+    // « Ou rien » only makes sense when matching the rank is allowed.
+    { key: "equalRankLock", default: true, requires: "equalRank" },
+    { key: "revolution", default: false },
+    { key: "quadClosesTrick", default: true },
+];
+
 export interface TrickPlay {
     readonly playerId: string;
     readonly cards: readonly CardDescriptor[];
@@ -133,7 +153,8 @@ export interface PresidentState extends GameState {
     readonly combo: ComboShape | null;
     /** Ranking inverted by a quad — holds until the trick clears. */
     readonly revolution: boolean;
-    /** « Ou rien » engaged — only the combo's rank may follow this trick. */
+    /** « Ou rien » armed by the last play — the next player must match the
+     * combo's rank or pass; a pass or a raise lifts it. */
     readonly equalLock: boolean;
     /** Players who passed this trick (locked out until it clears). */
     readonly passed: readonly string[];
@@ -181,7 +202,7 @@ export interface PresidentView {
     readonly combo: ComboShape | null;
     /** True while a revolution holds — the UI should flag the inversion. */
     readonly revolution: boolean;
-    /** True while « ou rien » locks the trick on the combo's rank. */
+    /** True while « ou rien » binds the next player to the combo's rank. */
     readonly equalLock: boolean;
     readonly pile: readonly TrickPlay[];
     /** The just-won trick, shown until the next lead (empty while a trick runs). */
@@ -325,6 +346,7 @@ const base: Omit<
     deck: french52,
     minPlayers: 3,
     maxPlayers: 6,
+    ruleToggles: PRESIDENT_RULE_TOGGLES,
 
     legalActions(state, playerId) {
         if (state.phase === "done") return [];
@@ -390,6 +412,9 @@ const base: Omit<
                 {
                     ...state,
                     passed: [...state.passed, action.playerId],
+                    // « Ou rien » binds only the next player — passing breaks the
+                    // chain, so whoever follows is free to raise again.
+                    equalLock: false,
                     turn: state.turn + 1,
                 },
                 action.playerId,
@@ -487,11 +512,12 @@ const base: Omit<
             });
         }
 
-        // « Ou rien » — matching the table's rank freezes the trick on it;
-        // an existing lock simply carries (only matches were legal anyway).
+        // « Ou rien » — a match binds only the *next* player: arm the lock when
+        // this play matches the table's rank, drop it otherwise (a raise frees
+        // the field). A locked player can only have matched, so a run of
+        // matches re-arms the lock turn after turn and still completes a carré.
         const equalMatch = state.combo !== null && rank === state.combo.rank;
-        const equalLock =
-            state.equalLock || (state.rules.equalRankLock && equalMatch);
+        const equalLock = state.rules.equalRankLock && equalMatch;
 
         const played: PresidentState = {
             ...state,
@@ -628,6 +654,14 @@ export function createPresident(
 ): GameModule<PresidentState, PresidentAction, PresidentView> {
     return {
         ...base,
+        // Rebuild bound to a host-chosen set — the resolved map is merged over
+        // the defaults so any unspecified field keeps its standard value.
+        withRules(chosen) {
+            return createPresident({
+                ...DEFAULT_PRESIDENT_RULES,
+                ...chosen,
+            } as PresidentRules);
+        },
         setup(players, rng, seed, gameId) {
             const order = seatOrder(players);
             const deck = rng.shuffle(buildDeck(french52));

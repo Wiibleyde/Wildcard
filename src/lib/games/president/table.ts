@@ -39,21 +39,28 @@ function rankLabel(ctx: TableContext, rank: unknown): string {
 }
 
 /** Title for a clean finish, when one exists ("Président", "Vice-Trou"…). */
-function finishTitle(ctx: TableContext, place: number): string | null {
-    const n = ctx.players.length;
+/**
+ * Canonical Président ladder, adjusted to the table size (`total` ranked
+ * players): Président, Vice-Président, Neutre(s), Vice-Trou du cul, Trou du cul.
+ * Vice titles need a 4th seat; everyone between the vices is Neutre. With 6
+ * players the two middle seats are both Neutre. `place` is 1-based.
+ */
+function rankTitle(ctx: TableContext, place: number, total: number): string {
     if (place === 1) return ctx.t("place_president");
-    if (place === n) return ctx.t("place_asshole");
-    if (n >= 4 && place === 2) return ctx.t("place_vice_president");
-    if (n >= 4 && place === n - 1) return ctx.t("place_vice_asshole");
-    return null;
+    if (place === total) return ctx.t("place_asshole");
+    if (total >= 4 && place === 2) return ctx.t("place_vice_president");
+    if (total >= 4 && place === total - 1) {
+        return ctx.t("place_vice_asshole");
+    }
+    return ctx.t("place_neutral");
 }
 
-/** "Président" / "Vice-Président" / "Vice-Trou" / "Trou du cul" / "Terminé
- * (n)" — or `null` while playing. Vice titles need a 4th seat to exist. */
+/** In-play badge title once a player has gone out (or was demoted on a 2) —
+ * `null` while still holding cards. Same ladder as the game-over standings. */
 function placeLabel(ctx: TableContext, p: PresidentPlayerView): string | null {
     if (p.demoted) return ctx.t("place_asshole");
     if (p.place === null) return null;
-    return finishTitle(ctx, p.place) ?? ctx.t("finished", { place: p.place });
+    return rankTitle(ctx, p.place, ctx.players.length);
 }
 
 /**
@@ -73,6 +80,8 @@ export const presidentTable = registerTable<PresidentView>({
         },
         { id: "hand", placement: "bottom", arrangement: "fan", cardSize: "lg" },
     ],
+
+    rankTitle: (rank, total, ctx) => rankTitle(ctx, rank, total),
 
     mapView(view, ctx) {
         const self = view.players.find((p) => p.playerId === ctx.viewerId);
@@ -236,10 +245,9 @@ export const presidentTable = registerTable<PresidentView>({
                 });
             case "finished": {
                 const place = typeof p.place === "number" ? p.place : 0;
-                const title = finishTitle(ctx, place);
-                return title
-                    ? ctx.t("log_finished_title", { name, title })
-                    : ctx.t("log_finished", { name, place });
+                if (place < 1) return ctx.t("log_finished", { name, place });
+                const title = rankTitle(ctx, place, ctx.players.length);
+                return ctx.t("log_finished_title", { name, title });
             }
             case "demoted":
                 return ctx.t("log_demoted", { name });

@@ -43,13 +43,17 @@ export function GameOverOverlay({
     outcome,
     players,
     currentUserId,
+    titleOf,
 }: {
     outcome: GameOutcome | null;
     players: readonly GamePlayer[];
     currentUserId: string;
+    /** Game-specific rank title (Président, Vice-Président…); `null` ⇒ none. */
+    titleOf?: (rank: number, total: number) => string | null;
 }) {
     const t = useTranslations("game");
     const won = outcome?.winners.includes(currentUserId) ?? false;
+    const total = outcome?.rankings.length ?? 0;
 
     return (
         <div
@@ -74,17 +78,55 @@ export function GameOverOverlay({
             </h2>
 
             {outcome && outcome.rankings.length > 0 && (
-                <ol className="flex flex-col gap-1">
-                    {outcome.rankings.map((r) => (
-                        <li
-                            key={r.playerId}
-                            className="text-sm font-bold"
-                            style={{ color: "#faf2e2" }}
-                        >
-                            {r.rank}. {nameOf(players, r.playerId)}
-                            {typeof r.score === "number" ? ` · ${r.score}` : ""}
-                        </li>
-                    ))}
+                <ol className="flex w-full max-w-xs flex-col gap-1.5">
+                    {outcome.rankings.map((r) => {
+                        const title = titleOf?.(r.rank, total) ?? null;
+                        const isMe = r.playerId === currentUserId;
+                        return (
+                            <li
+                                key={r.playerId}
+                                className="flex items-center justify-between gap-3 rounded-lg px-3 py-2"
+                                style={{
+                                    background: isMe
+                                        ? "rgba(245,197,22,0.12)"
+                                        : "rgba(255,255,255,0.04)",
+                                    border: `1px solid ${
+                                        isMe ? "#f5c51640" : "#3d2d18"
+                                    }`,
+                                }}
+                            >
+                                <span className="flex min-w-0 items-center gap-2">
+                                    <span
+                                        className="font-black tabular-nums"
+                                        style={{ color: "#7a6a50" }}
+                                    >
+                                        {r.rank}
+                                    </span>
+                                    <span
+                                        className="truncate text-sm font-bold"
+                                        style={{ color: "#faf2e2" }}
+                                    >
+                                        {nameOf(players, r.playerId)}
+                                    </span>
+                                </span>
+                                {title ? (
+                                    <span
+                                        className="shrink-0 text-xs font-black uppercase tracking-wider"
+                                        style={{ color: "#f5c516" }}
+                                    >
+                                        {title}
+                                    </span>
+                                ) : typeof r.score === "number" ? (
+                                    <span
+                                        className="shrink-0 text-sm font-bold"
+                                        style={{ color: "#9a8870" }}
+                                    >
+                                        · {r.score}
+                                    </span>
+                                ) : null}
+                            </li>
+                        );
+                    })}
                 </ol>
             )}
 

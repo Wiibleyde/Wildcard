@@ -135,7 +135,36 @@
         "no_spectators": "No spectators",
         "spectate": "Watch as spectator",
         "join_as_player": "Join as player",
-        "room_full_short": "Room full"
+        "room_full_short": "Room full",
+        "rules_title": "Game rules",
+        "rule_on": "On",
+        "rule_off": "Off",
+        "rules": {
+            "twoClosesTrick": {
+                "label": "A 2 closes the trick",
+                "description": "Playing a 2 sweeps the trick and the same player leads again."
+            },
+            "finishOnTwoPenalty": {
+                "label": "Finishing on a 2",
+                "description": "Going out on a 2 demotes you to last place."
+            },
+            "equalRank": {
+                "label": "Equal rank allowed",
+                "description": "Matching the table's rank is a legal play."
+            },
+            "equalRankLock": {
+                "label": "Match or pass",
+                "description": "An equal card forces the next player to match that rank or pass."
+            },
+            "revolution": {
+                "label": "Revolution",
+                "description": "Four of a kind reverses the card order until the trick clears."
+            },
+            "quadClosesTrick": {
+                "label": "A quad closes the trick",
+                "description": "Completing four cards of one rank sweeps the trick."
+            }
+        }
     },
     "game": {
         "your_turn": "Your turn",
@@ -158,6 +187,7 @@
         "back_to_lobby": "Back to lobby",
         "place_president": "President",
         "place_vice_president": "Vice-President",
+        "place_neutral": "Neutral",
         "place_vice_asshole": "Vice-Asshole",
         "place_asshole": "Asshole",
         "revolution": "Revolution! Card ranking is reversed",

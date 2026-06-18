@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ReconnectingBanner } from "@/components/realtime/ReconnectingBanner";
 import { useRouter } from "@/i18n/navigation";
+import { type GameRuleToggle, resolveRuleToggles } from "@/lib/engine/types";
 import { usernamesByIds } from "@/lib/models/usernames";
 import { useRoomChannel } from "@/lib/realtime/useRoomChannel";
 import { createClient } from "@/lib/supabase/client";
@@ -34,6 +35,8 @@ interface Props {
     initialBotCount: number;
     seated: boolean;
     initialRole: Role;
+    ruleToggles: readonly GameRuleToggle[];
+    initialRules: Record<string, boolean>;
 }
 
 type Slot =
@@ -54,6 +57,8 @@ export function RoomClient({
     initialBotCount,
     seated,
     initialRole,
+    ruleToggles,
+    initialRules,
 }: Props) {
     const t = useTranslations("room");
     const router = useRouter();
@@ -63,6 +68,9 @@ export function RoomClient({
     const [role, setRole] = useState<Role>(initialRole);
     const [hostId, setHostId] = useState(initialHostId);
     const [botCount, setBotCount] = useState(initialBotCount);
+    const [rules, setRulesState] = useState<Record<string, boolean>>(() =>
+        resolveRuleToggles(ruleToggles, initialRules),
+    );
     const [busy, setBusy] = useState(false);
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -82,7 +90,7 @@ export function RoomClient({
         const [{ data: room }, { data: players }] = await Promise.all([
             supabase
                 .from("rooms")
-                .select("status, current_game_id, host_id, bot_count")
+                .select("status, current_game_id, host_id, bot_count, rules")
                 .eq("id", roomId)
                 .maybeSingle(),
             supabase
@@ -99,6 +107,9 @@ export function RoomClient({
         }
         if (room?.host_id) setHostId(room.host_id);
         if (typeof room?.bot_count === "number") setBotCount(room.bot_count);
+        if (room?.rules) {
+            setRulesState(resolveRuleToggles(ruleToggles, room.rules));
+        }
 
         const rows = players ?? [];
         const nameOf = await usernamesByIds(
@@ -125,7 +136,7 @@ export function RoomClient({
         );
         const mine = rows.find((r) => r.user_id === currentUserId);
         setRole(mine?.role === "spectator" ? "spectator" : "player");
-    }, [roomId, router, currentUserId]);
+    }, [roomId, router, currentUserId, ruleToggles]);
 
     // Auto-join when arriving via a shared link, then sync.
     useEffect(() => {
@@ -155,6 +166,21 @@ export function RoomClient({
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ count: clamped }),
+        });
+    }
+
+    async function setRule(key: string, value: boolean) {
+        // Resolve locally so a dependency flip (turning « ou rien » off when
+        // its requirement goes off) shows instantly; the server re-resolves.
+        const next = resolveRuleToggles(ruleToggles, {
+            ...rules,
+            [key]: value,
+        });
+        setRulesState(next); // optimistic; Realtime reconciles
+        await fetch(`/api/rooms/${code}/rules`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rules: next }),
         });
     }
 
@@ -232,6 +258,11 @@ export function RoomClient({
             // keep the "copy" label; the code stays selectable by hand.
         }
     }
+
+    // Rule labels live under the dynamic `room.rules.<key>` path; next-intl
+    // types keys as a literal union, so cast the built key to that param type.
+    const ruleText = (key: string, field: "label" | "description") =>
+        t(`rules.${key}.${field}` as Parameters<typeof t>[0]);
 
     const slots: Slot[] = Array.from({ length: maxPlayers }, (_, i) => {
         if (i < seats.length) {
@@ -411,6 +442,99 @@ export function RoomClient({
                     })}
                 </ul>
             </div>
+
+            {/* Rules — host toggles the game's optional rules; others read them */}
+            {ruleToggles.length > 0 && (
+                <div className="flex flex-col gap-3">
+                    <h3
+                        className="text-xs font-bold uppercase tracking-widest"
+                        style={{ color: "#7a6a50" }}
+                    >
+                        {t("rules_title")}
+                    </h3>
+                    <ul className="flex flex-col gap-2">
+                        {ruleToggles.map((toggle) => {
+                            const on = rules[toggle.key];
+                            const locked = toggle.requires
+                                ? !rules[toggle.requires]
+                                : false;
+                            return (
+                                <li
+                                    key={toggle.key}
+                                    className="flex items-center justify-between gap-3 rounded-xl px-4 py-3"
+                                    style={{
+                                        background: "#1c1510",
+                                        border: "2px solid #3d2d18",
+                                        opacity: locked ? 0.5 : 1,
+                                    }}
+                                >
+                                    <div className="min-w-0 flex-1">
+                                        <div
+                                            className="font-bold text-sm"
+                                            style={{ color: "#faf2e2" }}
+                                        >
+                                            {ruleText(toggle.key, "label")}
+                                        </div>
+                                        <div
+                                            className="text-xs"
+                                            style={{ color: "#9a8870" }}
+                                        >
+                                            {ruleText(
+                                                toggle.key,
+                                                "description",
+                                            )}
+                                        </div>
+                                    </div>
+                                    {isHost ? (
+                                        <button
+                                            type="button"
+                                            role="switch"
+                                            aria-checked={on}
+                                            aria-label={ruleText(
+                                                toggle.key,
+                                                "label",
+                                            )}
+                                            disabled={busy || locked}
+                                            onClick={() =>
+                                                setRule(toggle.key, !on)
+                                            }
+                                            className="inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full p-1 transition-colors duration-200 disabled:cursor-default disabled:opacity-40"
+                                            style={{
+                                                background: on
+                                                    ? "#48c97a"
+                                                    : "rgba(255,255,255,0.08)",
+                                            }}
+                                        >
+                                            <span
+                                                className="h-4 w-4 rounded-full transition-transform duration-200"
+                                                style={{
+                                                    background: "#faf2e2",
+                                                    boxShadow:
+                                                        "0 1px 2px rgba(0,0,0,0.4)",
+                                                    transform: on
+                                                        ? "translateX(20px)"
+                                                        : "translateX(0)",
+                                                }}
+                                            />
+                                        </button>
+                                    ) : (
+                                        <span
+                                            className="shrink-0 text-xs font-black uppercase tracking-wider"
+                                            style={{
+                                                color: on
+                                                    ? "#48c97a"
+                                                    : "#7a6a50",
+                                            }}
+                                        >
+                                            {on ? t("rule_on") : t("rule_off")}
+                                        </span>
+                                    )}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </div>
+            )}
 
             {/* Spectators — watch the live game, never dealt in */}
             <div className="flex flex-col gap-3">

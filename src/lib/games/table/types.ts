@@ -219,6 +219,14 @@ export interface GameTableConfig<V> {
      * table; omitting the hook hides the feed for that game.
      */
     logLine?(event: GameEvent, ctx: TableContext): string | null;
+    /**
+     * Localized rank title for the game-over standings — e.g. Président,
+     * Vice-Président, Neutre, Vice-Trou, Trou du cul. `rank` is 1-based,
+     * `total` the number of ranked players, so the ladder adjusts to the table
+     * size. `null` ⇒ no title (the overlay shows the bare position). Omitting
+     * the hook shows positions only.
+     */
+    rankTitle?(rank: number, total: number, ctx: TableContext): string | null;
 }
 
 /** Type-erased table config, as stored in the catalog. */

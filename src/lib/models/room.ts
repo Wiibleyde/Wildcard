@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { after } from "next/server";
 import { createGame } from "@/lib/engine/runner";
-import type { Player } from "@/lib/engine/types";
+import { type Player, resolveRuleToggles } from "@/lib/engine/types";
 import { getGameModule } from "@/lib/games";
 import type { Database } from "@/lib/supabase/types";
 import { advanceBots } from "./game";
@@ -333,6 +333,40 @@ export async function setBotCount(
 }
 
 /**
+ * Host-only: set the lobby rule toggles. The raw selection is resolved against
+ * the game's declared toggles (unknown keys dropped, dependencies enforced)
+ * before storage, so what lands in `rooms.rules` is always a valid set. Bound
+ * into the module at deal time (see {@link startGame}).
+ */
+export async function setRules(
+    admin: Admin,
+    userId: string,
+    code: string,
+    rules: Record<string, unknown>,
+): Promise<Result<{ rules: Record<string, boolean> }>> {
+    const { data: room } = await admin
+        .from("rooms")
+        .select("id, module_id, host_id, status")
+        .eq("code", code.toUpperCase())
+        .maybeSingle();
+    if (!room) return { ok: false, error: "not_found" };
+    if (room.host_id !== userId) return { ok: false, error: "not_host" };
+    if (room.status !== "lobby") return { ok: false, error: "already_started" };
+
+    const module = getGameModule(room.module_id);
+    if (!module) return { ok: false, error: "unknown_game" };
+
+    const resolved = resolveRuleToggles(module.ruleToggles, rules);
+    const { error } = await admin
+        .from("rooms")
+        .update({ rules: resolved })
+        .eq("id", room.id);
+    if (error) return { ok: false, error: "db_error", message: error.message };
+
+    return { ok: true, rules: resolved };
+}
+
+/**
  * Host-only: deal the game. Builds the engine `Player[]` from the human seats
  * plus `bot_count` synthetic computer players, runs `createGame` (random seed),
  * persists public meta + secret state, flips the room to `playing`, and lets any
@@ -345,7 +379,7 @@ export async function startGame(
 ): Promise<Result<{ gameId: string }>> {
     const { data: room } = await admin
         .from("rooms")
-        .select("id, module_id, host_id, status, bot_count")
+        .select("id, module_id, host_id, status, bot_count, rules")
         .eq("code", code.toUpperCase())
         .maybeSingle();
     if (!room) return { ok: false, error: "not_found" };
@@ -354,6 +388,13 @@ export async function startGame(
 
     const module = getGameModule(room.module_id);
     if (!module) return { ok: false, error: "unknown_game" };
+
+    // Bind the host's chosen rules into a fresh module instance; games with no
+    // toggles (Bataille, Solitaire) deal as-is. Player limits are rule-agnostic
+    // so seat math below still reads `module`.
+    const configured = module.withRules
+        ? module.withRules(resolveRuleToggles(module.ruleToggles, room.rules))
+        : module;
 
     // Claim the room with a compare-and-set (lobby → playing). A concurrent
     // start (double-click, two tabs) loses the claim instead of dealing a
@@ -436,7 +477,7 @@ export async function startGame(
 
     let state: ReturnType<typeof createGame>;
     try {
-        state = createGame(module, players);
+        state = createGame(configured, players);
     } catch (err) {
         return abort(
             "not_enough_players",
@@ -451,7 +492,7 @@ export async function startGame(
             module_id: room.module_id,
             phase: state.phase,
             current_player_id: state.currentPlayerId,
-            is_over: module.isOver(state),
+            is_over: configured.isOver(state),
             version: 0,
             bot_ids: botIds,
         })
@@ -480,7 +521,7 @@ export async function startGame(
     // response, paced, so every client sees the opening moves animate.
     if (botIds.length > 0) {
         after(() =>
-            advanceBots(admin, game.id, room.id, module, state, 0, botIds),
+            advanceBots(admin, game.id, room.id, configured, state, 0, botIds),
         );
     }
 
