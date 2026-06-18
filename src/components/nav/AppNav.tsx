@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
+import { getUserRole, roleAtLeast } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 import { NavActions } from "./NavActions";
@@ -21,10 +22,12 @@ export async function AppNav() {
     } = await supabase.auth.getUser();
     if (!user) return null;
 
-    const [profileRes, xpRes] = await Promise.all([
+    const [profileRes, xpRes, role] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", user.id).single(),
         supabase.from("player_xp").select("xp").eq("user_id", user.id).single(),
+        getUserRole(supabase, user.id),
     ]);
+    const canModerate = roleAtLeast(role, "moderator");
 
     const t = await getTranslations("navigation");
     const tProfile = await getTranslations("profile");
@@ -51,6 +54,7 @@ export async function AppNav() {
                 initial={initial}
                 coins={t("coins")}
                 levelShort={tProfile("level_short")}
+                canModerate={canModerate}
             />
 
             {/* ── Mobile top bar ───────────────────────────────────────────── */}
@@ -153,7 +157,7 @@ export async function AppNav() {
                     boxShadow: "0 -4px 20px rgba(0,0,0,0.4)",
                 }}
             >
-                <NavLinks variant="bottom" />
+                <NavLinks variant="bottom" canModerate={canModerate} />
             </nav>
         </>
     );

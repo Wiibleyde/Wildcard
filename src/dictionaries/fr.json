@@ -22,7 +22,8 @@
         "login": "Connexion",
         "register": "S'inscrire",
         "logout": "Déconnexion",
-        "profile": "Mon profil"
+        "profile": "Mon profil",
+        "admin": "Admin"
     },
     "common": {
         "loading": "Chargement...",
@@ -236,5 +237,32 @@
         "you": "Toi",
         "rate_limited": "Doucement…",
         "disconnected": "Chat hors ligne — reconnexion…"
+    },
+    "admin": {
+        "title": "Administration",
+        "subtitle": "Surveille les parties en cours et gère la plateforme.",
+        "role_admin": "Administrateur",
+        "role_moderator": "Modérateur",
+        "ongoing_title": "Parties en cours",
+        "refresh": "Rafraîchir",
+        "no_games": "Aucune partie en cours pour le moment.",
+        "phase": "Phase",
+        "players_count": "{count, plural, one {# joueur} other {# joueurs}}",
+        "bots_count": "{count, plural, one {# bot} other {# bots}}",
+        "current_turn": "Au tour de",
+        "watch": "Observer",
+        "maintenance_title": "Maintenance",
+        "maintenance_desc": "Quand la maintenance est active, seuls les administrateurs peuvent accéder au site.",
+        "maintenance_active": "Maintenance active",
+        "maintenance_inactive": "Service en ligne",
+        "maintenance_message_label": "Message affiché aux joueurs",
+        "maintenance_message_placeholder": "Ex. : Maintenance en cours, retour à 14h.",
+        "enable": "Activer la maintenance",
+        "disable": "Désactiver",
+        "maintenance_confirm_on": "Activer la maintenance ? Tous les joueurs non-administrateurs perdront l'accès au site."
+    },
+    "maintenance": {
+        "title": "Maintenance en cours",
+        "description": "Wildcard est temporairement indisponible. Reviens dans quelques instants !"
     }
 }

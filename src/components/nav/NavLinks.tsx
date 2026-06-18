@@ -2,7 +2,13 @@
 
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
-import { HomeIcon, PaletteIcon, PlayIcon, ShopIcon } from "./NavIcons";
+import {
+    HomeIcon,
+    PaletteIcon,
+    PlayIcon,
+    ShieldIcon,
+    ShopIcon,
+} from "./NavIcons";
 
 type NavItemConfig = {
     href: string;
@@ -16,9 +22,15 @@ type NavItemConfig = {
 type Props = {
     variant: "sidebar" | "bottom";
     shown?: boolean;
+    /** Show the moderator/admin entry (moderators and admins only). */
+    canModerate?: boolean;
 };
 
-export function NavLinks({ variant, shown = true }: Props) {
+export function NavLinks({
+    variant,
+    shown = true,
+    canModerate = false,
+}: Props) {
     const t = useTranslations("navigation");
     const pathname = usePathname();
 
@@ -55,6 +67,18 @@ export function NavLinks({ variant, shown = true }: Props) {
             glow: "rgba(224,64,64,0.1)",
             suit: "♣",
         },
+        ...(canModerate
+            ? [
+                  {
+                      href: "/admin",
+                      label: t("admin"),
+                      icon: <ShieldIcon />,
+                      color: "#5ab0ff",
+                      glow: "rgba(90,176,255,0.1)",
+                      suit: "♠",
+                  },
+              ]
+            : []),
     ];
 
     function isActive(href: string) {

@@ -49,6 +49,24 @@ export function ShopIcon() {
     );
 }
 
+export function ShieldIcon() {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+        >
+            <path d="M12 3 5 6v5c0 4.5 3 8 7 9 4-1 7-4.5 7-9V6l-7-3z" />
+            <path d="m9 12 2 2 4-4" />
+        </svg>
+    );
+}
+
 export function PaletteIcon() {
     return (
         <svg

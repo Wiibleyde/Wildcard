@@ -1,5 +1,6 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { type AppRole, getUserRole, roleAtLeast } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 
@@ -46,4 +47,37 @@ export async function requireUser(): Promise<
         };
     }
     return { ok: true, user, supabase };
+}
+
+/**
+ * Like {@link requireUser}, but also enforces a minimum global role. Returns
+ * 401 when signed out and 403 when signed in but under-privileged, so a route
+ * stays a flat:
+ *
+ * ```ts
+ * const auth = await requireRole("moderator");
+ * if (!auth.ok) return auth.response;
+ * // auth.user, auth.supabase, auth.role
+ * ```
+ */
+export async function requireRole(
+    min: AppRole,
+): Promise<
+    | (AuthedRoute & { readonly role: AppRole })
+    | { readonly ok: false; readonly response: NextResponse }
+> {
+    const auth = await requireUser();
+    if (!auth.ok) return auth;
+
+    const role = await getUserRole(auth.supabase, auth.user.id);
+    if (!roleAtLeast(role, min)) {
+        return {
+            ok: false,
+            response: NextResponse.json(
+                { error: "Forbidden" },
+                { status: 403 },
+            ),
+        };
+    }
+    return { ...auth, role };
 }
