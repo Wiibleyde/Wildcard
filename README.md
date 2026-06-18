@@ -230,6 +230,12 @@ docker compose --env-file .env.docker --profile monitoring up -d
 - `wildcard_game_duration_seconds{module}` — durée d'une partie (histogram) → **durée moyenne par jeu**
 - métriques Node/process (`wildcard_*` : CPU, heap, event-loop)
 
+> **Accès protégé** — le port de l'app est publié, donc `/api/metrics` est
+> joignable de l'extérieur. Définir `METRICS_TOKEN` (`.env.docker`) : la route
+> exige alors un `Authorization: Bearer <token>`, que Prometheus envoie
+> automatiquement. Laissé vide en dev local (pas de Prometheus), la route reste
+> ouverte.
+
 ### Grafana
 
 Datasources et dashboards **provisionnés** au démarrage (`monitoring/grafana/`) :

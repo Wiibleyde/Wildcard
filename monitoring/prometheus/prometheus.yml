@@ -13,6 +13,13 @@ scrape_configs:
   # La cible inactive remonte simplement up=0 ; aucune des deux n'est requise.
   - job_name: wildcard-app
     metrics_path: /api/metrics
+    # Bearer token attendu par /api/metrics quand METRICS_TOKEN est défini.
+    # Prometheus ne sait pas interpoler l'env : l'entrypoint du conteneur écrit
+    # METRICS_TOKEN dans ce fichier au démarrage (cf. docker-compose.yml). Vide
+    # en dev → la route reste ouverte.
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/token
     static_configs:
       - targets:
           - app:3000

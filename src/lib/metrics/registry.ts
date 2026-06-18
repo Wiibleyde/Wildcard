@@ -65,8 +65,10 @@ async function collectActiveGames(gauge: Gauge<"module">): Promise<void> {
         for (const [module, count] of perModule) {
             gauge.set({ module }, count);
         }
-    } catch {
-        // Swallow — an unreachable DB should degrade the gauge, not the scrape.
+    } catch (err) {
+        // Degrade the gauge, never the scrape — but warn so a persistently
+        // broken collect is visible instead of silently reading empty forever.
+        console.warn("[metrics] active-games collect failed:", err);
     }
 }
 

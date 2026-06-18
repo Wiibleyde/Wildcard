@@ -289,7 +289,7 @@ export async function advanceBots(
     fromState: GameState,
     fromVersion: number,
     botIds: readonly string[],
-    createdAt: string | null = null,
+    createdAt: string | null,
 ): Promise<number> {
     let state = fromState;
     let version = fromVersion;
@@ -501,8 +501,9 @@ export async function applyAction(
 
     // Let any bots now on turn play out AFTER the response: the human's card
     // animates immediately, then each paced bot move arrives over Realtime as
-    // its own update — visible turns instead of one burst.
-    if (meta.bot_ids.length > 0) {
+    // its own update — visible turns instead of one burst. Skip when the game
+    // already ended (no bot to play, and avoids a redundant finish recording).
+    if (!isOver && meta.bot_ids.length > 0) {
         after(() =>
             advanceBots(
                 admin,

@@ -255,6 +255,8 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
       UMAMI_URL: ${UMAMI_URL}
       UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID}
+      # Bearer token exigé par /api/metrics. Même valeur côté Prometheus.
+      METRICS_TOKEN: ${METRICS_TOKEN}
     ports:
       - "3000:3000"
 
@@ -414,13 +416,23 @@ services:
     # (profil dev, app hors compose) en plus du service `app` conteneurisé.
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    environment:
+      METRICS_TOKEN: ${METRICS_TOKEN}
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.path=/prometheus
-      - --storage.tsdb.retention.time=30d
+    # Prometheus ne lit pas l'env : on matérialise METRICS_TOKEN dans un fichier
+    # au démarrage (référencé par `credentials_file` dans prometheus.yml), puis on
+    # lance le binaire normalement. Source unique : METRICS_TOKEN dans .env.docker.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        printf '%s' "$$METRICS_TOKEN" > /etc/prometheus/token
+        exec /bin/prometheus \
+          --config.file=/etc/prometheus/prometheus.yml \
+          --storage.tsdb.path=/prometheus \
+          --storage.tsdb.retention.time=30d
     ports:
       - ${PROMETHEUS_PORT}:9090
 
