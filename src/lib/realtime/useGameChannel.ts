@@ -39,5 +39,9 @@ export function useGameChannel(
         [gameId, onChange],
     );
 
-    return useRealtimeSync(`game:${gameId}`, build, onChange);
+    // Poll while Realtime is down. Kept *below* the bot move pacing
+    // (BOT_TURN_DELAY_MS, 900ms) so the fallback catches one move per tick
+    // instead of a burst — otherwise three bots resolve between two polls and
+    // the board jumps "three moves at a time". Costs nothing once subscribed.
+    return useRealtimeSync(`game:${gameId}`, build, onChange, 800);
 }

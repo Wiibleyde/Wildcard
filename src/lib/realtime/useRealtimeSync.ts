@@ -44,8 +44,24 @@ export function useRealtimeSync(
     topic: string,
     build: ChannelBuilder,
     onChange: () => void,
+    /**
+     * Fallback poll interval (ms). While the channel is **not** connected —
+     * including an environment where Realtime never establishes at all (the
+     * postgres_changes publication isn't live on the server) — refetch on this
+     * interval so bots, spectators and opponents still see updates. Costs
+     * nothing once subscribed: polling stops the moment the socket connects.
+     */
+    pollMs?: number,
 ): RealtimeStatus {
     const [status, setStatus] = useState<RealtimeStatus>("connecting");
+
+    // Backstop polling while detached: a broken/unauthorised Realtime channel
+    // would otherwise leave the client frozen on its last snapshot.
+    useEffect(() => {
+        if (!pollMs || status === "connected") return;
+        const id = setInterval(onChange, pollMs);
+        return () => clearInterval(id);
+    }, [pollMs, status, onChange]);
 
     useEffect(() => {
         const supabase = createClient();

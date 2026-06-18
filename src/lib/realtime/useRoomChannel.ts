@@ -47,5 +47,7 @@ export function useRoomChannel(
         [roomId, onChange],
     );
 
-    return useRealtimeSync(`room:${roomId}`, build, onChange);
+    // Poll every 3s while Realtime is down so the lobby roster (joins, bots,
+    // spectators, start) still refreshes for everyone.
+    return useRealtimeSync(`room:${roomId}`, build, onChange, 3000);
 }
