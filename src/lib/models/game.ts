@@ -11,6 +11,7 @@ import type {
     RuleViolation,
 } from "@/lib/engine/types";
 import { getGameModule } from "@/lib/games";
+import { recordGameFinished, recordMove } from "@/lib/metrics/registry";
 import type { Database } from "@/lib/supabase/types";
 
 type Admin = SupabaseClient<Database>;
@@ -73,6 +74,7 @@ interface LoadedGame {
         module_id: string;
         version: number;
         bot_ids: string[];
+        created_at: string | null;
     };
     module: AnyGameModule;
     state: GameState;
@@ -84,7 +86,7 @@ async function loadGame(
 ): Promise<{ ok: true; game: LoadedGame } | { ok: false; error: LoadError }> {
     const { data: meta } = await admin
         .from("games")
-        .select("id, room_id, module_id, version, bot_ids")
+        .select("id, room_id, module_id, version, bot_ids, created_at")
         .eq("id", gameId)
         .maybeSingle();
     if (!meta) return { ok: false, error: "not_found" };
@@ -233,6 +235,12 @@ function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Seconds elapsed since a game's `created_at`, or -1 when it is unknown. */
+function durationSeconds(createdAt: string | null): number {
+    if (!createdAt) return -1;
+    return (Date.now() - new Date(createdAt).getTime()) / 1000;
+}
+
 /**
  * Pick the bot that should make the next move, or `null` if a human owns it.
  *
@@ -281,6 +289,7 @@ export async function advanceBots(
     fromState: GameState,
     fromVersion: number,
     botIds: readonly string[],
+    createdAt: string | null = null,
 ): Promise<number> {
     let state = fromState;
     let version = fromVersion;
@@ -345,6 +354,7 @@ export async function advanceBots(
                 .from("rooms")
                 .update({ status: "finished" })
                 .eq("id", roomId);
+            recordGameFinished(module.id, durationSeconds(createdAt));
         }
     }
 
@@ -382,15 +392,25 @@ export async function applyAction(
     expectedVersion: number,
     rawAction: Record<string, unknown>,
 ): Promise<ApplyActionResult> {
+    const startedAt = performance.now();
     const loaded = await loadGame(admin, gameId);
-    if (!loaded.ok) return loaded;
+    if (!loaded.ok) {
+        recordMove("unknown", loaded.error, performance.now() - startedAt);
+        return loaded;
+    }
 
     const { meta, module, state } = loaded.game;
+    // Stamp every exit with its latency + outcome — `wildcard_moves_total` is
+    // the API throughput/error counter, `wildcard_move_duration_ms` the latency.
+    const record = (result: string) =>
+        recordMove(meta.module_id, result, performance.now() - startedAt);
 
     if (meta.version !== expectedVersion) {
+        record("version_conflict");
         return { ok: false, error: "version_conflict" };
     }
     if (typeof rawAction.type !== "string") {
+        record("invalid_action");
         return { ok: false, error: "invalid_action" };
     }
 
@@ -401,6 +421,7 @@ export async function applyAction(
     try {
         result = dispatch(module, state, action, actorId);
     } catch (err) {
+        record("invalid_action");
         return {
             ok: false,
             error: "invalid_action",
@@ -408,6 +429,7 @@ export async function applyAction(
         };
     }
     if (!result.ok) {
+        record("rule_violation");
         return { ok: false, error: "rule_violation", violation: result.error };
     }
 
@@ -434,9 +456,11 @@ export async function applyAction(
         .select("id")
         .maybeSingle();
     if (claimError) {
+        record("db_error");
         return { ok: false, error: "db_error", message: claimError.message };
     }
     if (!claimed) {
+        record("version_conflict");
         return { ok: false, error: "version_conflict" };
     }
 
@@ -457,17 +481,22 @@ export async function applyAction(
         }),
     ]);
     if (stateError) {
+        record("db_error");
         return { ok: false, error: "db_error", message: stateError.message };
     }
     if (logError) {
+        record("db_error");
         return { ok: false, error: "db_error", message: logError.message };
     }
+
+    record("ok");
 
     if (isOver) {
         await admin
             .from("rooms")
             .update({ status: "finished" })
             .eq("id", meta.room_id);
+        recordGameFinished(module.id, durationSeconds(meta.created_at));
     }
 
     // Let any bots now on turn play out AFTER the response: the human's card
@@ -483,6 +512,7 @@ export async function applyAction(
                 newState,
                 newVersion,
                 meta.bot_ids,
+                meta.created_at,
             ),
         );
     }

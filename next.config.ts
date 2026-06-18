@@ -6,6 +6,9 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 const nextConfig: NextConfig = {
     output: "standalone",
     reactCompiler: true,
+    // prom-client probes Node internals (perf_hooks, GC) — keep it external so
+    // the bundler doesn't tree-shake or wrap it; it must run as plain CJS.
+    serverExternalPackages: ["prom-client"],
     images: {
         dangerouslyAllowSVG: true,
         remotePatterns: [

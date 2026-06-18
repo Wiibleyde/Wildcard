@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { createGame } from "@/lib/engine/runner";
 import { type Player, resolveRuleToggles } from "@/lib/engine/types";
 import { getGameModule } from "@/lib/games";
+import { recordGameStarted } from "@/lib/metrics/registry";
 import type { Database } from "@/lib/supabase/types";
 import { advanceBots } from "./game";
 import { usernamesByIds } from "./usernames";
@@ -496,11 +497,12 @@ export async function startGame(
             version: 0,
             bot_ids: botIds,
         })
-        .select("id")
+        .select("id, created_at")
         .single();
     if (gameError || !game) {
         return abort("db_error", gameError?.message);
     }
+    recordGameStarted(room.module_id);
 
     const { error: stateError } = await admin.from("game_states").insert({
         game_id: game.id,
@@ -521,7 +523,16 @@ export async function startGame(
     // response, paced, so every client sees the opening moves animate.
     if (botIds.length > 0) {
         after(() =>
-            advanceBots(admin, game.id, room.id, configured, state, 0, botIds),
+            advanceBots(
+                admin,
+                game.id,
+                room.id,
+                configured,
+                state,
+                0,
+                botIds,
+                game.created_at,
+            ),
         );
     }
 

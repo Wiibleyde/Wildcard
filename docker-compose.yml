@@ -240,17 +240,21 @@ services:
     container_name: wildcard-app
     build:
       context: .
-      args:
-        NEXT_PUBLIC_SUPABASE_URL: ${API_EXTERNAL_URL}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${ANON_KEY}
     restart: unless-stopped
     depends_on:
       kong:
         condition: service_healthy
       auth:
         condition: service_healthy
+    # Config lue au RUNTIME (pas de --build-arg) → une image unique, paramétrée
+    # ici. Les valeurs publiques sont relayées au navigateur via window.__PUBLIC_ENV__.
     environment:
       NODE_ENV: production
+      SUPABASE_URL: ${API_EXTERNAL_URL}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      UMAMI_URL: ${UMAMI_URL}
+      UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID}
     ports:
       - "3000:3000"
 
@@ -359,6 +363,93 @@ services:
     ports:
       - ${STUDIO_PORT}:3000
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # Profil "monitoring" — stack analytics & observabilité (Umami + Prometheus +
+  # Grafana). 100% self-host, RGPD-compliant (Umami cookieless).
+  # Lancer avec : docker compose --env-file .env.docker --profile monitoring up -d
+  # ──────────────────────────────────────────────────────────────────────────
+
+  # Base Postgres dédiée à Umami — isolée de la DB Supabase pour ne pas mélanger
+  # les schémas applicatifs et analytics (et garder l'ownership des données clair).
+  umami-db:
+    profiles: [monitoring]
+    container_name: wildcard-umami-db
+    image: postgres:15-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U umami -d umami"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    environment:
+      POSTGRES_DB: umami
+      POSTGRES_USER: umami
+      POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD}
+    volumes:
+      - umami-db-data:/var/lib/postgresql/data
+
+  # Umami — analytics web cookieless (pages vues, sessions, événements joueurs).
+  umami:
+    profiles: [monitoring]
+    container_name: wildcard-umami
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    restart: unless-stopped
+    depends_on:
+      umami-db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD}@umami-db:5432/umami
+      DATABASE_TYPE: postgresql
+      APP_SECRET: ${UMAMI_APP_SECRET}
+    ports:
+      - ${UMAMI_PORT}:3000
+
+  # Prometheus — scrape les métriques applicatives exposées sur /api/metrics.
+  prometheus:
+    profiles: [monitoring]
+    container_name: wildcard-prometheus
+    image: prom/prometheus:v2.54.1
+    restart: unless-stopped
+    # host.docker.internal → permet de scraper `next dev` lancé sur l'hôte
+    # (profil dev, app hors compose) en plus du service `app` conteneurisé.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+    ports:
+      - ${PROMETHEUS_PORT}:9090
+
+  # Grafana — visualisation unifiée : datasource Prometheus + datasource
+  # PostgreSQL (Umami). Datasources et dashboards provisionnés au démarrage.
+  grafana:
+    profiles: [monitoring]
+    container_name: wildcard-grafana
+    image: grafana/grafana:11.2.0
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+      - umami-db
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # Consommée par la datasource PostgreSQL provisionnée (interpolée par Grafana).
+      UMAMI_DB_PASSWORD: ${UMAMI_DB_PASSWORD}
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - ${GRAFANA_PORT}:3000
+
 volumes:
   db-data:
   storage-data:
+  umami-db-data:
+  prometheus-data:
+  grafana-data:

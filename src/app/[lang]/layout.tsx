@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import "../globals.css";
+import { PublicEnvScript } from "@/components/analytics/PublicEnvScript";
+import { UmamiAnalytics } from "@/components/analytics/UmamiAnalytics";
 import { AppNav } from "@/components/nav/AppNav";
 import { AppShell } from "@/components/nav/AppShell";
 import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
@@ -42,6 +44,8 @@ export default async function RootLayout({
     return (
         <html lang={lang} className={`${nunito.variable} h-full antialiased`}>
             <body className="min-h-screen bg-wc-surface text-wc-text">
+                <PublicEnvScript />
+                <UmamiAnalytics />
                 <NextIntlClientProvider locale={lang} messages={messages}>
                     <ConfirmProvider>
                         <AppShell appNav={<AppNav />}>{children}</AppShell>
