@@ -12,6 +12,7 @@ type Props = {
     initial: string;
     coins: string;
     levelShort: string;
+    canModerate: boolean;
 };
 
 export function SidebarDesktop({
@@ -21,6 +22,7 @@ export function SidebarDesktop({
     initial,
     coins,
     levelShort,
+    canModerate,
 }: Props) {
     return (
         <aside
@@ -72,7 +74,11 @@ export function SidebarDesktop({
 
             {/* ── Nav links ──────────────────────────────────────────────── */}
             <div className="flex-1 overflow-y-auto px-3 py-3">
-                <NavLinks variant="sidebar" shown={true} />
+                <NavLinks
+                    variant="sidebar"
+                    shown={true}
+                    canModerate={canModerate}
+                />
             </div>
 
             {/* ── Bottom section ─────────────────────────────────────────── */}
@@ -141,6 +147,7 @@ export function SidebarDesktop({
                                     sizes="36px"
                                     className="object-cover"
                                     loading="eager"
+                                    unoptimized
                                 />
                             ) : (
                                 <div

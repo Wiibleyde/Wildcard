@@ -1,7 +1,10 @@
+import type { User } from "@supabase/supabase-js";
 import Image from "next/image";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
+import { getUserRole, roleAtLeast } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
+import { publicStorageUrl } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
 import { NavActions } from "./NavActions";
 import { NavLinks } from "./NavLinks";
@@ -14,17 +17,20 @@ function xpLevel(xp: number) {
     return Math.floor(xp / 500) + 1;
 }
 
-export async function AppNav() {
+/**
+ * Authenticated app chrome. `user` is resolved once in the layout and passed in
+ * (the layout decides between this and {@link GuestNav}), so no second
+ * `auth.getUser()` round-trip happens here.
+ */
+export async function AppNav({ user }: { user: User }) {
     const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return null;
 
-    const [profileRes, xpRes] = await Promise.all([
+    const [profileRes, xpRes, role] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", user.id).single(),
         supabase.from("player_xp").select("xp").eq("user_id", user.id).single(),
+        getUserRole(supabase, user.id),
     ]);
+    const canModerate = roleAtLeast(role, "moderator");
 
     const t = await getTranslations("navigation");
     const tProfile = await getTranslations("profile");
@@ -35,8 +41,7 @@ export async function AppNav() {
     const level = xpLevel(xp);
 
     const avatarUrl = profile?.avatar_url
-        ? supabase.storage.from("avatars").getPublicUrl(profile.avatar_url).data
-              .publicUrl
+        ? publicStorageUrl("avatars", profile.avatar_url)
         : null;
 
     const initial = profile?.username?.[0]?.toUpperCase() ?? "?";
@@ -51,6 +56,7 @@ export async function AppNav() {
                 initial={initial}
                 coins={t("coins")}
                 levelShort={tProfile("level_short")}
+                canModerate={canModerate}
             />
 
             {/* ── Mobile top bar ───────────────────────────────────────────── */}
@@ -111,6 +117,7 @@ export async function AppNav() {
                                             sizes="32px"
                                             className="object-cover"
                                             loading="eager"
+                                            unoptimized
                                         />
                                     ) : (
                                         <div
@@ -153,7 +160,7 @@ export async function AppNav() {
                     boxShadow: "0 -4px 20px rgba(0,0,0,0.4)",
                 }}
             >
-                <NavLinks variant="bottom" />
+                <NavLinks variant="bottom" canModerate={canModerate} />
             </nav>
         </>
     );

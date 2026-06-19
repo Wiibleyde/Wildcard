@@ -8,8 +8,10 @@ import { PublicEnvScript } from "@/components/analytics/PublicEnvScript";
 import { UmamiAnalytics } from "@/components/analytics/UmamiAnalytics";
 import { AppNav } from "@/components/nav/AppNav";
 import { AppShell } from "@/components/nav/AppShell";
+import { GuestNav } from "@/components/nav/GuestNav";
 import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 import { routing } from "@/i18n/routing";
+import { createClient } from "@/lib/supabase/server";
 
 const nunito = Nunito({
     variable: "--font-nunito",
@@ -41,6 +43,11 @@ export default async function RootLayout({
 
     const messages = await getMessages();
 
+    const supabase = await createClient();
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+
     return (
         <html lang={lang} className={`${nunito.variable} h-full antialiased`}>
             <body className="min-h-screen bg-wc-surface text-wc-text">
@@ -48,7 +55,14 @@ export default async function RootLayout({
                 <UmamiAnalytics />
                 <NextIntlClientProvider locale={lang} messages={messages}>
                     <ConfirmProvider>
-                        <AppShell appNav={<AppNav />}>{children}</AppShell>
+                        <AppShell
+                            authed={!!user}
+                            appNav={
+                                user ? <AppNav user={user} /> : <GuestNav />
+                            }
+                        >
+                            {children}
+                        </AppShell>
                     </ConfirmProvider>
                 </NextIntlClientProvider>
             </body>

@@ -186,6 +186,62 @@ export type Database = {
                     },
                 ];
             };
+            user_roles: {
+                Row: {
+                    user_id: string;
+                    role: "user" | "moderator" | "admin";
+                    granted_at: string;
+                };
+                Insert: {
+                    user_id: string;
+                    role?: "user" | "moderator" | "admin";
+                    granted_at?: string;
+                };
+                Update: {
+                    user_id?: string;
+                    role?: "user" | "moderator" | "admin";
+                    granted_at?: string;
+                };
+                Relationships: [
+                    {
+                        foreignKeyName: "user_roles_user_id_fkey";
+                        columns: ["user_id"];
+                        referencedRelation: "profiles";
+                        referencedColumns: ["id"];
+                    },
+                ];
+            };
+            app_settings: {
+                Row: {
+                    id: boolean;
+                    maintenance: boolean;
+                    maintenance_message: string | null;
+                    updated_at: string;
+                    updated_by: string | null;
+                };
+                Insert: {
+                    id?: boolean;
+                    maintenance?: boolean;
+                    maintenance_message?: string | null;
+                    updated_at?: string;
+                    updated_by?: string | null;
+                };
+                Update: {
+                    id?: boolean;
+                    maintenance?: boolean;
+                    maintenance_message?: string | null;
+                    updated_at?: string;
+                    updated_by?: string | null;
+                };
+                Relationships: [
+                    {
+                        foreignKeyName: "app_settings_updated_by_fkey";
+                        columns: ["updated_by"];
+                        referencedRelation: "profiles";
+                        referencedColumns: ["id"];
+                    },
+                ];
+            };
             profiles: {
                 Row: {
                     id: string;

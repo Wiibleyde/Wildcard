@@ -6,6 +6,7 @@ import { LinkedAccounts } from "@/components/profile/LinkedAccounts";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { ProfileXPCard } from "@/components/profile/ProfileXPCard";
 import { createClient } from "@/lib/supabase/server";
+import { publicStorageUrl } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -38,8 +39,7 @@ export async function ProfilePage({ lang }: { lang: string }) {
     );
 
     const avatarUrl = profile?.avatar_url
-        ? supabase.storage.from("avatars").getPublicUrl(profile.avatar_url).data
-              .publicUrl
+        ? publicStorageUrl("avatars", profile.avatar_url)
         : null;
 
     return (

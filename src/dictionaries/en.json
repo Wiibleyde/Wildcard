@@ -22,7 +22,8 @@
         "login": "Login",
         "register": "Sign up",
         "logout": "Logout",
-        "profile": "My profile"
+        "profile": "My profile",
+        "admin": "Admin"
     },
     "common": {
         "loading": "Loading...",
@@ -183,6 +184,7 @@
         "game_over": "Game over",
         "you_win": "You win!",
         "winner": "{name} wins!",
+        "game_aborted": "Game ended by an administrator",
         "winners": "Winners",
         "back_to_lobby": "Back to lobby",
         "place_president": "President",
@@ -236,5 +238,35 @@
         "you": "You",
         "rate_limited": "Slow down…",
         "disconnected": "Chat offline — reconnecting…"
+    },
+    "admin": {
+        "title": "Administration",
+        "subtitle": "Monitor live games and manage the platform.",
+        "role_admin": "Administrator",
+        "role_moderator": "Moderator",
+        "ongoing_title": "Live games",
+        "refresh": "Refresh",
+        "no_games": "No games in progress right now.",
+        "phase": "Phase",
+        "players_count": "{count, plural, one {# player} other {# players}}",
+        "bots_count": "{count, plural, one {# bot} other {# bots}}",
+        "current_turn": "Current turn",
+        "watch": "Watch",
+        "end_game": "End",
+        "end_title": "End the game",
+        "end_confirm": "End the “{game}” game? All players will be sent to the game-over screen.",
+        "maintenance_title": "Maintenance",
+        "maintenance_desc": "While maintenance is on, only administrators can access the site.",
+        "maintenance_active": "Maintenance on",
+        "maintenance_inactive": "Service online",
+        "maintenance_message_label": "Message shown to players",
+        "maintenance_message_placeholder": "e.g. Under maintenance, back at 2pm.",
+        "enable": "Enable maintenance",
+        "disable": "Disable",
+        "maintenance_confirm_on": "Enable maintenance? All non-admin players will lose access to the site."
+    },
+    "maintenance": {
+        "title": "Under maintenance",
+        "description": "Wildcard is temporarily unavailable. Check back in a moment!"
     }
 }

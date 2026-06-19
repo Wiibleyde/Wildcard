@@ -145,6 +145,7 @@ export function ProfileForm({
                                     sizes="64px"
                                     className="object-cover"
                                     loading="eager"
+                                    unoptimized
                                 />
                             ) : (
                                 <div

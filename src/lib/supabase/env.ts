@@ -20,6 +20,39 @@ export function getSupabaseEnv(): { url: string; anonKey: string } {
 }
 
 /**
+ * Server-side Supabase base URL — for code that runs **inside** the container
+ * (SSR, route handlers, the proxy, the service-role admin client).
+ *
+ * The public {@link getSupabaseEnv} URL (e.g. `http://localhost:54321`) is the
+ * browser's view: `localhost` is the host that maps Kong's port. Inside the app
+ * container `localhost` is the container itself, so that URL is unreachable
+ * ("ConnectionRefused"). `SUPABASE_INTERNAL_URL` points at the gateway on the
+ * compose network instead (`http://kong:8000`). It falls back to the public URL
+ * for local `next dev`, where `localhost` really is the host running Supabase.
+ */
+export function getServerSupabaseEnv(): { url: string; anonKey: string } {
+    const { url: publicUrl, anonKey } = getSupabaseEnv();
+    const url = process.env.SUPABASE_INTERNAL_URL || publicUrl;
+    return { url, anonKey };
+}
+
+/**
+ * Auth cookie / storage key — must be **byte-identical** across the browser and
+ * every server client. supabase-js derives it from the connection URL host
+ * (`sb-<host>-auth-token`); but the server reaches Supabase through a different
+ * host than the browser (`kong` vs `localhost`, see {@link getServerSupabaseEnv}),
+ * so the defaults would diverge and the PKCE verifier + session would be written
+ * under one name and read under another — login silently fails. We pin it to the
+ * **public** URL host everywhere via `cookieOptions.name`, so dev resolves to
+ * `sb-localhost-auth-token` and prod to `sb-<ref>-auth-token` on both sides.
+ */
+export function getSupabaseStorageKey(): string {
+    const { url } = getSupabaseEnv();
+    const host = new URL(url).hostname.split(".")[0];
+    return `sb-${host}-auth-token`;
+}
+
+/**
  * Returns the server-only service-role key, throwing early if missing.
  *
  * This key bypasses RLS and must never reach the browser — it is read only

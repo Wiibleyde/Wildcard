@@ -250,7 +250,11 @@ services:
     # ici. Les valeurs publiques sont relayées au navigateur via window.__PUBLIC_ENV__.
     environment:
       NODE_ENV: production
+      # SUPABASE_URL = vue navigateur (localhost:54321, port Kong mappé sur l'hôte).
+      # SUPABASE_INTERNAL_URL = vue serveur depuis CE conteneur : localhost y est
+      # le conteneur app, pas Kong → on cible la gateway sur le réseau compose.
       SUPABASE_URL: ${API_EXTERNAL_URL}
+      SUPABASE_INTERNAL_URL: http://kong:8000
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
       UMAMI_URL: ${UMAMI_URL}

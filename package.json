@@ -6,17 +6,23 @@
         "dev": "docker compose --env-file .env.docker --profile studio up -d --scale app=0 && bun run db:migrate && next dev",
         "build": "next build",
         "start": "next start",
+
         "lint": "biome check",
         "format": "biome format --write",
         "test": "vitest run",
         "test:watch": "vitest",
+
         "up": "docker compose --env-file .env.docker up -d && bun run db:migrate",
         "down": "docker compose --env-file .env.docker down",
+        "docker:build": "docker compose --env-file .env.docker build",
+        "docker:up": "docker compose --env-file .env.docker up -d",
+        "docker:down": "docker compose --env-file .env.docker down",
+
         "db:migrate": "bash scripts/db-migrate.sh",
-        "db:reset": "supabase db reset",
+        "db:new-migration": "supabase migration new",
         "db:push": "supabase db push",
-        "db:types": "supabase gen types typescript --local > src/lib/supabase/types.ts",
-        "db:new-migration": "supabase migration new"
+        "db:reset": "supabase db reset",
+        "db:types": "supabase gen types typescript --local > src/lib/supabase/types.ts"
     },
     "dependencies": {
         "@gsap/react": "^2.1.2",
