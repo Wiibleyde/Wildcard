@@ -108,7 +108,7 @@ async function loadGame(
     };
 }
 
-async function playersOf(
+export async function playersOf(
     admin: Admin,
     state: GameState,
 ): Promise<GamePlayer[]> {

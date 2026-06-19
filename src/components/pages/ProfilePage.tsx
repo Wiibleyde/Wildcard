@@ -5,6 +5,7 @@ import { AvatarHero } from "@/components/profile/AvatarHero";
 import { LinkedAccounts } from "@/components/profile/LinkedAccounts";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { ProfileXPCard } from "@/components/profile/ProfileXPCard";
+import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { publicStorageUrl } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
@@ -169,6 +170,35 @@ export async function ProfilePage({ lang }: { lang: string }) {
                         <LinkedAccounts linkedProviders={linkedProviders} />
                     </div>
                 </div>
+
+                {/* ── Match history ─────────────────────────────────────────── */}
+                <Link
+                    href="/profile/history"
+                    className="group rounded-xl p-6 border flex items-center justify-between gap-4 transition-colors"
+                    style={{ background: "#1c1510", borderColor: "#3d2d18" }}
+                >
+                    <div className="min-w-0">
+                        <h2
+                            className="text-xs font-bold uppercase tracking-widest mb-1"
+                            style={{ color: "#7a6a50" }}
+                        >
+                            {t("history")}
+                        </h2>
+                        <p
+                            className="text-sm font-semibold"
+                            style={{ color: "#9a8870" }}
+                        >
+                            {t("history_desc")}
+                        </p>
+                    </div>
+                    <span
+                        className="text-2xl font-black shrink-0 transition-transform group-hover:translate-x-1"
+                        style={{ color: "#f5c516" }}
+                        aria-hidden="true"
+                    >
+                        →
+                    </span>
+                </Link>
             </div>
         </div>
     );

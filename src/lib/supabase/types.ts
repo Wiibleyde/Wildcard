@@ -454,9 +454,58 @@ export type Database = {
                     },
                 ];
             };
+            persistent_replays: {
+                Row: {
+                    user_id: string;
+                    game_id: string;
+                    created_at: string;
+                };
+                Insert: {
+                    user_id: string;
+                    game_id: string;
+                    created_at?: string;
+                };
+                Update: {
+                    user_id?: string;
+                    game_id?: string;
+                    created_at?: string;
+                };
+                Relationships: [
+                    {
+                        foreignKeyName: "persistent_replays_user_id_fkey";
+                        columns: ["user_id"];
+                        referencedRelation: "profiles";
+                        referencedColumns: ["id"];
+                    },
+                    {
+                        foreignKeyName: "persistent_replays_game_id_fkey";
+                        columns: ["game_id"];
+                        referencedRelation: "games";
+                        referencedColumns: ["id"];
+                    },
+                ];
+            };
         };
         Views: Record<string, never>;
-        Functions: Record<string, never>;
+        Functions: {
+            match_history: {
+                Args: {
+                    p_user_id: string;
+                    p_limit?: number;
+                };
+                Returns: {
+                    game_id: string;
+                    module_id: string;
+                    version: number;
+                    created_at: string;
+                    winner_ids: string[];
+                    bot_ids: string[];
+                    players: unknown;
+                    has_moves: boolean;
+                    pinned: boolean;
+                }[];
+            };
+        };
         Enums: Record<string, never>;
     };
 };
