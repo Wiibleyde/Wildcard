@@ -43,20 +43,21 @@ export function readPublicEnvFromProcess(): PublicEnv {
     };
 }
 
+const EMPTY_PUBLIC_ENV: PublicEnv = {
+    SUPABASE_URL: "",
+    SUPABASE_ANON_KEY: "",
+    UMAMI_URL: "",
+    UMAMI_WEBSITE_ID: "",
+};
+
 /**
- * Isomorphic accessor. In the browser it reads the injected
- * `window.__PUBLIC_ENV__`; on the server it reads live `process.env`.
+ * Isomorphic accessor. In the browser it reads `window.__PUBLIC_ENV__`,
+ * published by {@link EnvBootstrap} before any deeper component renders; on the
+ * server it reads live `process.env`.
  */
 export function publicEnv(): PublicEnv {
     if (typeof window !== "undefined") {
-        return (
-            window.__PUBLIC_ENV__ ?? {
-                SUPABASE_URL: "",
-                SUPABASE_ANON_KEY: "",
-                UMAMI_URL: "",
-                UMAMI_WEBSITE_ID: "",
-            }
-        );
+        return window.__PUBLIC_ENV__ ?? EMPTY_PUBLIC_ENV;
     }
     return readPublicEnvFromProcess();
 }
