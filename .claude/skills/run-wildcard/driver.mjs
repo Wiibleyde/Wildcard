@@ -133,6 +133,7 @@ if (mode === "shoot") {
         login: "/fr/login",
         lobby: "/fr/lobby",
         profile: "/fr/profile",
+        history: "/fr/profile/history",
         customize: "/fr/customize",
         preview: "/fr/customize/preview",
         room: `/fr/lobby/${lobbyRoom.code}`,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type BatailleAction, bataille } from "@/lib/games/bataille/bataille";
 import {
+    DEFAULT_PRESIDENT_RULES,
     type PresidentAction,
     president,
 } from "@/lib/games/president/president";
@@ -55,6 +56,51 @@ describe("replay", () => {
         const replayed = replay(president, FOUR, seed, log, state.gameId);
         expect(replayed).toEqual(state);
         expect(president.outcome(replayed)).toEqual(president.outcome(state));
+    });
+
+    // Guards the replay reconstruction (src/lib/models/replay.ts): a game played
+    // under non-default table rules must replay identically when rebuilt from the
+    // base module + the persisted `state.rules`. createGame re-stamps the module
+    // DEFAULT rules, so without grafting the persisted ones a `revolution: false`
+    // game diverges the moment a four-of-a-kind is played.
+    it("re-derives a president round played under non-default rules", () => {
+        const seed = 1248401141;
+        const rules = { ...DEFAULT_PRESIDENT_RULES, revolution: false };
+        const configured = president.withRules?.(rules);
+        if (!configured) throw new Error("president.withRules unavailable");
+
+        const log: PresidentAction[] = [];
+        let state = createGame(configured, FOUR, seed);
+        let guard = 0;
+        while (!configured.isOver(state) && guard++ < 10_000) {
+            const action = configured.legalActions(
+                state,
+                state.currentPlayerId,
+            )[0];
+            const result = dispatch(configured, state, action, action.playerId);
+            if (!result.ok) throw new Error(result.error.code);
+            log.push(action);
+            state = result.state;
+        }
+
+        // Reconstruct the way the replay model does: base module, default-rules
+        // deal, then graft the persisted rules back on before folding the log.
+        let rebuilt = {
+            ...createGame(president, FOUR, seed, state.gameId),
+            rules,
+        };
+        for (const action of log) {
+            const result = dispatch(
+                president,
+                rebuilt,
+                action,
+                action.playerId,
+            );
+            if (!result.ok) throw new Error(result.error.code);
+            rebuilt = result.state;
+        }
+
+        expect(rebuilt).toEqual(state);
     });
 
     it("throws when the log diverges from the rules", () => {

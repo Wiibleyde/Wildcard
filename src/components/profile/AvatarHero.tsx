@@ -12,7 +12,7 @@ export function AvatarHero({ profile, avatarUrl }: Props) {
     const initial = profile.username?.[0]?.toUpperCase() ?? "?";
     return (
         <div
-            className="relative w-20 h-20 rounded-full p-[3px] shrink-0"
+            className="relative w-20 h-20 rounded-full p-0.75 shrink-0"
             style={{
                 background: "linear-gradient(135deg, #f5c516, #e04040)",
                 boxShadow: "0 0 20px rgba(245,197,22,0.25)",
