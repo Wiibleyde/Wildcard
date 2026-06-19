@@ -4,6 +4,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 import { Link } from "@/i18n/navigation";
 import type { MatchHistoryEntry, MatchResult } from "@/lib/models/history";
+import { MAX_PERSISTENT_REPLAYS } from "@/lib/models/persistence";
 
 interface Props {
     entries: readonly MatchHistoryEntry[];
@@ -32,6 +33,64 @@ export function MatchHistoryClient({ entries }: Props) {
     const [game, setGame] = useState("all");
     const [from, setFrom] = useState("");
     const [to, setTo] = useState("");
+
+    // Pinned games survive the 15-day move-retention sweep. Seeded from the
+    // server, then kept in sync as the viewer toggles pins (optimistic, rolled
+    // back on failure). Capped at MAX_PERSISTENT_REPLAYS per account.
+    const [pinned, setPinned] = useState<Set<string>>(
+        () => new Set(entries.filter((e) => e.persistent).map((e) => e.gameId)),
+    );
+    const [busy, setBusy] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const isPinned = (id: string) => pinned.has(id);
+
+    async function togglePin(gameId: string) {
+        if (busy) return;
+        const next = !pinned.has(gameId);
+        if (next && pinned.size >= MAX_PERSISTENT_REPLAYS) {
+            setError(t("cap_reached", { max: MAX_PERSISTENT_REPLAYS }));
+            return;
+        }
+        setBusy(gameId);
+        setError(null);
+        // Optimistic flip.
+        setPinned((prev) => {
+            const copy = new Set(prev);
+            if (next) copy.add(gameId);
+            else copy.delete(gameId);
+            return copy;
+        });
+        try {
+            const res = await fetch(`/api/games/${gameId}/persist`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ persistent: next }),
+            });
+            if (!res.ok) {
+                const body = (await res.json().catch(() => ({}))) as {
+                    error?: string;
+                };
+                throw new Error(body.error ?? "pin_error");
+            }
+        } catch (e) {
+            // Roll back the optimistic flip and surface a message.
+            setPinned((prev) => {
+                const copy = new Set(prev);
+                if (next) copy.delete(gameId);
+                else copy.add(gameId);
+                return copy;
+            });
+            const code = e instanceof Error ? e.message : "pin_error";
+            setError(
+                code === "cap_reached"
+                    ? t("cap_reached", { max: MAX_PERSISTENT_REPLAYS })
+                    : t("pin_error"),
+            );
+        } finally {
+            setBusy(null);
+        }
+    }
 
     // Filter options = only the games the player has actually played.
     const games = useMemo(() => {
@@ -153,6 +212,28 @@ export function MatchHistoryClient({ entries }: Props) {
                 )}
             </div>
 
+            {/* ── Pin counter + error ─────────────────────────────────── */}
+            <div className="flex items-center justify-between gap-3 px-1">
+                <span
+                    className="text-xs font-bold uppercase tracking-widest"
+                    style={{ color: "#7a6a50" }}
+                >
+                    📌{" "}
+                    {t("pin_count", {
+                        n: pinned.size,
+                        max: MAX_PERSISTENT_REPLAYS,
+                    })}
+                </span>
+                {error && (
+                    <span
+                        className="text-xs font-semibold"
+                        style={{ color: "#e04040" }}
+                    >
+                        {error}
+                    </span>
+                )}
+            </div>
+
             {/* ── List ────────────────────────────────────────────────── */}
             {filtered.length === 0 ? (
                 <p
@@ -219,17 +300,77 @@ export function MatchHistoryClient({ entries }: Props) {
                                     </div>
                                 </div>
 
-                                <Link
-                                    href={`/replay/${entry.gameId}`}
-                                    className="shrink-0 self-start sm:self-auto rounded-lg px-4 py-2 font-black text-sm text-center transition-transform active:scale-95"
-                                    style={{
-                                        background: "rgba(245,197,22,0.12)",
-                                        border: "2px solid rgba(245,197,22,0.3)",
-                                        color: "#f5c516",
-                                    }}
-                                >
-                                    {t("replay")}
-                                </Link>
+                                <div className="flex shrink-0 items-center gap-2 self-start sm:self-auto">
+                                    {/* Pin: keep this replay past the 15-day
+                                        sweep. Hidden once the moves are gone —
+                                        nothing left to preserve. */}
+                                    {!entry.expired && (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                togglePin(entry.gameId)
+                                            }
+                                            disabled={busy === entry.gameId}
+                                            title={
+                                                isPinned(entry.gameId)
+                                                    ? t("unpin")
+                                                    : t("pin_hint")
+                                            }
+                                            aria-pressed={isPinned(
+                                                entry.gameId,
+                                            )}
+                                            className="rounded-lg px-3 py-2 font-black text-sm transition-transform active:scale-95 disabled:opacity-50"
+                                            style={
+                                                isPinned(entry.gameId)
+                                                    ? {
+                                                          background:
+                                                              "rgba(245,197,22,0.16)",
+                                                          border: "2px solid rgba(245,197,22,0.5)",
+                                                          color: "#f5c516",
+                                                      }
+                                                    : {
+                                                          background:
+                                                              "rgba(255,255,255,0.04)",
+                                                          border: "2px solid #3d2d18",
+                                                          color: "#9a8870",
+                                                      }
+                                            }
+                                        >
+                                            {isPinned(entry.gameId)
+                                                ? `📌 ${t("pinned")}`
+                                                : `📌 ${t("pin")}`}
+                                        </button>
+                                    )}
+
+                                    {entry.expired ? (
+                                        <span
+                                            aria-disabled="true"
+                                            title={t("replay_expired_hint")}
+                                            className="rounded-lg px-4 py-2 font-black text-sm text-center cursor-not-allowed opacity-50"
+                                            style={{
+                                                background:
+                                                    "rgba(255,255,255,0.04)",
+                                                border: "2px solid #3d2d18",
+                                                color: "#7a6a50",
+                                            }}
+                                        >
+                                            {t("replay_expired")}
+                                        </span>
+                                    ) : (
+                                        <Link
+                                            href={`/replay/${entry.gameId}`}
+                                            className="rounded-lg px-4 py-2 font-black text-sm text-center transition-transform active:scale-95"
+                                            style={{
+                                                background:
+                                                    "rgba(245,197,22,0.12)",
+                                                border: "2px solid rgba(245,197,22,0.3)",
+                                                color: "#f5c516",
+                                            }}
+                                        >
+                                            {t("replay")}
+                                        </Link>
+                                    )}
+                                </div>
                             </li>
                         );
                     })}

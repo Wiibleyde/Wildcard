@@ -29,6 +29,14 @@ export interface MatchHistoryEntry {
     readonly result: MatchResult;
     /** Every seat, in seating order. */
     readonly players: readonly MatchPlayer[];
+    /**
+     * True once the move log has been pruned by the 15-day sweep — the durable
+     * result survives, but there is nothing left to replay (button disabled).
+     * Mirrors `ReplayPayload.expired` so the list and the replay page agree.
+     */
+    readonly expired: boolean;
+    /** True when the viewer has pinned this game to keep its replay forever. */
+    readonly persistent: boolean;
 }
 
 /** Cap on how many finished games we load — most recent first. */
@@ -37,51 +45,38 @@ const HISTORY_LIMIT = 100;
 /**
  * A player's match history: every finished game they sat in, newest first.
  *
+ * Backed by the `match_history(user, limit)` SQL function (one indexed query)
+ * rather than a fan-out of reads. It joins `games` + `game_states`, filters to
+ * the viewer's finished games, orders by date and caps at `p_limit` in the
+ * database, and folds replay-availability (`has_moves`) and pin status
+ * (`pinned`) per row — so we never stream every move row to Node or build an
+ * unbounded `IN` list.
+ *
  * Participation is read from the authoritative engine state, not from
  * `room_players` — that seat is deleted when a player leaves the room, so it
  * cannot reconstruct who played a past game. `game_states.state.players` is
  * stamped at deal time and never mutated, so it survives the player leaving and
- * even the room being reused. The lookup is a jsonb containment match
- * (`state @> {players:[{id}]}`); a GIN index on `state` would make it indexed,
- * but at our scale a scan over finished games is fine.
+ * even the room being reused.
  *
- * Must run with the service-role `admin` client: `game_states` is the secret
- * full state (RLS denies every client key). We only ever read the public-safe
- * `players` projection out of it here — never hand raw state to a client.
+ * Must run with the service-role `admin` client: the function is SECURITY
+ * DEFINER (it reads the RLS-denied secret state) and its EXECUTE is revoked from
+ * every client role, so only the server may ask for a given user's history. We
+ * only ever surface the public-safe `players` projection out of it here.
  */
 export async function getMatchHistory(
     admin: Admin,
     userId: string,
 ): Promise<MatchHistoryEntry[]> {
-    // 1. Games whose seated players include the viewer (durable participation).
-    const { data: states } = await admin
-        .from("game_states")
-        .select("game_id, players:state->players")
-        .contains("state", { players: [{ id: userId }] });
-    if (!states || states.length === 0) return [];
+    const { data } = await admin.rpc("match_history", {
+        p_user_id: userId,
+        p_limit: HISTORY_LIMIT,
+    });
+    if (!data || data.length === 0) return [];
 
-    const playersByGame = new Map<string, Player[]>();
-    for (const row of states) {
-        playersByGame.set(
-            row.game_id,
-            (row.players ?? []) as unknown as Player[],
-        );
-    }
-
-    // 2. Public meta for those games — only the finished ones, newest first.
-    const { data: metas } = await admin
-        .from("games")
-        .select("id, module_id, winner_ids, bot_ids, created_at")
-        .in("id", [...playersByGame.keys()])
-        .eq("is_over", true)
-        .order("created_at", { ascending: false })
-        .limit(HISTORY_LIMIT);
-    if (!metas || metas.length === 0) return [];
-
-    return metas.map((meta) => {
-        const winners = new Set(meta.winner_ids);
-        const bots = new Set(meta.bot_ids);
-        const seats = [...(playersByGame.get(meta.id) ?? [])].sort(
+    return data.map((row) => {
+        const winners = new Set(row.winner_ids);
+        const bots = new Set(row.bot_ids);
+        const seats = [...((row.players ?? []) as unknown as Player[])].sort(
             (a, b) => a.seat - b.seat,
         );
 
@@ -93,11 +88,15 @@ export async function getMatchHistory(
               : "none";
 
         return {
-            gameId: meta.id,
-            moduleId: meta.module_id,
-            moduleName: getGameModule(meta.module_id)?.name ?? meta.module_id,
-            playedAt: meta.created_at,
+            gameId: row.game_id,
+            moduleId: row.module_id,
+            moduleName: getGameModule(row.module_id)?.name ?? row.module_id,
+            playedAt: row.created_at,
             result,
+            // Mirrors getReplay's rule: a finished game that bumped its version
+            // but has no surviving moves was pruned by the 15-day sweep.
+            expired: row.version > 0 && !row.has_moves,
+            persistent: row.pinned,
             players: seats.map((p) => ({
                 id: p.id,
                 name: p.name,

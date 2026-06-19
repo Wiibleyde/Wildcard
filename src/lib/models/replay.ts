@@ -79,10 +79,16 @@ export async function getReplay(
     const module = getGameModule(meta.module_id);
     if (!module) return { ok: false, error: "unknown_game" };
 
-    // Only seated players see their own hand replayed; everyone else spectates.
+    // A replay is private to its participants: only someone who actually sat in
+    // the game may open it. We answer `not_found` (not a distinct `forbidden`)
+    // so the endpoint never confirms a game id exists to an outsider — replay
+    // ids are unguessable UUIDs and stay that way. The viewer is therefore
+    // always a seated player here, and sees their own hand redacted in by
+    // `view()`.
     const isPlayer =
         viewerId !== null && finalState.players.some((p) => p.id === viewerId);
-    const viewer = isPlayer ? viewerId : null;
+    if (!isPlayer) return { ok: false, error: "not_found" };
+    const viewer = viewerId;
 
     // Whole action log, oldest first — this drives the re-derivation.
     const { data: rows } = await admin
@@ -140,6 +146,11 @@ export async function getReplay(
 
     const players = await playersOf(admin, finalState);
 
+    // A finished game that bumped its version but has no surviving moves had its
+    // log pruned by retention (vs. one that never got a move). Computed once so
+    // the two flags stay mutually exclusive below.
+    const expired = meta.is_over && meta.version > 0 && actions.length === 0;
+
     return {
         ok: true,
         payload: {
@@ -148,10 +159,12 @@ export async function getReplay(
             viewerId: viewer,
             players,
             steps,
-            adminEnded: meta.is_over && !module.isOver(state),
-            // A finished game that bumped its version but has no surviving moves
-            // had its log pruned by retention (vs. one that never got a move).
-            expired: meta.is_over && meta.version > 0 && actions.length === 0,
+            // An admin force-ended the game (DB says over, but the re-derived
+            // state isn't terminal). Excludes the expired case, where state is
+            // stuck at the deal only because the log is gone, not because it was
+            // cut short.
+            adminEnded: meta.is_over && !expired && !module.isOver(state),
+            expired,
         },
     };
 }

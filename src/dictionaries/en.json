@@ -110,7 +110,16 @@
         "result_none": "Finished",
         "vs": "vs",
         "bot": "bot",
-        "replay": "Review"
+        "replay": "Review",
+        "replay_expired": "Replay expired",
+        "replay_expired_hint": "Moves are kept for 15 days only, unless the game is pinned.",
+        "pin": "Pin",
+        "pinned": "Pinned",
+        "unpin": "Unpin",
+        "pin_hint": "Keep this replay beyond 15 days",
+        "pin_count": "{n} / {max} games pinned",
+        "cap_reached": "Pinned games limit reached ({max}).",
+        "pin_error": "Couldn't update, try again."
     },
     "replay": {
         "back": "History",
