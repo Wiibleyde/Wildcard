@@ -5,8 +5,8 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { CheckIcon, UploadIcon } from "@/components/profile/AvatarIcons";
 import { GameButton } from "@/components/ui/GameButton";
+import { useAvatarUpload } from "@/hooks/profile/useAvatarUpload";
 import { useApiMutation } from "@/hooks/useApiMutation";
-import { useAvatarUpload } from "@/hooks/useAvatarUpload";
 import type { ProfilePatch, ProfilePatchErrorCode } from "@/lib/models/profile";
 import { GOLD_GRADIENT, GOLD_RED_GRADIENT } from "@/lib/ui/brand";
 

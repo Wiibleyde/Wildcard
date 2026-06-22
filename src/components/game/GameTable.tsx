@@ -3,8 +3,8 @@
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { Card } from "@/components/card/Card";
-import { useTableCardAnimations } from "@/hooks/useTableCardAnimations";
-import { CLONE_OFFSET, useTableDrag } from "@/hooks/useTableDrag";
+import { useTableCardAnimations } from "@/hooks/game/useTableCardAnimations";
+import { CLONE_OFFSET, useTableDrag } from "@/hooks/game/useTableDrag";
 import { buildSurfaceStyle } from "@/lib/board/styles";
 import type { BoardTheme } from "@/lib/board/types";
 import { getCardTheme } from "@/lib/card/themes";

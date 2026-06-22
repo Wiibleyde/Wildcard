@@ -1,8 +1,8 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { useFilteredHistory } from "@/hooks/useFilteredHistory";
-import { useGamePinning } from "@/hooks/useGamePinning";
+import { useFilteredHistory } from "@/hooks/profile/useFilteredHistory";
+import { useGamePinning } from "@/hooks/profile/useGamePinning";
 import type { MatchHistoryEntry } from "@/lib/models/history";
 import { MAX_PERSISTENT_REPLAYS } from "@/lib/models/persistence";
 import { MatchHistoryItem } from "./MatchHistoryItem";

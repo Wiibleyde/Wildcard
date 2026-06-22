@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { BOUNDED_MQ, useBoundedMeasure } from "@/hooks/useBoundedMeasure";
+import { BOUNDED_MQ, useBoundedMeasure } from "@/hooks/game/useBoundedMeasure";
 import { CARD_WIDTH_CLASS } from "@/lib/card/sizes";
 import { type TableZoneProps, ZoneCard } from "../TableZone";
 

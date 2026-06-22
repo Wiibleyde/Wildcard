@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { ReconnectingBanner } from "@/components/realtime/ReconnectingBanner";
-import { useRoomRefresh } from "@/hooks/useRoomRefresh";
+import { useRoomRefresh } from "@/hooks/lobby/useRoomRefresh";
 import { useRouter } from "@/i18n/navigation";
 import { type GameRuleToggle, resolveRuleToggles } from "@/lib/engine/types";
 import { RoomActions } from "./room/RoomActions";

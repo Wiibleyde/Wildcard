@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useXPBarAnimation } from "@/hooks/useXPBarAnimation";
+import { useXPBarAnimation } from "@/hooks/profile/useXPBarAnimation";
 
 const XP_PER_LEVEL = 500;
 

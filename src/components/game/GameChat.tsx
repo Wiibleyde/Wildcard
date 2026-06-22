@@ -2,8 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import { type SyntheticEvent, useState } from "react";
-import { useAutoScroll } from "@/hooks/useAutoScroll";
-import { useTransientNotice } from "@/hooks/useTransientNotice";
+import { useAutoScroll } from "@/hooks/game/useAutoScroll";
+import { useTransientNotice } from "@/hooks/game/useTransientNotice";
 import { buildSurfaceStyle } from "@/lib/board/styles";
 import type { BoardTheme } from "@/lib/board/types";
 import type { GamePlayer } from "@/lib/models/game";

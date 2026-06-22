@@ -3,7 +3,7 @@
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { Card } from "@/components/card/Card";
 import { BoardPill } from "@/components/ui/BoardPill";
-import type { DragState } from "@/hooks/useTableDrag";
+import type { DragState } from "@/hooks/game/useTableDrag";
 import { buildZoneStyle } from "@/lib/board/styles";
 import type { BoardTheme } from "@/lib/board/types";
 import { CARD_WIDTH_CLASS, type CardSize } from "@/lib/card/sizes";

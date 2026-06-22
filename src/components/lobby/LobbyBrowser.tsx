@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { GameButton } from "@/components/ui/GameButton";
-import { useRoomAction } from "@/hooks/useRoomAction";
+import { useRoomAction } from "@/hooks/lobby/useRoomAction";
 import type { GameCatalogEntry } from "@/lib/games";
 
 export interface OpenRoom {

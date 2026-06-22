@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useOAuthLinking } from "@/hooks/useOAuthLinking";
+import { useOAuthLinking } from "@/hooks/profile/useOAuthLinking";
 import type { OAuthProvider } from "@/lib/supabase/auth";
 
 const PROVIDERS: {

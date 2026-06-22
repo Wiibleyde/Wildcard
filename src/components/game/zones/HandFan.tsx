@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/card/Card";
 import { GameButton } from "@/components/ui/GameButton";
-import { BOUNDED_MQ, useBoundedMeasure } from "@/hooks/useBoundedMeasure";
+import { BOUNDED_MQ, useBoundedMeasure } from "@/hooks/game/useBoundedMeasure";
 import { CARD_WIDTH_CLASS } from "@/lib/card/sizes";
 import type { TableCardItem } from "@/lib/games/table/types";
 import { CARD_PX_ESTIMATE, type TableZoneProps } from "../TableZone";

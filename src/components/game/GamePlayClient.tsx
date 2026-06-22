@@ -7,7 +7,7 @@ import { GameTable } from "@/components/game/GameTable";
 import { ReconnectingBanner } from "@/components/realtime/ReconnectingBanner";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { GameButton } from "@/components/ui/GameButton";
-import { useTransientNotice } from "@/hooks/useTransientNotice";
+import { useTransientNotice } from "@/hooks/game/useTransientNotice";
 import { useRouter } from "@/i18n/navigation";
 import { BOARD_THEMES } from "@/lib/board/themes";
 import { greenFeltTheme } from "@/lib/board/themes/green_felt";

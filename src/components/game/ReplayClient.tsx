@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { useMemo } from "react";
 import { GameTable } from "@/components/game/GameTable";
 import { GameButton } from "@/components/ui/GameButton";
-import { useReplayPlayback } from "@/hooks/useReplayPlayback";
+import { useReplayPlayback } from "@/hooks/game/useReplayPlayback";
 import { Link } from "@/i18n/navigation";
 import { BOARD_THEMES } from "@/lib/board/themes";
 import { greenFeltTheme } from "@/lib/board/themes/green_felt";
