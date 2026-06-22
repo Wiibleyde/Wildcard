@@ -75,8 +75,11 @@ function checkTableData(
         }
     }
 
-    // Every control must dispatch one of the viewer's legal actions.
+    // Every enabled control must dispatch one of the viewer's legal actions.
+    // Disabled controls (e.g. the off-turn pass kept as a stable bar) carry a
+    // placeholder action that is never dispatched, so they're exempt.
     for (const control of data.controls ?? []) {
+        if (control.disabled) continue;
         expect(legalActions).toContain(control.action);
     }
 
