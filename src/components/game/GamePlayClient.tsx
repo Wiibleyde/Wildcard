@@ -149,14 +149,14 @@ export function GamePlayClient({
     return (
         <div className="flex flex-col gap-2">
             <ReconnectingBanner status={conn} />
-            <div className="mx-auto flex w-full max-w-3xl justify-end xl:max-w-5xl 2xl:max-w-7xl">
+            <div className="mx-auto flex w-full max-w-3xl justify-end lg:max-w-none">
                 <GameButton variant="ghost" size="sm" onClick={leave}>
                     {t("leave")}
                 </GameButton>
             </div>
             {actionError && (
                 <div
-                    className="mx-auto w-full max-w-3xl rounded-xl px-4 py-2 text-center text-sm font-bold xl:max-w-5xl 2xl:max-w-7xl"
+                    className="mx-auto w-full max-w-3xl rounded-xl px-4 py-2 text-center text-sm font-bold lg:max-w-none"
                     style={{
                         background: "rgba(224,64,64,0.12)",
                         color: "#e04040",

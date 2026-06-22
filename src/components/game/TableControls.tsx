@@ -45,7 +45,7 @@ export function TableControls({
                     key={control.key}
                     size="sm"
                     variant={BUTTON_VARIANT[control.variant ?? "primary"]}
-                    disabled={pending}
+                    disabled={pending || control.disabled}
                     onClick={() => onAction(control.action)}
                     className="xl:text-sm"
                 >

@@ -179,11 +179,13 @@ export function GameTable({
             templates.get(z.zone)?.fill,
     );
     const centerClass = centerFills
-        ? "flex w-full items-start justify-center gap-1 sm:gap-2 xl:gap-3"
+        ? "flex w-full items-start justify-center gap-1 sm:gap-2 xl:gap-3 lg:min-h-0 lg:flex-1"
         : "flex flex-wrap items-start justify-center gap-4 sm:gap-6 xl:gap-10";
 
+    const hasHand = bottom.length > 0;
+
     return (
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 xl:max-w-5xl 2xl:max-w-7xl">
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 lg:max-w-none">
             <TurnBanner
                 label={data.banner.label}
                 highlight={data.banner.highlight}
@@ -192,24 +194,31 @@ export function GameTable({
             <div className="flex flex-col gap-3 lg:flex-row">
                 <div
                     ref={rootRef}
-                    className="relative flex min-h-[60vh] flex-1 flex-col gap-3 overflow-hidden rounded-2xl p-3 sm:gap-4 sm:p-4 lg:h-[70vh] lg:min-h-0 xl:p-6"
+                    className="relative flex min-h-[60vh] flex-1 flex-col gap-3 overflow-hidden rounded-2xl p-3 sm:gap-4 sm:p-4 lg:h-[78vh] lg:min-h-0 xl:p-6"
                     style={buildSurfaceStyle(boardTheme)}
                 >
                     {data.seats && (
-                        <TableSeats
-                            seats={data.seats}
-                            boardTheme={boardTheme}
-                            deckStyleOf={(playerId) => styleOf.get(playerId)}
-                        />
+                        <div className="shrink-0">
+                            <TableSeats
+                                seats={data.seats}
+                                boardTheme={boardTheme}
+                                deckStyleOf={(playerId) =>
+                                    styleOf.get(playerId)
+                                }
+                            />
+                        </div>
                     )}
 
                     {top.length > 0 && (
-                        <div className="flex flex-wrap items-start justify-center gap-3 sm:gap-4 xl:gap-6">
+                        <div className="flex shrink-0 flex-wrap items-start justify-center gap-3 sm:gap-4 xl:gap-6">
                             {top}
                         </div>
                     )}
 
-                    <div className="flex flex-1 flex-col items-center justify-center gap-3">
+                    <div
+                        data-center-region
+                        className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 lg:flex-4"
+                    >
                         <div className={centerClass}>{center}</div>
                         {data.status && (
                             <span
@@ -221,9 +230,17 @@ export function GameTable({
                         )}
                     </div>
 
-                    {(bottom.length > 0 || controls.length > 0) && (
-                        <div className="flex w-full flex-col items-center gap-3">
-                            {bottom}
+                    {(hasHand || controls.length > 0) && (
+                        <div
+                            className={`flex w-full shrink-0 flex-col items-center gap-2 sm:gap-3 ${
+                                hasHand ? "lg:min-h-0 lg:flex-5" : ""
+                            }`}
+                        >
+                            {hasHand && (
+                                <div className="flex w-full items-end justify-center lg:min-h-0 lg:flex-1 lg:items-stretch">
+                                    {bottom}
+                                </div>
+                            )}
                             <TableControls
                                 controls={controls}
                                 deckTheme={deckTheme}
@@ -250,7 +267,7 @@ export function GameTable({
                 </div>
 
                 {(logLines || chat) && (
-                    <div className="flex flex-col gap-3 lg:h-[70vh] lg:self-start">
+                    <div className="flex flex-col gap-3 lg:h-[78vh] lg:self-start">
                         {logLines && (
                             <GameLog
                                 title={t("log_title")}
@@ -268,7 +285,7 @@ export function GameTable({
                 overflow never clips it) and inert to hit-testing. */}
             {dragging && (
                 <div
-                    className="pointer-events-none fixed z-[9999]"
+                    className="pointer-events-none fixed z-9999"
                     style={{ left: dragging.x, top: dragging.y }}
                 >
                     {dragging.stack.map((s, i) => (

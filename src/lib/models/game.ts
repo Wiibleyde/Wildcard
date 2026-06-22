@@ -76,6 +76,7 @@ interface LoadedGame {
         is_over: boolean;
         bot_ids: string[];
         created_at: string | null;
+        updated_at: string;
     };
     module: AnyGameModule;
     state: GameState;
@@ -87,7 +88,9 @@ async function loadGame(
 ): Promise<{ ok: true; game: LoadedGame } | { ok: false; error: LoadError }> {
     const { data: meta } = await admin
         .from("games")
-        .select("id, room_id, module_id, version, is_over, bot_ids, created_at")
+        .select(
+            "id, room_id, module_id, version, is_over, bot_ids, created_at, updated_at",
+        )
         .eq("id", gameId)
         .maybeSingle();
     if (!meta) return { ok: false, error: "not_found" };
@@ -156,6 +159,12 @@ export async function getGameClientState(
 > {
     const loaded = await loadGame(admin, gameId);
     if (!loaded.ok) return loaded;
+
+    // Self-heal a stranded bot chain: the bot loop is an in-process `after()`
+    // task that a dropped/killed invocation or restart can lose mid-turn,
+    // leaving a bot on turn with nothing to drive it. Every viewer read (page
+    // load + the ~800ms poll) re-kicks it once it has clearly stalled.
+    maybeResumeBots(admin, loaded.game);
 
     const { meta, module, state } = loaded.game;
     const isPlayer =
@@ -268,6 +277,45 @@ function nextBotMover(
     if (actors.length === 0) return null;
     if (!actors.every((p) => botSet.has(p.id))) return null;
     return actors[0].id;
+}
+
+/** A bot on turn whose game has sat untouched for this long is treated as a
+ * stranded chain and re-kicked. Comfortably above one paced bot move
+ * ({@link BOT_TURN_DELAY_MS}) so a healthy, still-running chain is never
+ * double-driven into the same turn. */
+const STALL_RESUME_MS = 3000;
+
+/**
+ * Re-launch the bot chain when it has died mid-turn. The bot loop is an
+ * in-process `after()` task; a dropped/killed serverless invocation or a server
+ * restart can lose it, stranding a bot on turn with nothing to drive it (the
+ * game sits at `is_over = false` waiting on a player who will never move).
+ *
+ * Safe to call on every viewer read: it no-ops unless a bot genuinely owns the
+ * turn and the game has been untouched past {@link STALL_RESUME_MS}, and
+ * `advanceBots`'s per-step compare-and-set means racing kicks from several
+ * concurrent reads collapse to a single live chain.
+ */
+function maybeResumeBots(admin: Admin, game: LoadedGame): void {
+    const { meta, module, state } = game;
+    if (meta.is_over || meta.bot_ids.length === 0 || module.isOver(state))
+        return;
+    // Nobody (or a human) owns the turn → nothing to resume.
+    if (nextBotMover(module, state, new Set(meta.bot_ids)) === null) return;
+    const idleMs = Date.now() - new Date(meta.updated_at).getTime();
+    if (idleMs < STALL_RESUME_MS) return; // a live chain is still pacing moves
+    after(() =>
+        advanceBots(
+            admin,
+            meta.id,
+            meta.room_id,
+            module,
+            state,
+            meta.version,
+            meta.bot_ids,
+            meta.created_at,
+        ),
+    );
 }
 
 /**

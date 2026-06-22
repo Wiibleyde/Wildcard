@@ -43,7 +43,7 @@ export default async function Page({
 
     return (
         <div
-            className="min-h-screen px-4 xl:px-10 pt-6 pb-16"
+            className="min-h-screen px-4 xl:px-10 pt-6 pb-6"
             style={{ background: "#0d0a05" }}
         >
             <GamePlayClient

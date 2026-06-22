@@ -194,17 +194,18 @@ export const presidentTable = registerTable<PresidentView>({
 
         // Pass stays: the verb you need when you can't or won't beat the trick,
         // not a card to lay. Combos are built by tapping the hand, not proposed.
+        // It is shown to every seated player on every turn and simply greyed out
+        // when it isn't theirs to use — a stable bar, no appearing/disappearing.
         const controls: TableControl[] = [];
-        if (isYourTurn) {
+        if (self) {
             const pass = legal.find((a) => a.type === "pass");
-            if (pass) {
-                controls.push({
-                    key: "pass",
-                    label: ctx.t("pass"),
-                    action: pass,
-                    variant: "danger",
-                });
-            }
+            controls.push({
+                key: "pass",
+                label: ctx.t("pass"),
+                action: pass ?? { type: "pass", playerId: ctx.viewerId ?? "" },
+                variant: "danger",
+                disabled: !isYourTurn || !pass,
+            });
         }
 
         return {
