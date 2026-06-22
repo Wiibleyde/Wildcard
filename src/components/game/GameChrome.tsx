@@ -5,7 +5,6 @@ import { GameButton } from "@/components/ui/GameButton";
 import type { GameOutcome } from "@/lib/engine/types";
 import type { GamePlayer } from "@/lib/models/game";
 
-/** Resolve a player's display name from the seat list, falling back to id. */
 export function nameOf(
     players: readonly GamePlayer[],
     userId: string | null,
@@ -14,7 +13,6 @@ export function nameOf(
     return players.find((p) => p.userId === userId)?.username ?? "?";
 }
 
-/** Banner above the board: whose turn it is, or a spectator notice. */
 export function TurnBanner({
     label,
     highlight,
@@ -38,7 +36,6 @@ export function TurnBanner({
     );
 }
 
-/** Full-board overlay shown once `isOver`, with final standings. */
 export function GameOverOverlay({
     outcome,
     players,
@@ -48,7 +45,6 @@ export function GameOverOverlay({
     outcome: GameOutcome | null;
     players: readonly GamePlayer[];
     currentUserId: string;
-    /** Game-specific rank title (Président, Vice-Président…); `null` ⇒ none. */
     titleOf?: (rank: number, total: number) => string | null;
 }) {
     const t = useTranslations("game");

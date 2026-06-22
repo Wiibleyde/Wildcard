@@ -4,10 +4,8 @@ import { useTranslations } from "next-intl";
 import type { RealtimeStatus } from "@/lib/realtime/useRealtimeSync";
 
 /**
- * Thin "you may be out of sync" notice driven by a Realtime channel's health.
  * Renders only while reconnecting after a drop — the first `connecting` join is
- * silent to avoid a banner flashing on every page load. Once the socket
- * re-`SUBSCRIBED`s, the hook resyncs state and this disappears.
+ * silent to avoid a banner flashing on every page load.
  */
 export function ReconnectingBanner({ status }: { status: RealtimeStatus }) {
     const t = useTranslations("realtime");

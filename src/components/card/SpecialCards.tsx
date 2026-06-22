@@ -1,5 +1,5 @@
 import type { CardTheme, JokerVariant } from "@/lib/card/types";
-import { ArtworkFill, CardBody, CenteredArtwork } from "./CardBody";
+import { ArtworkFill, CardBody, CenterBox, CenteredArtwork } from "./CardBody";
 import { Corner } from "./Corner";
 
 export function FoolContent({ theme }: { theme: CardTheme }) {
@@ -22,12 +22,11 @@ export function FoolContent({ theme }: { theme: CardTheme }) {
                             color={color}
                         />
                     ) : (
-                        <div
-                            className="w-full h-full flex items-center justify-center"
+                        <CenterBox
                             style={{ fontSize: "46cqi", color, lineHeight: 1 }}
                         >
                             ★
-                        </div>
+                        </CenterBox>
                     )}
                 </CardBody>
             )}
@@ -65,12 +64,11 @@ export function JokerContent({
                             color={color}
                         />
                     ) : (
-                        <div
-                            className="w-full h-full flex items-center justify-center"
+                        <CenterBox
                             style={{ fontSize: "46cqi", color, lineHeight: 1 }}
                         >
                             ★
-                        </div>
+                        </CenterBox>
                     )}
                 </CardBody>
             )}

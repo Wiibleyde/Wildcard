@@ -13,7 +13,6 @@ import { CARD_WIDTH_CLASS, HAND_OVERLAP_CLASS } from "@/lib/card/sizes";
 import { getCardTheme } from "@/lib/card/themes";
 import { FACE_DOWN_CARD } from "@/lib/card/utils";
 
-/** Face-down cards drawn for each opponent — purely decorative. */
 const OPPONENT_HAND_SLOTS = ["c1", "c2", "c3", "c4", "c5"] as const;
 
 function OpponentSeat({
@@ -26,7 +25,6 @@ function OpponentSeat({
     return (
         <div className="flex flex-col items-center gap-1">
             <BoardPill theme={theme}>{player.username}</BoardPill>
-            {/* Opponent hand — face-down backs in THAT player's deck style */}
             <div className="flex">
                 {OPPONENT_HAND_SLOTS.map((slot) => (
                     <div
@@ -74,7 +72,6 @@ export function GameBoard({
             className="relative flex h-full w-full flex-col overflow-hidden rounded-2xl"
             style={buildSurfaceStyle(theme)}
         >
-            {/* Opponents row */}
             <div className="flex flex-wrap items-start justify-around gap-x-4 gap-y-2 px-3 pt-3 sm:px-6 sm:pt-4">
                 {opponents.map((player) => (
                     <OpponentSeat
@@ -85,7 +82,6 @@ export function GameBoard({
                 ))}
             </div>
 
-            {/* Center play area */}
             <div className="flex flex-1 items-center justify-center px-3 py-3 sm:px-8 sm:py-4">
                 <div
                     className="flex min-h-36 w-full max-w-xl items-center justify-center rounded-xl backdrop-blur-sm sm:min-h-44 lg:max-w-2xl xl:min-h-52 xl:max-w-3xl 2xl:min-h-60 2xl:max-w-5xl"
@@ -101,7 +97,6 @@ export function GameBoard({
                 </div>
             </div>
 
-            {/* Current player hand */}
             <div className="flex flex-col items-center gap-2 px-2 pb-3 sm:px-6 sm:pb-4">
                 {currentPlayer && (
                     <BoardPill theme={theme}>

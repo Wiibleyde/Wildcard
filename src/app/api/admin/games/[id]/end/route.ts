@@ -3,11 +3,8 @@ import { requireRole } from "@/lib/api/auth";
 import { APPLY_ERROR_STATUS, endGame } from "@/lib/models/game";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-/**
- * Admin-only: force-end a live game. The dashboard is reachable by moderators
- * too, but only admins may abort a game, so the role is re-checked server-side
- * (defense in depth) before the service-role write.
- */
+// Force-end a live game. Dashboard is moderator-reachable, but only admins may abort, so the role is
+// re-checked server-side (defense in depth) before the service-role write.
 export async function POST(
     _request: Request,
     ctx: { params: Promise<{ id: string }> },

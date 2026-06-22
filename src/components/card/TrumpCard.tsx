@@ -1,5 +1,5 @@
 import type { CardTheme, TrumpIndex } from "@/lib/card/types";
-import { ArtworkFill, CardBody, CenteredArtwork } from "./CardBody";
+import { ArtworkFill, CardBody, CenterBox, CenteredArtwork } from "./CardBody";
 import { Corner } from "./Corner";
 
 const ROMAN: Record<TrumpIndex, string> = {
@@ -52,10 +52,7 @@ export function TrumpContent({
                             color={color}
                         />
                     ) : (
-                        <div
-                            className="w-full h-full flex flex-col items-center justify-center"
-                            style={{ color, gap: "4%" }}
-                        >
+                        <CenterBox col style={{ color, gap: "4%" }}>
                             <span
                                 style={{
                                     fontSize: "38cqi",
@@ -74,7 +71,7 @@ export function TrumpContent({
                             >
                                 {ROMAN[index]}
                             </span>
-                        </div>
+                        </CenterBox>
                     )}
                 </CardBody>
             )}

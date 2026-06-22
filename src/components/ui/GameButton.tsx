@@ -1,7 +1,5 @@
 import { Link } from "@/i18n/navigation";
 
-// ── Variants ────────────────────────────────────────────────────────────────
-
 export type GameButtonVariant = "gold" | "green" | "red" | "purple" | "ghost";
 export type GameButtonSize = "sm" | "md" | "lg";
 
@@ -36,8 +34,6 @@ const SIZES: Record<GameButtonSize, SizeConfig> = {
     lg: { cls: "py-4   px-8  text-lg  rounded-xl  font-black", depth: "5px" },
 };
 
-// ── Props ───────────────────────────────────────────────────────────────────
-
 type BaseProps = {
     variant?: GameButtonVariant;
     size?: GameButtonSize;
@@ -61,8 +57,6 @@ type AsLink = BaseProps & {
 };
 
 type GameButtonProps = AsButton | AsLink;
-
-// ── Component ───────────────────────────────────────────────────────────────
 
 export function GameButton({
     variant = "gold",

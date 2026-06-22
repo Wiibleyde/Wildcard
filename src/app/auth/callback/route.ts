@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-/**
- * Constrain a user-supplied redirect target to a same-origin path. Anything
- * else ("//evil.com", "@evil.com", ".evil.com", absolute URLs, backslash
- * tricks) falls back to the locale root — prevents open redirects.
- */
+// Constrain redirects to a same-origin path; anything else falls back to locale root (prevents open redirects).
 function safeNextPath(raw: string | null): string {
     if (raw?.startsWith("/") && !raw.startsWith("//") && !raw.includes("\\")) {
         return raw;

@@ -19,17 +19,11 @@ const BUTTON_VARIANT: Record<
 
 interface TableControlsProps {
     controls: readonly TableControl[];
-    /** Skins the mini cards rendered inside combo buttons. */
     deckTheme: CardTheme;
     pending: boolean;
     onAction: (action: GameAction) => void;
 }
 
-/**
- * Action bar under the hand: plain verbs ("Passer") and card-combo
- * suggestions. Combo cards render on the shared `xs` card scale so
- * suggestions stay readable from mobile up to 2K screens.
- */
 export function TableControls({
     controls,
     deckTheme,
@@ -45,7 +39,7 @@ export function TableControls({
                     key={control.key}
                     size="sm"
                     variant={BUTTON_VARIANT[control.variant ?? "primary"]}
-                    disabled={pending}
+                    disabled={pending || control.disabled}
                     onClick={() => onAction(control.action)}
                     className="xl:text-sm"
                 >

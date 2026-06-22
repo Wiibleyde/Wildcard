@@ -7,17 +7,14 @@ import { getCardTheme } from "@/lib/card/themes";
 import { FACE_DOWN_CARD } from "@/lib/card/utils";
 import type { TableSeat } from "@/lib/games/table/types";
 
-/** Cap of face-down mini cards drawn under a seat — the count never overflows. */
 const SEAT_HAND_MAX = 8;
 
 interface TableSeatsProps {
     seats: readonly TableSeat[];
     boardTheme: BoardTheme;
-    /** Resolves a seat's deck style for its face-down mini cards. */
     deckStyleOf: (playerId: string) => string | undefined;
 }
 
-/** Opponent chips across the top of the board: name, hand size, status. */
 export function TableSeats({
     seats,
     boardTheme,

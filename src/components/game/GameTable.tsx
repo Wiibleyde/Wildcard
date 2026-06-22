@@ -1,12 +1,12 @@
 "use client";
 
-import { useGSAP } from "@gsap/react";
 import { useTranslations } from "next-intl";
-import { type ReactNode, useRef } from "react";
+import type { ReactNode } from "react";
 import { Card } from "@/components/card/Card";
+import { useTableCardAnimations } from "@/hooks/game/useTableCardAnimations";
+import { CLONE_OFFSET, useTableDrag } from "@/hooks/game/useTableDrag";
 import { buildSurfaceStyle } from "@/lib/board/styles";
 import type { BoardTheme } from "@/lib/board/types";
-import { getPlayAnimation, prefersReducedMotion } from "@/lib/card/animations";
 import { getCardTheme } from "@/lib/card/themes";
 import type { CardTheme } from "@/lib/card/types";
 import type { GameAction } from "@/lib/engine/types";
@@ -24,7 +24,6 @@ import { GameLog, type GameLogLine } from "./GameLog";
 import { TableControls } from "./TableControls";
 import { TableSeats } from "./TableSeats";
 import { TableZone, type ZoneContext } from "./TableZone";
-import { CLONE_OFFSET, useTableDrag } from "./useTableDrag";
 
 interface GameTableProps {
     table: AnyGameTableConfig;
@@ -42,13 +41,6 @@ interface GameTableProps {
     chat?: ReactNode;
 }
 
-/**
- * THE game table. Renders any game from its {@link AnyGameTableConfig}:
- * zone templates say where cards go (top/center/bottom × row/fan/stack/
- * cascade), the game's pure `mapView` says what fills them. Every card is
- * skinned with its owner's deck style and lands with that deck's play
- * animation — no per-game component anywhere.
- */
 export function GameTable({
     table,
     view,
@@ -75,8 +67,6 @@ export function GameTable({
     };
     const data: TableData = table.mapView(view, ctx);
 
-    // History feed — newest entry first, each event turned into a localized
-    // sentence by the game's own `logLine`. Games without the hook get no feed.
     const logLines: GameLogLine[] | null = table.logLine
         ? [...payload.log].reverse().flatMap((entry) =>
               entry.events.flatMap((event, eventIndex) => {
@@ -99,41 +89,12 @@ export function GameTable({
             ? deckTheme
             : getCardTheme(styleOf.get(ownerId));
 
-    // ── Entry animations — each card lands with its owner deck's template ──
-    const rootRef = useRef<HTMLDivElement>(null);
-    const cardRefs = useRef(new Map<string, HTMLDivElement>());
-    const animatedIds = useRef(new Set<string>());
-
-    useGSAP(
-        () => {
-            if (prefersReducedMotion()) return;
-            for (const zone of data.zones) {
-                for (const item of zone.cards) {
-                    if (animatedIds.current.has(item.id)) continue;
-                    animatedIds.current.add(item.id);
-                    const el = cardRefs.current.get(item.id);
-                    if (!el) continue;
-                    const theme = themeFor(item.ownerId);
-                    getPlayAnimation(theme.playAnimation).animate(el, {
-                        origin:
-                            (item.ownerId ?? currentUserId) === currentUserId
-                                ? "self"
-                                : "opponent",
-                        duration: theme.playAnimation?.duration,
-                    });
-                }
-            }
-        },
-        { dependencies: [data], scope: rootRef },
+    const { rootRef, registerCard } = useTableCardAnimations(
+        data,
+        themeFor,
+        currentUserId,
     );
 
-    const registerCard = (id: string) => (el: HTMLDivElement | null) => {
-        if (el) cardRefs.current.set(id, el);
-        else cardRefs.current.delete(id);
-    };
-
-    // Pointer drag-and-drop: a card (and its run) lifts out, a floating clone
-    // follows the cursor, and the drop is hit-tested against the board zones.
     const { dragging, beginDrag } = useTableDrag({
         onAction,
         pending,
@@ -170,20 +131,21 @@ export function GameTable({
     const bottom = zonesAt("bottom");
     const controls = data.controls ?? [];
 
-    // A `fill` center zone (solitaire's tableau columns) spans the board width:
-    // lay them in one non-wrapping row of flex-1 cells. Otherwise the classic
-    // centered, wrapping layout (a framed trick zone, two reveal piles…).
+    // A `fill` center zone (e.g. solitaire tableau) spans the board in one
+    // non-wrapping row; otherwise cards wrap centered.
     const centerFills = data.zones.some(
         (z) =>
             templates.get(z.zone)?.placement === "center" &&
             templates.get(z.zone)?.fill,
     );
     const centerClass = centerFills
-        ? "flex w-full items-start justify-center gap-1 sm:gap-2 xl:gap-3"
+        ? "flex w-full items-start justify-center gap-1 sm:gap-2 xl:gap-3 lg:min-h-0 lg:flex-1"
         : "flex flex-wrap items-start justify-center gap-4 sm:gap-6 xl:gap-10";
 
+    const hasHand = bottom.length > 0;
+
     return (
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 xl:max-w-5xl 2xl:max-w-7xl">
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 lg:max-w-none">
             <TurnBanner
                 label={data.banner.label}
                 highlight={data.banner.highlight}
@@ -192,24 +154,31 @@ export function GameTable({
             <div className="flex flex-col gap-3 lg:flex-row">
                 <div
                     ref={rootRef}
-                    className="relative flex min-h-[60vh] flex-1 flex-col gap-3 overflow-hidden rounded-2xl p-3 sm:gap-4 sm:p-4 lg:h-[70vh] lg:min-h-0 xl:p-6"
+                    className="relative flex min-h-[60vh] flex-1 flex-col gap-3 overflow-hidden rounded-2xl p-3 sm:gap-4 sm:p-4 lg:h-[78vh] lg:min-h-0 xl:p-6"
                     style={buildSurfaceStyle(boardTheme)}
                 >
                     {data.seats && (
-                        <TableSeats
-                            seats={data.seats}
-                            boardTheme={boardTheme}
-                            deckStyleOf={(playerId) => styleOf.get(playerId)}
-                        />
+                        <div className="shrink-0">
+                            <TableSeats
+                                seats={data.seats}
+                                boardTheme={boardTheme}
+                                deckStyleOf={(playerId) =>
+                                    styleOf.get(playerId)
+                                }
+                            />
+                        </div>
                     )}
 
                     {top.length > 0 && (
-                        <div className="flex flex-wrap items-start justify-center gap-3 sm:gap-4 xl:gap-6">
+                        <div className="flex shrink-0 flex-wrap items-start justify-center gap-3 sm:gap-4 xl:gap-6">
                             {top}
                         </div>
                     )}
 
-                    <div className="flex flex-1 flex-col items-center justify-center gap-3">
+                    <div
+                        data-center-region
+                        className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 lg:flex-4"
+                    >
                         <div className={centerClass}>{center}</div>
                         {data.status && (
                             <span
@@ -221,9 +190,17 @@ export function GameTable({
                         )}
                     </div>
 
-                    {(bottom.length > 0 || controls.length > 0) && (
-                        <div className="flex w-full flex-col items-center gap-3">
-                            {bottom}
+                    {(hasHand || controls.length > 0) && (
+                        <div
+                            className={`flex w-full shrink-0 flex-col items-center gap-2 sm:gap-3 ${
+                                hasHand ? "lg:min-h-0 lg:flex-5" : ""
+                            }`}
+                        >
+                            {hasHand && (
+                                <div className="flex w-full items-end justify-center lg:min-h-0 lg:flex-1 lg:items-stretch">
+                                    {bottom}
+                                </div>
+                            )}
                             <TableControls
                                 controls={controls}
                                 deckTheme={deckTheme}
@@ -250,7 +227,7 @@ export function GameTable({
                 </div>
 
                 {(logLines || chat) && (
-                    <div className="flex flex-col gap-3 lg:h-[70vh] lg:self-start">
+                    <div className="flex flex-col gap-3 lg:h-[78vh] lg:self-start">
                         {logLines && (
                             <GameLog
                                 title={t("log_title")}
@@ -264,11 +241,10 @@ export function GameTable({
                 )}
             </div>
 
-            {/* Floating drag clone — fixed to the viewport (so the board's
-                overflow never clips it) and inert to hit-testing. */}
+            {/* Fixed to the viewport so the board's overflow can't clip the clone. */}
             {dragging && (
                 <div
-                    className="pointer-events-none fixed z-[9999]"
+                    className="pointer-events-none fixed z-9999"
                     style={{ left: dragging.x, top: dragging.y }}
                 >
                     {dragging.stack.map((s, i) => (

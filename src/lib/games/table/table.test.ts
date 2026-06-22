@@ -177,6 +177,7 @@ describe("president table", () => {
         // No combo is pre-proposed — pass is the only control left.
         expect(mine.controls).toHaveLength(1);
         expect(mine.controls?.[0]?.variant).toBe("danger");
+        expect(mine.controls?.[0]?.disabled).toBeFalsy();
 
         const hand = mine.zones.find((z) => z.key === "hand");
         // The hand is a tap-to-build picker advertising the legal combos.
@@ -200,7 +201,9 @@ describe("president table", () => {
             { ...view, currentPlayerId: "b" },
             ctx({ legalActions: legal }),
         );
-        expect(waiting.controls).toHaveLength(0);
+        // Pass stays as a stable bar even off-turn — present but greyed out.
+        expect(waiting.controls).toHaveLength(1);
+        expect(waiting.controls?.[0]?.disabled).toBe(true);
         expect(waiting.banner.label).toBe("waiting_for|Bob");
         // Not your turn → no picker, cards inert and never flagged illegal.
         const waitingHand = waiting.zones.find((z) => z.key === "hand");

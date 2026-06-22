@@ -4,19 +4,10 @@ import { useTranslations } from "next-intl";
 import { Card } from "@/components/card/Card";
 import { TierBadge } from "@/components/ui/TierBadge";
 import { CARD_WIDTH_CLASS } from "@/lib/card/sizes";
+import { TIER_KEYS } from "@/lib/card/tiers";
 import type { CardTheme } from "@/lib/card/types";
 import { FACE_DOWN_CARD } from "@/lib/card/utils";
 import { TileShell } from "./TileShell";
-
-const TIER_KEYS: Record<string, string> = {
-    common: "tier_common",
-    uncommon: "tier_uncommon",
-    rare: "tier_rare",
-    epic: "tier_epic",
-    legendary: "tier_legendary",
-    mystical: "tier_mystical",
-    ethereal: "tier_ethereal",
-};
 
 type Props = {
     theme: CardTheme;

@@ -7,7 +7,7 @@ import type {
     SuitStyle,
 } from "@/lib/card/types";
 import { rankToPipIndex } from "@/lib/card/utils";
-import { ArtworkFill, CardBody, CenteredArtwork } from "./CardBody";
+import { ArtworkFill, CardBody, CenterBox, CenteredArtwork } from "./CardBody";
 import { Corner } from "./Corner";
 
 export function SuitedContent({
@@ -91,8 +91,7 @@ function SuitedBody({
 
     if (isAce) {
         return (
-            <div
-                className="w-full h-full flex items-center justify-center"
+            <CenterBox
                 style={{
                     fontSize: "46cqi",
                     color: suitStyle.color,
@@ -101,16 +100,13 @@ function SuitedBody({
                 }}
             >
                 {suitStyle.symbol}
-            </div>
+            </CenterBox>
         );
     }
 
     if (isFaceCard) {
         return (
-            <div
-                className="w-full h-full flex flex-col items-center justify-center"
-                style={{ color: suitStyle.color, gap: "5%" }}
-            >
+            <CenterBox col style={{ color: suitStyle.color, gap: "5%" }}>
                 <span
                     style={{
                         fontSize: "33cqi",
@@ -129,7 +125,7 @@ function SuitedBody({
                 >
                     {suitStyle.symbol}
                 </span>
-            </div>
+            </CenterBox>
         );
     }
 

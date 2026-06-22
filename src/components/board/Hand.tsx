@@ -11,20 +11,12 @@ import { cardKey } from "@/lib/card/utils";
 
 export interface HandProps {
     cards: CardDescriptor[];
-    /** The viewer's own deck theme — a hand always renders in it */
     theme: CardTheme;
-    /** Called when the viewer clicks a card to play it */
     onPlay?: (card: CardDescriptor) => void;
     size?: CardSize;
-    /** Block plays (not the viewer's turn) while keeping the hand visible */
     disabled?: boolean;
 }
 
-/**
- * The viewer's hand. Cards overlap like a held fan so they can render large
- * (readable down to 375px) without overflowing; the hovered card lifts above
- * its neighbours.
- */
 export function Hand({
     cards,
     theme,

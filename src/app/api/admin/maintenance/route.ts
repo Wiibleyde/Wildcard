@@ -3,11 +3,7 @@ import { requireRole } from "@/lib/api/auth";
 import { setMaintenance } from "@/lib/models/settings";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-/**
- * Admin-only: toggle site maintenance. The proxy enforces the lock-out; this
- * route only flips the flag (and an optional message shown on the maintenance
- * page). Writes go through the service role, after the role check.
- */
+// Admin-only: toggle site maintenance. The proxy enforces the lock-out; this route only flips the flag.
 export async function POST(request: Request) {
     const auth = await requireRole("admin");
     if (!auth.ok) return auth.response;

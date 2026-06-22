@@ -20,8 +20,7 @@ export default async function Page({
     } = await supabase.auth.getUser();
     if (!user) redirect(`/${lang}/login`);
 
-    // Service-role re-derivation: secret state never leaves the server; the
-    // client receives only the per-frame redacted views.
+    // Service-role re-derivation: secret state stays server-side; client gets only per-frame redacted views.
     const admin = createAdminClient();
     const result = await getReplay(admin, id, user.id);
     if (!result.ok) notFound();

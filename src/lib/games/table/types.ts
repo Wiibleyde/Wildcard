@@ -167,6 +167,12 @@ export interface TableControl {
     readonly cards?: readonly CardDescriptor[];
     readonly action: GameAction;
     readonly variant?: "primary" | "success" | "danger";
+    /**
+     * Greys the button out instead of hiding it — keeps the controls bar stable
+     * so a verb the player always sees (e.g. "Passer") never appears/disappears
+     * between turns. Defaults to enabled.
+     */
+    readonly disabled?: boolean;
 }
 
 /** Everything `GameTable` needs for one render, produced by `mapView`. */

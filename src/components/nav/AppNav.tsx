@@ -1,12 +1,13 @@
 import type { User } from "@supabase/supabase-js";
-import Image from "next/image";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getUserRole, roleAtLeast } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
 import { publicStorageUrl } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
+import { Brand } from "./Brand";
 import { NavActions } from "./NavActions";
+import { NavAvatar } from "./NavAvatar";
 import { NavLinks } from "./NavLinks";
 import { SidebarDesktop } from "./SidebarDesktop";
 
@@ -17,11 +18,6 @@ function xpLevel(xp: number) {
     return Math.floor(xp / 500) + 1;
 }
 
-/**
- * Authenticated app chrome. `user` is resolved once in the layout and passed in
- * (the layout decides between this and {@link GuestNav}), so no second
- * `auth.getUser()` round-trip happens here.
- */
 export async function AppNav({ user }: { user: User }) {
     const supabase = await createClient();
 
@@ -48,7 +44,6 @@ export async function AppNav({ user }: { user: User }) {
 
     return (
         <>
-            {/* ── Desktop sidebar ──────────────────────────────────────────── */}
             <SidebarDesktop
                 profile={profile}
                 avatarUrl={avatarUrl}
@@ -59,7 +54,6 @@ export async function AppNav({ user }: { user: User }) {
                 canModerate={canModerate}
             />
 
-            {/* ── Mobile top bar ───────────────────────────────────────────── */}
             <header
                 className="md:hidden sticky top-0 z-40"
                 style={{
@@ -68,74 +62,21 @@ export async function AppNav({ user }: { user: User }) {
                 }}
             >
                 <div className="flex items-center justify-between px-4 h-14">
-                    <Link href="/" className="flex items-center gap-2.5">
-                        <div
-                            className="w-8 h-8 rounded-xl flex items-center justify-center text-sm font-black shrink-0"
-                            style={{
-                                background:
-                                    "linear-gradient(135deg, #f5c516, #c49010)",
-                                color: "#0d0a05",
-                                boxShadow: "0 0 12px rgba(245,197,22,0.25)",
-                            }}
-                        >
-                            W
-                        </div>
-                        <div>
-                            <p
-                                className="font-black text-sm leading-none tracking-tight"
-                                style={{ color: "#faf2e2" }}
-                            >
-                                Wildcard
-                            </p>
-                            <p
-                                className="text-[9px] font-bold tracking-[0.2em] uppercase"
-                                style={{ color: "#7a6a50" }}
-                            >
-                                ♠ ♥ ♦ ♣
-                            </p>
-                        </div>
-                    </Link>
+                    <Brand size="sm" />
 
                     <div className="flex items-center gap-2">
                         <NavActions variant="mobile-header" />
 
-                        {/* Avatar */}
                         <Link href="/profile">
-                            <div
-                                className="relative w-8 h-8 rounded-full p-[2px] shrink-0"
-                                style={{
-                                    background:
-                                        "linear-gradient(135deg, #f5c516, #e04040)",
-                                }}
-                            >
-                                <div className="relative w-full h-full rounded-full overflow-hidden">
-                                    {avatarUrl ? (
-                                        <Image
-                                            src={avatarUrl}
-                                            alt={profile?.username ?? ""}
-                                            fill
-                                            sizes="32px"
-                                            className="object-cover"
-                                            loading="eager"
-                                            unoptimized
-                                        />
-                                    ) : (
-                                        <div
-                                            className="w-full h-full flex items-center justify-center text-xs font-black"
-                                            style={{
-                                                background:
-                                                    "linear-gradient(135deg, #f5c516, #c49010)",
-                                                color: "#0d0a05",
-                                            }}
-                                        >
-                                            {initial}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                            <NavAvatar
+                                avatarUrl={avatarUrl}
+                                initial={initial}
+                                username={profile?.username ?? null}
+                                sizePx={32}
+                                initialClassName="text-xs"
+                            />
                         </Link>
 
-                        {/* Level badge */}
                         <span
                             className="text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-wider"
                             style={{
@@ -150,7 +91,6 @@ export async function AppNav({ user }: { user: User }) {
                 </div>
             </header>
 
-            {/* ── Mobile bottom nav ────────────────────────────────────────── */}
             <nav
                 className="md:hidden fixed bottom-0 left-0 right-0 z-40"
                 style={{

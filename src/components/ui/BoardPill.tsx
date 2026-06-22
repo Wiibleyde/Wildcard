@@ -4,17 +4,12 @@ import type { BoardTheme } from "@/lib/board/types";
 interface BoardPillProps {
     children: React.ReactNode;
     theme: BoardTheme;
-    /**
-     * - `badge`  — player name pill in the theme's badge colors
-     * - `accent` — high-contrast pill in the theme's accent color
-     *   (role markers like "Président")
-     */
+    /** `badge` — player-name colors; `accent` — high-contrast role markers. */
     tone?: "badge" | "accent";
-    /** Outline the pill in the accent color (active turn marker). */
+    /** Outline in the accent color (active turn marker). */
     outlined?: boolean;
 }
 
-/** Rounded pill used for player names and role markers on a board. */
 export function BoardPill({
     children,
     theme,

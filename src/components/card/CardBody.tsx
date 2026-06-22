@@ -1,12 +1,31 @@
-import type { ReactElement } from "react";
+import type { CSSProperties, ReactElement } from "react";
 import type { CardArtwork } from "@/lib/card/types";
 
-/** Absolute-positioned center area shared by all card face types */
 export function CardBody({ children }: { children: React.ReactNode }) {
     return (
         <div
             className="absolute"
             style={{ top: "16%", bottom: "16%", left: "10%", right: "10%" }}
+        >
+            {children}
+        </div>
+    );
+}
+
+/** Centered flex container; `col` stacks children vertically. */
+export function CenterBox({
+    children,
+    col = false,
+    style,
+}: {
+    children: React.ReactNode;
+    col?: boolean;
+    style?: CSSProperties;
+}) {
+    return (
+        <div
+            className={`w-full h-full flex items-center justify-center${col ? " flex-col" : ""}`}
+            style={style}
         >
             {children}
         </div>
@@ -41,7 +60,6 @@ export function ArtworkFill({ artwork }: { artwork: CardArtwork }) {
     );
 }
 
-/** Centers a string symbol or ReactElement inside the card body */
 export function CenteredArtwork({
     artwork,
     color,

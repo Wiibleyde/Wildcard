@@ -12,7 +12,6 @@ interface Options {
 
 export interface MutationHandle<TBody> {
     status: MutationStatus;
-    /** Error code string returned by the API, or null. */
     error: string | null;
     mutate: (body: TBody) => Promise<boolean>;
     reset: () => void;

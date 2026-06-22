@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { GameButton } from "@/components/ui/GameButton";
+import { ADMIN } from "./adminTheme";
 
 type Props = {
     initialEnabled: boolean;
@@ -12,9 +13,8 @@ type Props = {
 };
 
 /**
- * Admin-only card to toggle site-wide maintenance. Enabling locks every
- * non-admin out (enforced in src/proxy.ts), so it asks to confirm first. The
- * optional message is shown on the maintenance page.
+ * Toggle site-wide maintenance. Enabling locks every non-admin out (enforced
+ * in src/proxy.ts), so it confirms first.
  */
 export function MaintenanceControl({ initialEnabled, initialMessage }: Props) {
     const t = useTranslations("admin");
@@ -67,19 +67,18 @@ export function MaintenanceControl({ initialEnabled, initialMessage }: Props) {
             className="rounded-2xl p-5 xl:p-6 flex flex-col gap-4"
             style={{
                 background: "rgba(255,255,255,0.03)",
-                border: `1px solid ${enabled ? "rgba(224,64,64,0.4)" : "#2a1e0f"}`,
+                border: `1px solid ${enabled ? "rgba(224,64,64,0.4)" : ADMIN.border}`,
             }}
         >
             <div className="flex items-center gap-2.5">
                 <h2
                     className="text-lg xl:text-xl font-black"
-                    style={{ color: "#faf2e2" }}
+                    style={{ color: ADMIN.text }}
                 >
                     {t("maintenance_title")}
                 </h2>
             </div>
 
-            {/* Status pill */}
             <div
                 className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl"
                 style={{
@@ -92,13 +91,13 @@ export function MaintenanceControl({ initialEnabled, initialMessage }: Props) {
                 <span
                     className="w-2.5 h-2.5 rounded-full shrink-0"
                     style={{
-                        background: enabled ? "#e04040" : "#48c97a",
-                        boxShadow: `0 0 8px ${enabled ? "#e04040" : "#48c97a"}`,
+                        background: enabled ? ADMIN.danger : ADMIN.success,
+                        boxShadow: `0 0 8px ${enabled ? ADMIN.danger : ADMIN.success}`,
                     }}
                 />
                 <span
                     className="text-sm font-black"
-                    style={{ color: enabled ? "#e04040" : "#48c97a" }}
+                    style={{ color: enabled ? ADMIN.danger : ADMIN.success }}
                 >
                     {enabled
                         ? t("maintenance_active")
@@ -106,15 +105,17 @@ export function MaintenanceControl({ initialEnabled, initialMessage }: Props) {
                 </span>
             </div>
 
-            <p className="text-xs font-semibold" style={{ color: "#9a8870" }}>
+            <p
+                className="text-xs font-semibold"
+                style={{ color: ADMIN.textSubtle }}
+            >
                 {t("maintenance_desc")}
             </p>
 
-            {/* Message shown to users */}
             <label className="flex flex-col gap-1.5">
                 <span
                     className="text-xs font-bold uppercase tracking-wider"
-                    style={{ color: "#7a6a50" }}
+                    style={{ color: ADMIN.textMuted }}
                 >
                     {t("maintenance_message_label")}
                 </span>
@@ -127,14 +128,17 @@ export function MaintenanceControl({ initialEnabled, initialMessage }: Props) {
                     className="w-full rounded-xl px-3 py-2.5 text-sm font-semibold resize-none outline-none"
                     style={{
                         background: "rgba(0,0,0,0.3)",
-                        border: "1px solid #2a1e0f",
-                        color: "#faf2e2",
+                        border: `1px solid ${ADMIN.border}`,
+                        color: ADMIN.text,
                     }}
                 />
             </label>
 
             {error && (
-                <p className="text-xs font-bold" style={{ color: "#e04040" }}>
+                <p
+                    className="text-xs font-bold"
+                    style={{ color: ADMIN.danger }}
+                >
                     {error}
                 </p>
             )}

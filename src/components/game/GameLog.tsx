@@ -11,17 +11,11 @@ export interface GameLogLine {
 interface GameLogProps {
     title: string;
     emptyText: string;
-    /** Newest first — the latest move is readable without scrolling. */
+    /** Newest first. */
     lines: readonly GameLogLine[];
     boardTheme: BoardTheme;
 }
 
-/**
- * History feed beside the table — one localized sentence per game event
- * ("Nadia pose 2× 8", "Marc ramasse le pli…"), themed like the board so it
- * reads as part of the table. Sits under the board on mobile, as a right
- * rail from `lg:`.
- */
 export function GameLog({ title, emptyText, lines, boardTheme }: GameLogProps) {
     return (
         <aside

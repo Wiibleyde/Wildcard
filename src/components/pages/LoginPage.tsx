@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { OAuthButton } from "@/components/auth/OAuthButton";
+import { DecoSuit } from "@/components/brand/DecoSuit";
+import { LogoCard } from "@/components/brand/LogoCard";
 import { createClient } from "@/lib/supabase/server";
 
 export async function LoginPage({ lang }: { lang: string }) {
@@ -18,13 +20,12 @@ export async function LoginPage({ lang }: { lang: string }) {
             className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden"
             style={{ background: "#0d0a05" }}
         >
-            {/* Atmospheric card suit decorations */}
             <div
                 className="absolute inset-0 pointer-events-none select-none overflow-hidden"
                 aria-hidden="true"
             >
-                <span
-                    className="absolute font-black leading-none"
+                <DecoSuit
+                    suit="♠"
                     style={{
                         fontSize: "22rem",
                         opacity: 0.025,
@@ -33,11 +34,9 @@ export async function LoginPage({ lang }: { lang: string }) {
                         left: "-5rem",
                         transform: "rotate(-15deg)",
                     }}
-                >
-                    ♠
-                </span>
-                <span
-                    className="absolute font-black leading-none"
+                />
+                <DecoSuit
+                    suit="♥"
                     style={{
                         fontSize: "22rem",
                         opacity: 0.025,
@@ -46,11 +45,9 @@ export async function LoginPage({ lang }: { lang: string }) {
                         right: "-5rem",
                         transform: "rotate(12deg)",
                     }}
-                >
-                    ♥
-                </span>
-                <span
-                    className="absolute font-black leading-none"
+                />
+                <DecoSuit
+                    suit="♦"
                     style={{
                         fontSize: "10rem",
                         opacity: 0.02,
@@ -59,11 +56,9 @@ export async function LoginPage({ lang }: { lang: string }) {
                         right: "-2rem",
                         transform: "rotate(6deg)",
                     }}
-                >
-                    ♦
-                </span>
-                <span
-                    className="absolute font-black leading-none"
+                />
+                <DecoSuit
+                    suit="♣"
                     style={{
                         fontSize: "10rem",
                         opacity: 0.02,
@@ -72,29 +67,13 @@ export async function LoginPage({ lang }: { lang: string }) {
                         left: "-2rem",
                         transform: "rotate(-6deg)",
                     }}
-                >
-                    ♣
-                </span>
+                />
             </div>
 
             <div className="relative w-full max-w-sm lg:max-w-md xl:max-w-lg">
-                {/* Header / branding */}
                 <div className="text-center mb-10">
-                    {/* Logo card */}
                     <div className="relative inline-flex items-center justify-center mb-6">
-                        <div
-                            className="w-20 h-20 rounded-2xl flex items-center justify-center font-black text-4xl"
-                            style={{
-                                background:
-                                    "linear-gradient(135deg, #f5c516, #c49010)",
-                                color: "#0d0a05",
-                                boxShadow:
-                                    "0 0 48px rgba(245,197,22,0.28), 0 6px 24px rgba(0,0,0,0.55)",
-                            }}
-                        >
-                            W
-                        </div>
-                        {/* Corner suit pips */}
+                        <LogoCard boxShadow="0 0 48px rgba(245,197,22,0.28), 0 6px 24px rgba(0,0,0,0.55)" />
                         <span
                             className="absolute -top-2 -left-1.5 text-sm font-black"
                             style={{ color: "#f5c516", opacity: 0.7 }}
@@ -135,7 +114,6 @@ export async function LoginPage({ lang }: { lang: string }) {
                     </p>
                 </div>
 
-                {/* Divider */}
                 <div className="flex items-center gap-3 mb-6">
                     <div
                         className="h-px flex-1"
@@ -153,7 +131,6 @@ export async function LoginPage({ lang }: { lang: string }) {
                     />
                 </div>
 
-                {/* OAuth buttons */}
                 <div className="space-y-3">
                     <OAuthButton
                         provider="google"
@@ -165,7 +142,6 @@ export async function LoginPage({ lang }: { lang: string }) {
                     />
                 </div>
 
-                {/* Footer */}
                 <p
                     className="mt-10 text-center text-xs font-semibold"
                     style={{ color: "#7a6a50" }}

@@ -22,9 +22,7 @@ export default async function AdminPage({
     } = await supabase.auth.getUser();
     if (!user) redirect(`/${lang}/login`);
 
-    // The moderator dashboard is reachable by moderators and admins; everyone
-    // else is bounced home. This is the in-app gate; API writes re-check the
-    // role server-side (defense in depth).
+    // In-app gate only; API writes re-check the role server-side (defense in depth).
     const role = await getUserRole(supabase, user.id);
     if (!roleAtLeast(role, "moderator")) redirect(`/${lang}`);
 

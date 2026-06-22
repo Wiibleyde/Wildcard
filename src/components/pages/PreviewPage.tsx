@@ -23,7 +23,6 @@ const SAMPLE_HAND: CardDescriptor[] = [
     { type: "suited", suit: "spades", rank: "10" },
 ];
 
-/** The demo opponent's pool — replayed in a loop as they answer your plays. */
 const OPPONENT_CARDS: CardDescriptor[] = [
     { type: "suited", suit: "hearts", rank: "7" },
     { type: "suited", suit: "clubs", rank: "A" },
@@ -32,7 +31,6 @@ const OPPONENT_CARDS: CardDescriptor[] = [
     { type: "suited", suit: "hearts", rank: "2" },
 ];
 
-/** One card from each seat so mixed deck styles are visible before any click. */
 const INITIAL_TABLE: TableCard[] = [
     {
         id: "demo-self",
@@ -46,7 +44,6 @@ const INITIAL_TABLE: TableCard[] = [
     },
 ];
 
-/** Keep only the latest plays on the table so the demo never overflows. */
 const TABLE_LIMIT = 6;
 
 const OPPONENT_REPLY_DELAY_MS = 650;
@@ -63,8 +60,6 @@ export function PreviewPage({ deckId, boardId, backHref }: Props) {
     const t = useTranslations("preview");
     const cardTheme = THEMES[deckId] ?? defaultDeck;
     const boardTheme = BOARD_THEMES[boardId] ?? defaultBoard;
-    // The demo opponent always uses a contrasting deck, so the table shows
-    // how every played card carries its owner's style in a real game.
     const opponentDeckId = deckId === "creator" ? "free" : "creator";
 
     const [hand, setHand] = useState(SAMPLE_HAND);
@@ -80,7 +75,6 @@ export function PreviewPage({ deckId, boardId, backHref }: Props) {
         };
     }, []);
 
-    // Refill the demo hand once it has been emptied
     useEffect(() => {
         if (hand.length > 0) return;
         const timer = window.setTimeout(

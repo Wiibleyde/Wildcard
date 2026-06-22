@@ -1,9 +1,10 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { GameTable } from "@/components/game/GameTable";
 import { GameButton } from "@/components/ui/GameButton";
+import { useReplayPlayback } from "@/hooks/game/useReplayPlayback";
 import { Link } from "@/i18n/navigation";
 import { BOARD_THEMES } from "@/lib/board/themes";
 import { greenFeltTheme } from "@/lib/board/themes/green_felt";
@@ -20,17 +21,10 @@ interface Props {
     boardStyleId: string;
 }
 
-/** Milliseconds each frame holds during autoplay. */
 const AUTOPLAY_INTERVAL = 1100;
 
 const noop = () => {};
 
-/**
- * Read-only replay player. Scrubs a finished game frame-by-frame off the
- * pre-derived {@link ReplayPayload} — no server round-trips, no live channel.
- * Each frame is turned into the same {@link GameClientPayload} the live table
- * consumes, so the one generic {@link GameTable} renders it unchanged.
- */
 export function ReplayClient({
     payload,
     currentUserId,
@@ -39,27 +33,13 @@ export function ReplayClient({
 }: Props) {
     const t = useTranslations("replay");
     const last = payload.steps.length - 1;
-    // Open on the final position (the result), then let the viewer rewind.
-    const [index, setIndex] = useState(last);
-    const [playing, setPlaying] = useState(false);
-
-    // Autoplay ticks forward and parks on the last frame.
-    useEffect(() => {
-        if (!playing) return;
-        if (index >= last) {
-            setPlaying(false);
-            return;
-        }
-        const id = window.setTimeout(
-            () => setIndex((i) => Math.min(i + 1, last)),
-            AUTOPLAY_INTERVAL,
-        );
-        return () => window.clearTimeout(id);
-    }, [playing, index, last]);
+    const { index, playing, togglePlay, step, seek } = useReplayPlayback(
+        last,
+        AUTOPLAY_INTERVAL,
+    );
 
     const framePayload: GameClientPayload = useMemo(() => {
         const step = payload.steps[index];
-        // Cumulative log up to (and including) the current frame, oldest first.
         const log: GameLogEntry[] = [];
         for (let i = 1; i <= index; i++) {
             const s = payload.steps[i];
@@ -119,17 +99,6 @@ export function ReplayClient({
         );
     }
 
-    function togglePlay() {
-        // Pressing play at the end restarts from the deal.
-        if (!playing && index >= last) setIndex(0);
-        setPlaying((p) => !p);
-    }
-
-    function step(delta: number) {
-        setPlaying(false);
-        setIndex((i) => Math.min(Math.max(i + delta, 0), last));
-    }
-
     return (
         <div className="flex flex-col gap-3">
             <div className="mx-auto flex w-full max-w-3xl items-center justify-between xl:max-w-5xl 2xl:max-w-7xl">
@@ -162,7 +131,6 @@ export function ReplayClient({
                 onIllegal={noop}
             />
 
-            {/* ── Transport bar ───────────────────────────────────────── */}
             <div
                 className="mx-auto flex w-full max-w-3xl flex-col gap-3 rounded-2xl p-3 sm:p-4 xl:max-w-5xl 2xl:max-w-7xl"
                 style={{ background: "#1c1510", border: "2px solid #3d2d18" }}
@@ -202,10 +170,7 @@ export function ReplayClient({
                     min={0}
                     max={last}
                     value={index}
-                    onChange={(e) => {
-                        setPlaying(false);
-                        setIndex(Number(e.target.value));
-                    }}
+                    onChange={(e) => seek(Number(e.target.value))}
                     className="w-full accent-wc-gold"
                     aria-label={t("scrub")}
                 />
