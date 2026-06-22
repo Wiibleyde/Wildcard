@@ -4,11 +4,7 @@ import { NavCollapseContext } from "./NavCollapseContext";
 
 type Props = {
     appNav: React.ReactNode;
-    /**
-     * Whether the authenticated chrome (sidebar + bottom nav) is present. The
-     * sidebar offset / bottom padding must only be reserved when it is —
-     * otherwise a signed-out visitor sees an empty gap where the nav would be.
-     */
+    // Reserve the sidebar offset only when the nav is present, else guests see an empty gap.
     authed: boolean;
     children: React.ReactNode;
 };

@@ -1,21 +1,11 @@
 import { metrics } from "@/lib/metrics/registry";
 
-// Always run on the Node runtime (prom-client + the admin DB client are
-// server-only) and never cache — Prometheus needs the value at scrape time.
+// Node runtime (prom-client + admin DB client are server-only); never cache — value is read at scrape time.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * Prometheus scrape endpoint. Returns the registry in text exposition format.
- * Scraped by the `prometheus` service over the Docker network (see
- * monitoring/prometheus/prometheus.yml).
- *
- * The app's port 3000 is published, so this route is reachable from outside the
- * Docker network. When `METRICS_TOKEN` is set we require a matching bearer token
- * (Prometheus sends it via its `authorization` scrape config) — otherwise the
- * metrics, and the scrape-time DB read behind `wildcard_active_games`, would be
- * exposed to anyone. The var is left unset in local dev, where the route is open.
- */
+// Prometheus scrape endpoint. Port 3000 is published, so when METRICS_TOKEN is set we require a
+// matching bearer token — otherwise the metrics (and the DB read behind them) are public. Unset in local dev.
 export async function GET(request: Request): Promise<Response> {
     const token = process.env.METRICS_TOKEN;
     if (token && request.headers.get("authorization") !== `Bearer ${token}`) {

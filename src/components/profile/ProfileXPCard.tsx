@@ -1,11 +1,7 @@
 "use client";
 
-import { useGSAP } from "@gsap/react";
-import gsap from "gsap";
 import { useTranslations } from "next-intl";
-import { useRef } from "react";
-
-gsap.registerPlugin(useGSAP);
+import { useXPBarAnimation } from "@/hooks/useXPBarAnimation";
 
 const XP_PER_LEVEL = 500;
 
@@ -24,46 +20,8 @@ type Props = {
 export function ProfileXPCard({ xp }: Props) {
     "use no memo";
     const t = useTranslations("profile");
-    const containerRef = useRef<HTMLDivElement>(null);
-    const barRef = useRef<HTMLDivElement>(null);
-    const xpNumRef = useRef<HTMLSpanElement>(null);
-
     const { level, xpToNext, progress } = xpStats(xp);
-
-    useGSAP(
-        () => {
-            const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-
-            tl.from(containerRef.current, {
-                y: 16,
-                opacity: 0,
-                duration: 0.55,
-            });
-
-            tl.fromTo(
-                barRef.current,
-                { width: "0%" },
-                {
-                    width: `${progress * 100}%`,
-                    duration: 1.1,
-                    ease: "power2.out",
-                },
-                "-=0.2",
-            );
-
-            tl.from(
-                xpNumRef.current,
-                {
-                    textContent: 0,
-                    duration: 0.9,
-                    snap: { textContent: 1 },
-                    ease: "power1.out",
-                },
-                "<",
-            );
-        },
-        { scope: containerRef, dependencies: [xp] },
-    );
+    const { containerRef, barRef, xpNumRef } = useXPBarAnimation(xp, progress);
 
     return (
         <div ref={containerRef}>
@@ -103,7 +61,6 @@ export function ProfileXPCard({ xp }: Props) {
                 </div>
             </div>
 
-            {/* XP bar — game health bar style */}
             <div
                 className="relative h-3 rounded-full overflow-hidden"
                 style={{
@@ -120,7 +77,6 @@ export function ProfileXPCard({ xp }: Props) {
                         width: "0%",
                     }}
                 >
-                    {/* Shine line on top of bar */}
                     <div
                         className="absolute inset-x-0 top-0 h-1/2 rounded-full"
                         style={{

@@ -1,5 +1,7 @@
 import type { Locale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { DecoSuit } from "@/components/brand/DecoSuit";
+import { LogoCard } from "@/components/brand/LogoCard";
 import { GameButton } from "@/components/ui/GameButton";
 import { Link } from "@/i18n/navigation";
 
@@ -78,7 +80,6 @@ export default async function Home({
             style={{ background: "#0d0a05" }}
         >
             <div className="max-w-lg lg:max-w-5xl xl:max-w-7xl mx-auto flex flex-col gap-10">
-                {/* ── Hero ──────────────────────────────────────────────────── */}
                 <div
                     className="relative rounded-2xl overflow-hidden px-8 py-12 xl:py-16 flex flex-col items-center text-center"
                     style={{
@@ -88,9 +89,8 @@ export default async function Home({
                         boxShadow: "0 8px 40px rgba(0,0,0,0.5)",
                     }}
                 >
-                    {/* Decorative suits */}
-                    <span
-                        className="absolute font-black leading-none select-none pointer-events-none"
+                    <DecoSuit
+                        suit="♠"
                         style={{
                             fontSize: "14rem",
                             opacity: 0.04,
@@ -99,12 +99,9 @@ export default async function Home({
                             left: "-2rem",
                             transform: "rotate(-10deg)",
                         }}
-                        aria-hidden="true"
-                    >
-                        ♠
-                    </span>
-                    <span
-                        className="absolute font-black leading-none select-none pointer-events-none"
+                    />
+                    <DecoSuit
+                        suit="♥"
                         style={{
                             fontSize: "14rem",
                             opacity: 0.04,
@@ -113,24 +110,10 @@ export default async function Home({
                             right: "-2rem",
                             transform: "rotate(10deg)",
                         }}
-                        aria-hidden="true"
-                    >
-                        ♥
-                    </span>
+                    />
 
                     <div className="relative z-10 flex flex-col items-center gap-6">
-                        <div
-                            className="w-20 h-20 rounded-2xl flex items-center justify-center font-black text-4xl"
-                            style={{
-                                background:
-                                    "linear-gradient(135deg, #f5c516, #c49010)",
-                                color: "#0d0a05",
-                                boxShadow:
-                                    "0 0 48px rgba(245,197,22,0.3), 0 6px 0 0 #7a5a00",
-                            }}
-                        >
-                            W
-                        </div>
+                        <LogoCard />
 
                         <div>
                             <h1
@@ -155,7 +138,6 @@ export default async function Home({
                     </div>
                 </div>
 
-                {/* ── Game grid ─────────────────────────────────────────────── */}
                 <div>
                     <h2
                         className="text-xs font-bold uppercase tracking-widest mb-5"
@@ -176,7 +158,6 @@ export default async function Home({
                                         : undefined,
                                 }}
                             >
-                                {/* Card header */}
                                 <div
                                     className="flex items-center justify-between px-4 pt-5 pb-4"
                                     style={{

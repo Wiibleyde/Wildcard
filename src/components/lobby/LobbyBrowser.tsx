@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { GameButton } from "@/components/ui/GameButton";
-import { useRouter } from "@/i18n/navigation";
+import { useRoomAction } from "@/hooks/useRoomAction";
 import type { GameCatalogEntry } from "@/lib/games";
 
 export interface OpenRoom {
@@ -19,60 +19,14 @@ interface Props {
     openRooms: OpenRoom[];
 }
 
-const ROOM_ERROR_KEYS = new Set(["not_found", "room_full", "already_started"]);
-
 export function LobbyBrowser({ catalog, openRooms }: Props) {
     const t = useTranslations("lobby");
-    const router = useRouter();
     const [selected, setSelected] = useState(catalog[0]?.id ?? "");
     const [code, setCode] = useState("");
-    const [busy, setBusy] = useState<"create" | "join" | null>(null);
-    const [error, setError] = useState<string | null>(null);
-
-    function describeError(errorCode: unknown): string {
-        if (typeof errorCode === "string" && ROOM_ERROR_KEYS.has(errorCode)) {
-            return t(`error_${errorCode}` as "error_not_found");
-        }
-        return t("error_generic");
-    }
-
-    async function createRoom() {
-        setBusy("create");
-        setError(null);
-        const res = await fetch("/api/rooms", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ moduleId: selected }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-            setBusy(null);
-            setError(describeError(data.error));
-            return;
-        }
-        router.push(`/lobby/${data.code}`);
-    }
-
-    async function joinRoom(target: string) {
-        const normalized = target.trim().toUpperCase();
-        if (!normalized) return;
-        setBusy("join");
-        setError(null);
-        const res = await fetch(`/api/rooms/${normalized}/join`, {
-            method: "POST",
-        });
-        const data = await res.json();
-        if (!res.ok) {
-            setBusy(null);
-            setError(describeError(data.error));
-            return;
-        }
-        router.push(`/lobby/${normalized}`);
-    }
+    const { busy, error, createRoom, joinRoom } = useRoomAction();
 
     return (
         <div className="flex flex-col gap-8 lg:grid lg:grid-cols-2 lg:items-start">
-            {/* Create */}
             <section
                 className="rounded-2xl p-5 sm:p-8 flex flex-col gap-5"
                 style={{
@@ -135,7 +89,7 @@ export function LobbyBrowser({ catalog, openRooms }: Props) {
 
                 <button
                     type="button"
-                    onClick={createRoom}
+                    onClick={() => createRoom(selected)}
                     disabled={busy !== null || !selected}
                     className="rounded-xl py-3 font-black text-sm disabled:opacity-50"
                     style={{
@@ -148,7 +102,6 @@ export function LobbyBrowser({ catalog, openRooms }: Props) {
                 </button>
             </section>
 
-            {/* Join + open rooms */}
             <section className="flex flex-col gap-8">
                 <div
                     className="rounded-2xl p-5 sm:p-8 flex flex-col gap-4"

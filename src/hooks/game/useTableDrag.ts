@@ -49,7 +49,6 @@ interface DragOptions {
     boundsRef: RefObject<HTMLElement | null>;
 }
 
-/** Resolve the drop under (x, y) to a legal target, or `null`. */
 function hitTest(
     x: number,
     y: number,
@@ -62,12 +61,6 @@ function hitTest(
     return targets.find((t) => t.zoneKey === key) ?? null;
 }
 
-/**
- * Pointer-driven drag for the table: grab a card (and its run), a floating
- * clone follows the cursor, and on release the drop is hit-tested against the
- * zone under the pointer. Unifies mouse and touch via Pointer Events. The
- * caller renders the clone from the returned {@link DragState}.
- */
 export function useTableDrag({ onAction, pending, boundsRef }: DragOptions): {
     dragging: DragState | null;
     beginDrag: (

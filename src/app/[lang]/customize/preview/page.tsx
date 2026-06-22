@@ -23,7 +23,6 @@ export default async function Page({
     } = await supabase.auth.getUser();
     if (!user) redirect(`/${lang}/login`);
 
-    // Resolve IDs: prefer query params, fall back to player's current customization
     let deckId = deck && THEMES[deck] ? deck : null;
     let boardId = board && BOARD_THEMES[board] ? board : null;
 

@@ -1,7 +1,9 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type SyntheticEvent, useEffect, useRef, useState } from "react";
+import { type SyntheticEvent, useState } from "react";
+import { useAutoScroll } from "@/hooks/useAutoScroll";
+import { useTransientNotice } from "@/hooks/useTransientNotice";
 import { buildSurfaceStyle } from "@/lib/board/styles";
 import type { BoardTheme } from "@/lib/board/types";
 import type { GamePlayer } from "@/lib/models/game";
@@ -20,12 +22,6 @@ interface GameChatProps {
     isOver: boolean;
 }
 
-/**
- * In-game chat panel. Lives in the right rail under the {@link GameLog} and is
- * themed off the board so it reads as part of the table. State and transport
- * are owned by {@link useGameChat} (broadcast, ephemeral); this is purely the
- * feed + composer. Stacks under the board on mobile, becomes a rail from `lg:`.
- */
 export function GameChat({
     gameId,
     currentUserId,
@@ -43,33 +39,21 @@ export function GameChat({
     );
     const [draft, setDraft] = useState("");
     // A rejected send must not vanish silently — surface why in the composer.
-    const [notice, setNotice] = useState<
-        "rate_limited" | "disconnected" | null
-    >(null);
-    const listRef = useRef<HTMLOListElement>(null);
-
-    // Pin to the newest line whenever the feed grows. Reading `messages.length`
-    // keeps it a real dependency (biome would otherwise strip an unused dep and
-    // the effect would only ever run once on mount).
-    useEffect(() => {
-        const el = listRef.current;
-        if (el && messages.length > 0) el.scrollTop = el.scrollHeight;
-    }, [messages]);
+    const [notice, showNotice] = useTransientNotice<
+        "rate_limited" | "disconnected"
+    >();
+    const listRef = useAutoScroll<HTMLOListElement>(messages);
 
     const onSubmit = (e: SyntheticEvent) => {
         e.preventDefault();
         const result = send(draft);
         if (result === "sent") {
             setDraft("");
-            setNotice(null);
         } else if (result === "rate_limited") {
-            // Brief visual nudge; input keeps its text so nothing is lost.
-            setNotice("rate_limited");
-            window.setTimeout(() => setNotice(null), 1500);
+            // Input keeps its text so nothing is lost.
+            showNotice("rate_limited", 1500);
         } else if (result === "disconnected") {
-            // The channel isn't live — say so instead of eating the message.
-            setNotice("disconnected");
-            window.setTimeout(() => setNotice(null), 2500);
+            showNotice("disconnected", 2500);
         }
         // "empty" / "too_long" can't occur — the input guards both.
     };

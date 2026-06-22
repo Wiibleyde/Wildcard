@@ -48,18 +48,13 @@ function CardFaceContent({
 export interface CardProps {
     card: CardDescriptor;
     theme?: CardTheme;
-    /** Render the card back instead of its face */
     faceDown?: boolean;
-    /** Lift the card upward via CSS transform (only when disableTransitions is false) */
     selected?: boolean;
-    /**
-     * Strip all CSS transitions and transform classes from the root element.
-     * Set to true whenever GSAP (or a D&D library) drives this card's position.
-     */
+    /** Strip CSS transitions/transforms whenever GSAP (or D&D) drives position. */
     disableTransitions?: boolean;
     onClick?: () => void;
     className?: string;
-    /** Ref forwarded to the root DOM element — required for GSAP targets */
+    /** Required for GSAP targets. */
     ref?: Ref<HTMLElement>;
 }
 

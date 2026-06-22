@@ -22,9 +22,7 @@ export default async function Page({
     } = await supabase.auth.getUser();
     if (!user) redirect(`/${lang}/login`);
 
-    // Service-role read: participation lives in the secret engine state, which
-    // RLS denies to every client key. We only surface the public-safe
-    // projection (game name, date, result, seat names) to the page.
+    // Service-role read: participation lives in RLS-denied engine state; only the public-safe projection reaches the page.
     const admin = createAdminClient();
     const entries = await getMatchHistory(admin, user.id);
 

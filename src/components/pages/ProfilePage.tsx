@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { SignOutButton } from "@/components/auth/SignOutButton";
+import { DecoSuit } from "@/components/brand/DecoSuit";
 import { AvatarHero } from "@/components/profile/AvatarHero";
 import { LinkedAccounts } from "@/components/profile/LinkedAccounts";
 import { ProfileForm } from "@/components/profile/ProfileForm";
@@ -49,7 +50,6 @@ export async function ProfilePage({ lang }: { lang: string }) {
             style={{ background: "#0d0a05" }}
         >
             <div className="max-w-lg lg:max-w-4xl xl:max-w-6xl mx-auto flex flex-col gap-5">
-                {/* ── Player card header ────────────────────────────────────── */}
                 <div
                     className="relative rounded-2xl overflow-hidden"
                     style={{
@@ -59,9 +59,8 @@ export async function ProfilePage({ lang }: { lang: string }) {
                         boxShadow: "0 8px 40px rgba(0,0,0,0.4)",
                     }}
                 >
-                    {/* Decorative suit */}
-                    <span
-                        className="absolute font-black select-none pointer-events-none leading-none"
+                    <DecoSuit
+                        suit="♠"
                         style={{
                             fontSize: "18rem",
                             opacity: 0.03,
@@ -70,10 +69,7 @@ export async function ProfilePage({ lang }: { lang: string }) {
                             right: "-2rem",
                             transform: "rotate(8deg)",
                         }}
-                        aria-hidden="true"
-                    >
-                        ♠
-                    </span>
+                    />
 
                     <div className="relative z-10 p-6 xl:p-8">
                         <div className="flex items-start justify-between mb-6">
@@ -121,16 +117,13 @@ export async function ProfilePage({ lang }: { lang: string }) {
                             </div>
                         </div>
 
-                        {/* Quick XP inline */}
                         <div className="mt-5">
                             <ProfileXPCard xp={xp} />
                         </div>
                     </div>
                 </div>
 
-                {/* ── Settings columns ──────────────────────────────────────── */}
                 <div className="lg:grid lg:grid-cols-2 lg:gap-5 flex flex-col gap-5 lg:flex-none">
-                    {/* Edit profile */}
                     <div
                         className="rounded-xl p-6 border"
                         style={{
@@ -153,7 +146,6 @@ export async function ProfilePage({ lang }: { lang: string }) {
                         )}
                     </div>
 
-                    {/* Linked accounts */}
                     <div
                         className="rounded-xl p-6 border"
                         style={{
@@ -171,7 +163,6 @@ export async function ProfilePage({ lang }: { lang: string }) {
                     </div>
                 </div>
 
-                {/* ── Match history ─────────────────────────────────────────── */}
                 <Link
                     href="/profile/history"
                     className="group rounded-xl p-6 border flex items-center justify-between gap-4 transition-colors"

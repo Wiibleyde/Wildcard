@@ -9,6 +9,7 @@ import {
     ShieldIcon,
     ShopIcon,
 } from "./NavIcons";
+import { isActive } from "./navUtils";
 
 type NavItemConfig = {
     href: string;
@@ -22,7 +23,6 @@ type NavItemConfig = {
 type Props = {
     variant: "sidebar" | "bottom";
     shown?: boolean;
-    /** Show the moderator/admin entry (moderators and admins only). */
     canModerate?: boolean;
 };
 
@@ -81,16 +81,11 @@ export function NavLinks({
             : []),
     ];
 
-    function isActive(href: string) {
-        if (href === "/") return pathname === "/";
-        return pathname.startsWith(href);
-    }
-
     if (variant === "sidebar") {
         return (
             <nav className="flex flex-col gap-1 mt-4">
                 {items.map((item) => {
-                    const active = isActive(item.href);
+                    const active = isActive(pathname, item.href);
                     return (
                         <Link
                             key={item.href}
@@ -110,7 +105,6 @@ export function NavLinks({
                             }
                             title={!shown ? item.label : undefined}
                         >
-                            {/* Icon wrapper */}
                             <div
                                 className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition-all duration-150"
                                 style={
@@ -159,11 +153,10 @@ export function NavLinks({
         );
     }
 
-    /* Bottom nav */
     return (
         <nav className="flex items-stretch justify-around w-full h-full">
             {items.map((item) => {
-                const active = isActive(item.href);
+                const active = isActive(pathname, item.href);
                 return (
                     <Link
                         key={item.href}
@@ -171,7 +164,6 @@ export function NavLinks({
                         className="relative flex flex-col items-center justify-center gap-1 flex-1 text-[10px] font-bold uppercase tracking-wider transition-all"
                         style={{ color: active ? item.color : "#7a6a50" }}
                     >
-                        {/* Active top line indicator */}
                         {active && (
                             <span
                                 className="absolute top-0 left-1/2 -translate-x-1/2 rounded-b-full"
@@ -184,7 +176,6 @@ export function NavLinks({
                             />
                         )}
 
-                        {/* Icon in colored wrapper when active */}
                         <div
                             className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-150"
                             style={

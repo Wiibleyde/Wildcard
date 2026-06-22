@@ -11,18 +11,11 @@ import { getCardTheme } from "@/lib/card/themes";
 
 export interface PlayAreaProps {
     cards: TableCard[];
-    /** Seats — each table card resolves to its owner's deck style and name */
     players: BoardPlayer[];
     size?: CardSize;
-    /** Shown when no card has been played yet */
     emptyHint?: string;
 }
 
-/**
- * Cards currently on the table. Every card is rendered in the deck style of
- * the player who played it (so a table mixes styles), and enters with that
- * deck's play-animation template.
- */
 export function PlayArea({
     cards,
     players,

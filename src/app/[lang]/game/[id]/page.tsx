@@ -20,8 +20,7 @@ export default async function Page({
     } = await supabase.auth.getUser();
     if (!user) redirect(`/${lang}/login`);
 
-    // Service-role read: the secret state never leaves the server; the client
-    // receives only the redacted `view()` projection in `result.payload`.
+    // Service-role read: secret state stays server-side; client gets only the redacted view().
     const admin = createAdminClient();
     const result = await getGameClientState(admin, id, user.id);
     if (!result.ok) notFound();
@@ -32,8 +31,7 @@ export default async function Page({
             .select("deck_style_id, board_style_id")
             .eq("user_id", user.id)
             .maybeSingle(),
-        // The viewer's own name — needed for chat even when they are a
-        // spectator (and thus absent from the game's seated player list).
+        // Viewer's own name — needed for chat even when they're a spectator (not a seated player).
         supabase
             .from("profiles")
             .select("username")

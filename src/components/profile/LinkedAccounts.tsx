@@ -1,9 +1,8 @@
 "use client";
 
-import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
-import { linkIdentity, type OAuthProvider } from "@/lib/supabase/auth";
+import { useOAuthLinking } from "@/hooks/useOAuthLinking";
+import type { OAuthProvider } from "@/lib/supabase/auth";
 
 const PROVIDERS: {
     id: OAuthProvider;
@@ -60,14 +59,7 @@ type Props = {
 export function LinkedAccounts({ linkedProviders }: Props) {
     "use no memo";
     const t = useTranslations("profile");
-    const params = useParams();
-    const lang = (params?.lang as string) ?? "fr";
-    const [linking, setLinking] = useState<OAuthProvider | null>(null);
-
-    async function handleLink(provider: OAuthProvider) {
-        setLinking(provider);
-        await linkIdentity(provider, lang);
-    }
+    const { linking, handleLink } = useOAuthLinking();
 
     return (
         <div className="flex flex-col gap-2.5">

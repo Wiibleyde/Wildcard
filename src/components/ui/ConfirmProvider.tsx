@@ -15,11 +15,11 @@ import type { GameButtonVariant } from "./GameButton";
 export interface ConfirmOptions {
     title?: string;
     message: string;
-    /** Defaults to the localized "Confirm" from the `common` namespace. */
+    /** Defaults to the localized "Confirm". */
     confirmLabel?: string;
-    /** Defaults to the localized "Cancel" from the `common` namespace. */
+    /** Defaults to the localized "Cancel". */
     cancelLabel?: string;
-    /** Colour of the confirm button — pass "red" for destructive actions. */
+    /** Pass "red" for destructive actions. */
     variant?: GameButtonVariant;
 }
 
@@ -27,16 +27,7 @@ type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>;
 
 const ConfirmContext = createContext<ConfirmFn | null>(null);
 
-/**
- * Imperative confirmation, a themed drop-in for `window.confirm`:
- *
- * ```ts
- * const confirm = useConfirm();
- * if (await confirm({ message: t("leave_confirm"), variant: "red" })) {
- *     // confirmed
- * }
- * ```
- */
+/** Imperative confirmation — a themed `await confirm({...})` drop-in for `window.confirm`. */
 export function useConfirm(): ConfirmFn {
     const ctx = useContext(ConfirmContext);
     if (!ctx) {
@@ -49,10 +40,7 @@ interface DialogState extends ConfirmOptions {
     open: boolean;
 }
 
-/**
- * Holds the single dialog instance for the whole app and exposes
- * {@link useConfirm}. Mount once near the root, inside the i18n provider.
- */
+/** Holds the single dialog instance. Mount once near the root, inside the i18n provider. */
 export function ConfirmProvider({ children }: { children: ReactNode }) {
     const t = useTranslations("common");
     const [state, setState] = useState<DialogState>({

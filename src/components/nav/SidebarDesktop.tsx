@@ -1,8 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { Link } from "@/i18n/navigation";
+import { GOLD_GRADIENT } from "@/lib/ui/brand";
+import { Brand } from "./Brand";
 import { NavActions } from "./NavActions";
+import { NavAvatar } from "./NavAvatar";
 import { NavLinks } from "./NavLinks";
 
 type Props = {
@@ -33,46 +35,13 @@ export function SidebarDesktop({
                 boxShadow: "4px 0 20px rgba(0,0,0,0.3)",
             }}
         >
-            {/* ── Logo / header section ──────────────────────────────────── */}
             <div
                 className="shrink-0 px-4 pt-5 pb-4"
                 style={{ borderBottom: "1px solid #2a1e0f" }}
             >
-                <div className="flex items-center gap-3">
-                    {/* W logo card */}
-                    <Link href="/" className="shrink-0 block">
-                        <div
-                            className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-lg"
-                            style={{
-                                background:
-                                    "linear-gradient(135deg, #f5c516, #c49010)",
-                                color: "#0d0a05",
-                                boxShadow:
-                                    "0 0 20px rgba(245,197,22,0.25), 0 3px 0 0 #7a5a00",
-                            }}
-                        >
-                            W
-                        </div>
-                    </Link>
-
-                    <Link href="/" className="flex-1 min-w-0">
-                        <p
-                            className="font-black text-base tracking-tight leading-none"
-                            style={{ color: "#faf2e2" }}
-                        >
-                            Wildcard
-                        </p>
-                        <p
-                            className="text-[10px] font-bold tracking-[0.2em] uppercase mt-0.5"
-                            style={{ color: "#7a6a50" }}
-                        >
-                            ♠ ♥ ♦ ♣
-                        </p>
-                    </Link>
-                </div>
+                <Brand size="md" />
             </div>
 
-            {/* ── Nav links ──────────────────────────────────────────────── */}
             <div className="flex-1 overflow-y-auto px-3 py-3">
                 <NavLinks
                     variant="sidebar"
@@ -81,12 +50,10 @@ export function SidebarDesktop({
                 />
             </div>
 
-            {/* ── Bottom section ─────────────────────────────────────────── */}
             <div
                 className="shrink-0 px-3 pb-4 pt-3 flex flex-col gap-2"
                 style={{ borderTop: "1px solid #2a1e0f" }}
             >
-                {/* Coins widget */}
                 <div
                     className="flex items-center gap-2.5 px-3 py-2 rounded-xl"
                     style={{
@@ -97,8 +64,7 @@ export function SidebarDesktop({
                     <div
                         className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-black"
                         style={{
-                            background:
-                                "linear-gradient(135deg, #f5c516, #c49010)",
+                            background: GOLD_GRADIENT,
                             color: "#0d0a05",
                         }}
                     >
@@ -118,10 +84,8 @@ export function SidebarDesktop({
                     </span>
                 </div>
 
-                {/* Lang + logout */}
                 <NavActions variant="sidebar" shown={true} />
 
-                {/* Profile card */}
                 <Link
                     href="/profile"
                     className="flex items-center gap-3 p-2.5 rounded-xl transition-all duration-150"
@@ -130,39 +94,13 @@ export function SidebarDesktop({
                         border: "1px solid #2a1e0f",
                     }}
                 >
-                    {/* Avatar with gradient ring */}
-                    <div
-                        className="relative w-9 h-9 rounded-full shrink-0 p-[2px]"
-                        style={{
-                            background:
-                                "linear-gradient(135deg, #f5c516, #e04040)",
-                        }}
-                    >
-                        <div className="relative w-full h-full rounded-full overflow-hidden">
-                            {avatarUrl ? (
-                                <Image
-                                    src={avatarUrl}
-                                    alt={profile?.username ?? ""}
-                                    fill
-                                    sizes="36px"
-                                    className="object-cover"
-                                    loading="eager"
-                                    unoptimized
-                                />
-                            ) : (
-                                <div
-                                    className="w-full h-full flex items-center justify-center text-sm font-black"
-                                    style={{
-                                        background:
-                                            "linear-gradient(135deg, #f5c516, #c49010)",
-                                        color: "#0d0a05",
-                                    }}
-                                >
-                                    {initial}
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                    <NavAvatar
+                        avatarUrl={avatarUrl}
+                        initial={initial}
+                        username={profile?.username ?? null}
+                        sizePx={36}
+                        initialClassName="text-sm"
+                    />
 
                     <div className="flex-1 min-w-0">
                         <p
