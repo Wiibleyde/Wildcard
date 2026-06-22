@@ -12,6 +12,8 @@ import type {
 } from "@/lib/engine/types";
 import { getGameModule } from "@/lib/games";
 import { recordGameFinished, recordMove } from "@/lib/metrics/registry";
+import { recordEloForGame } from "@/lib/models/elo";
+import { recordXpForGame } from "@/lib/models/xp";
 import type { Database } from "@/lib/supabase/types";
 
 type Admin = SupabaseClient<Database>;
@@ -406,6 +408,8 @@ export async function advanceBots(
                 .update({ status: "finished" })
                 .eq("id", roomId);
             recordGameFinished(module.id, durationSeconds(createdAt));
+            await recordEloForGame(admin, module.id, outcome, botIds);
+            await recordXpForGame(admin, outcome, botIds);
         }
     }
 
@@ -561,6 +565,8 @@ export async function applyAction(
             .update({ status: "finished" })
             .eq("id", meta.room_id);
         recordGameFinished(module.id, durationSeconds(meta.created_at));
+        await recordEloForGame(admin, meta.module_id, outcome, meta.bot_ids);
+        await recordXpForGame(admin, outcome, meta.bot_ids);
     }
 
     // Let any bots now on turn play out AFTER the response: the human's card

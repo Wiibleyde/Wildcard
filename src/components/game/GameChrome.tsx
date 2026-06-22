@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { GameButton } from "@/components/ui/GameButton";
 import type { GameOutcome } from "@/lib/engine/types";
 import type { GamePlayer } from "@/lib/models/game";
+import { GameOverXp } from "./GameOverXp";
 
 export function nameOf(
     players: readonly GamePlayer[],
@@ -127,6 +128,12 @@ export function GameOverOverlay({
                         );
                     })}
                 </ol>
+            )}
+
+            {/* XP reward — only for a seated participant (in the rankings), not
+                spectators or admin-aborted games. */}
+            {outcome?.rankings.some((r) => r.playerId === currentUserId) && (
+                <GameOverXp userId={currentUserId} won={won} />
             )}
 
             <GameButton href="/lobby" className="mt-2">

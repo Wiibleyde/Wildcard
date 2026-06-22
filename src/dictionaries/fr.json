@@ -92,7 +92,11 @@
         "xp_to_next": "XP vers le niveau suivant",
         "edit_title": "Modifier le profil",
         "history": "Historique des parties",
-        "history_desc": "Consulter vos parties passées et leurs résultats"
+        "history_desc": "Consulter vos parties passées et leurs résultats",
+        "ratings_title": "Classement ELO",
+        "ratings_empty": "Aucune partie classée pour l'instant",
+        "ratings_played": "parties",
+        "ratings_wins": "V"
     },
     "history": {
         "title": "Historique des parties",
@@ -226,6 +230,9 @@
         "game_aborted": "Partie terminée par un administrateur",
         "winners": "Gagnants",
         "back_to_lobby": "Retour au lobby",
+        "xp_title": "Expérience",
+        "level_short": "Niv.",
+        "level_up": "Niveau supérieur !",
         "place_president": "Président",
         "place_vice_president": "Vice-Président",
         "place_neutral": "Neutre",

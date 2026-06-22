@@ -186,6 +186,40 @@ export type Database = {
                     },
                 ];
             };
+            player_elo: {
+                Row: {
+                    user_id: string;
+                    module_id: string;
+                    rating: number;
+                    games_played: number;
+                    wins: number;
+                    updated_at: string;
+                };
+                Insert: {
+                    user_id: string;
+                    module_id: string;
+                    rating?: number;
+                    games_played?: number;
+                    wins?: number;
+                    updated_at?: string;
+                };
+                Update: {
+                    user_id?: string;
+                    module_id?: string;
+                    rating?: number;
+                    games_played?: number;
+                    wins?: number;
+                    updated_at?: string;
+                };
+                Relationships: [
+                    {
+                        foreignKeyName: "player_elo_user_id_fkey";
+                        columns: ["user_id"];
+                        referencedRelation: "profiles";
+                        referencedColumns: ["id"];
+                    },
+                ];
+            };
             user_roles: {
                 Row: {
                     user_id: string;
@@ -488,6 +522,26 @@ export type Database = {
         };
         Views: Record<string, never>;
         Functions: {
+            apply_elo_results: {
+                Args: {
+                    p_module_id: string;
+                    p_results: {
+                        user_id: string;
+                        delta: number;
+                        won: boolean;
+                    }[];
+                };
+                Returns: undefined;
+            };
+            award_game_xp: {
+                Args: {
+                    p_awards: {
+                        user_id: string;
+                        amount: number;
+                    }[];
+                };
+                Returns: undefined;
+            };
             match_history: {
                 Args: {
                     p_user_id: string;
