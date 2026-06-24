@@ -9,18 +9,26 @@
  */
 export type CardSize = "xs" | "sm" | "md" | "lg" | "xl";
 
-/** Tailwind width classes per size — responsive from mobile to 2K. */
+/**
+ * Tailwind width classes per size — responsive from mobile to 2K.
+ *
+ * Each size is bounded by an explicit `min-w-*` floor and `max-w-*` cap so a
+ * card never collapses below readability on 375px nor balloons absurdly large
+ * on 2560px screens (the responsive `w-*` steps stop escalating at `2xl:`, but
+ * the cap makes that ceiling explicit and protects width-driven layouts). The
+ * 5/7 aspect ratio is untouched: `Card` derives its height from its width.
+ */
 export const CARD_WIDTH_CLASS: Record<CardSize, string> = {
     /** Thumbnails — customization tiles, compact lists */
-    xs: "w-12 xl:w-14",
+    xs: "w-12 xl:w-14 min-w-10 max-w-14",
     /** Opponent card backs, dense board zones */
-    sm: "w-12 sm:w-14 xl:w-16 2xl:w-20",
+    sm: "w-12 sm:w-14 xl:w-16 2xl:w-20 min-w-10 max-w-20",
     /** Cards on the table (play area) */
-    md: "w-20 sm:w-24 xl:w-28 2xl:w-32",
+    md: "w-20 sm:w-24 xl:w-28 2xl:w-32 min-w-16 max-w-32",
     /** The viewer's hand */
-    lg: "w-24 sm:w-28 xl:w-32 2xl:w-36",
+    lg: "w-24 sm:w-28 xl:w-32 2xl:w-36 min-w-20 max-w-36",
     /** Hero / showcase displays */
-    xl: "w-32 sm:w-40 xl:w-48 2xl:w-56",
+    xl: "w-32 sm:w-40 xl:w-48 2xl:w-56 min-w-28 max-w-56",
 };
 
 /**
