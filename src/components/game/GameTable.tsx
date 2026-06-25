@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import type { ReactNode } from "react";
+import { type ReactNode, useCallback, useMemo } from "react";
 import { Card } from "@/components/card/Card";
 import { useTableCardAnimations } from "@/hooks/game/useTableCardAnimations";
 import { CLONE_OFFSET, useTableDrag } from "@/hooks/game/useTableDrag";
@@ -54,40 +54,75 @@ export function GameTable({
     chat,
 }: GameTableProps) {
     const t = useTranslations("game");
-    const text: TableText = (key, values) =>
+    const text: TableText = useCallback(
         // biome-ignore lint/suspicious/noExplicitAny: dynamic i18n key lookup
-        t(key as any, values as any);
-
-    const ctx: TableContext = {
-        viewerId: payload.viewerId,
-        players: payload.players,
-        legalActions: payload.legalActions,
-        isOver: payload.isOver,
-        t: text,
-    };
-    const data: TableData = table.mapView(view, ctx);
-
-    const logLines: GameLogLine[] | null = table.logLine
-        ? [...payload.log].reverse().flatMap((entry) =>
-              entry.events.flatMap((event, eventIndex) => {
-                  const line = table.logLine?.(event, ctx);
-                  return line
-                      ? [{ id: `${entry.seq}.${eventIndex}`, text: line }]
-                      : [];
-              }),
-          )
-        : null;
-
-    const templates = new Map<string, TableZoneTemplate>(
-        table.zones.map((z) => [z.id, z]),
+        (key, values) => t(key as any, values as any),
+        [t],
     );
-    const styleOf = new Map(
-        payload.players.map((p) => [p.userId, p.deckStyleId]),
+
+    // Everything below is a pure projection of the payload — memoised so the
+    // frequent presentation-only re-renders (drag fires ~60×/s, pending toggles,
+    // selection) skip the `mapView` recompute and, crucially, keep `data` stable
+    // so the GSAP landing effect (keyed on `data`) never re-runs off a real move.
+    const ctx: TableContext = useMemo(
+        () => ({
+            viewerId: payload.viewerId,
+            players: payload.players,
+            legalActions: payload.legalActions,
+            isOver: payload.isOver,
+            t: text,
+        }),
+        [
+            payload.viewerId,
+            payload.players,
+            payload.legalActions,
+            payload.isOver,
+            text,
+        ],
     );
-    const themeFor = (ownerId: string | undefined): CardTheme =>
-        ownerId === undefined || ownerId === currentUserId
-            ? deckTheme
-            : getCardTheme(styleOf.get(ownerId));
+    const data: TableData = useMemo(
+        () => table.mapView(view, ctx),
+        [table, view, ctx],
+    );
+
+    const logLines: GameLogLine[] | null = useMemo(
+        () =>
+            table.logLine
+                ? [...payload.log].reverse().flatMap((entry) =>
+                      entry.events.flatMap((event, eventIndex) => {
+                          const line = table.logLine?.(event, ctx);
+                          return line
+                              ? [
+                                    {
+                                        id: `${entry.seq}.${eventIndex}`,
+                                        text: line,
+                                    },
+                                ]
+                              : [];
+                      }),
+                  )
+                : null,
+        [table, payload.log, ctx],
+    );
+
+    const templates = useMemo(
+        () =>
+            new Map<string, TableZoneTemplate>(
+                table.zones.map((z) => [z.id, z]),
+            ),
+        [table],
+    );
+    const styleOf = useMemo(
+        () => new Map(payload.players.map((p) => [p.userId, p.deckStyleId])),
+        [payload.players],
+    );
+    const themeFor = useCallback(
+        (ownerId: string | undefined): CardTheme =>
+            ownerId === undefined || ownerId === currentUserId
+                ? deckTheme
+                : getCardTheme(styleOf.get(ownerId)),
+        [styleOf, deckTheme, currentUserId],
+    );
 
     const { rootRef, registerCard } = useTableCardAnimations(
         data,
@@ -101,16 +136,28 @@ export function GameTable({
         boundsRef: rootRef,
     });
 
-    const zoneCtx: ZoneContext = {
-        boardTheme,
-        pending,
-        themeFor,
-        registerCard,
-        onAction,
-        onIllegal,
-        dragging,
-        beginDrag,
-    };
+    const zoneCtx: ZoneContext = useMemo(
+        () => ({
+            boardTheme,
+            pending,
+            themeFor,
+            registerCard,
+            onAction,
+            onIllegal,
+            dragging,
+            beginDrag,
+        }),
+        [
+            boardTheme,
+            pending,
+            themeFor,
+            registerCard,
+            onAction,
+            onIllegal,
+            dragging,
+            beginDrag,
+        ],
+    );
 
     const zonesAt = (placement: ZonePlacement) =>
         data.zones.flatMap((instance) => {

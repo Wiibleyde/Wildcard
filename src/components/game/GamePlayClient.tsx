@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { GameChat } from "@/components/game/GameChat";
 import { GameTable } from "@/components/game/GameTable";
 import { ReconnectingBanner } from "@/components/realtime/ReconnectingBanner";
@@ -48,25 +48,47 @@ export function GamePlayClient({
     const [payload, setPayload] = useState<GameClientPayload>(initial);
     const [pending, setPending] = useState(false);
     const [actionError, showError] = useTransientNotice<ActionErrorKey>();
+    // Latest version we hold, mirrored outside React so the cheap probe can gate
+    // the full fetch without making the poll callback depend on (and churn with)
+    // `payload`.
+    const versionRef = useRef(initial.version);
 
-    const refetch = useCallback(async () => {
+    // Pull the full redacted payload. Adopt only a strictly newer version:
+    // equal/stale fetches keep the same object so React skips re-render — else
+    // the fan churns mid-selection.
+    const refetchFull = useCallback(async () => {
         const res = await fetch(`/api/games/${initial.gameId}`, {
             cache: "no-store",
         });
-        if (res.ok) {
-            const next = (await res.json()) as GameClientPayload;
-            // Adopt only a strictly newer version: equal/stale refetches keep the
-            // same object so React skips re-render — else the fan churns mid-selection.
-            setPayload((prev) => (next.version > prev.version ? next : prev));
-        }
+        if (!res.ok) return;
+        const next = (await res.json()) as GameClientPayload;
+        setPayload((prev) => {
+            if (next.version <= prev.version) return prev;
+            versionRef.current = next.version;
+            return next;
+        });
     }, [initial.gameId]);
+
+    // Poll/doorbell entry point: hit the few-byte version probe and only pull
+    // the heavy payload when the server has actually advanced. Steady-state
+    // polling is then off the secret state, the log and the view projection, and
+    // the board never re-renders on an unchanged tick.
+    const sync = useCallback(async () => {
+        const res = await fetch(`/api/games/${initial.gameId}/version`, {
+            cache: "no-store",
+        });
+        if (!res.ok) return;
+        const info = (await res.json()) as { version: number };
+        if (info.version <= versionRef.current) return;
+        await refetchFull();
+    }, [initial.gameId, refetchFull]);
 
     // Poll slow on your turn (nobody else can act), fast otherwise to catch moves —
     // postgres_changes is unreliable on self-hosted stacks, so the poll is the dependable path.
     const myTurn =
         payload.currentPlayerId !== null &&
         payload.currentPlayerId === currentUserId;
-    const conn = useGameChannel(initial.gameId, refetch, myTurn ? 4000 : 800);
+    const conn = useGameChannel(initial.gameId, sync, myTurn ? 4000 : 800);
 
     const onAction = useCallback(
         async (action: GameAction) => {
@@ -79,11 +101,12 @@ export function GamePlayClient({
             if (!res.ok) {
                 showError(statusToErrorKey(res.status), 3500);
             }
-            // Resync whether it committed or hit a version conflict.
-            await refetch();
+            // The version advanced either way (our commit, or whoever beat us on
+            // conflict), so pull the full payload directly — no probe needed.
+            await refetchFull();
             setPending(false);
         },
-        [initial.gameId, payload.version, refetch, showError],
+        [initial.gameId, payload.version, refetchFull, showError],
     );
 
     const onIllegal = useCallback(

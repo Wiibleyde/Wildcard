@@ -200,6 +200,52 @@ export async function getGameClientState(
     };
 }
 
+export interface GameVersionInfo {
+    readonly version: number;
+    readonly isOver: boolean;
+}
+
+/**
+ * Cheap "did anything change?" probe for the poll/doorbell hot path. Reads only
+ * the small public meta row — no secret `state`, no action log, no `view()`
+ * projection — so a client can poll it at the bot-move cadence for a handful of
+ * bytes and pull the full redacted payload ({@link getGameClientState}) only
+ * once `version` has actually advanced past what it holds.
+ *
+ * Bot self-heal still piggybacks on the read, but only on the rare *idle* path:
+ * a live game (and a healthy bot chain pacing its moves) bumps `updated_at` well
+ * inside the stall window, so the heavy state load needed to confirm a stranded
+ * chain runs only after the row has sat untouched past {@link STALL_RESUME_MS} —
+ * never on a normal tick.
+ */
+export async function getGameVersion(
+    admin: Admin,
+    gameId: string,
+): Promise<GameVersionInfo | null> {
+    const { data: meta } = await admin
+        .from("games")
+        .select("version, is_over, bot_ids, current_player_id, updated_at")
+        .eq("id", gameId)
+        .maybeSingle();
+    if (!meta) return null;
+
+    if (!meta.is_over && meta.bot_ids.length > 0) {
+        const idleMs = Date.now() - new Date(meta.updated_at).getTime();
+        // Sequential: only a bot on turn can be stranded. Simultaneous
+        // (current_player_id null): a bot *might* drive the round — confirm with
+        // state. Either way we touch state only once genuinely stale.
+        const maybeBotTurn =
+            meta.current_player_id === null ||
+            meta.bot_ids.includes(meta.current_player_id);
+        if (maybeBotTurn && idleMs >= STALL_RESUME_MS) {
+            const loaded = await loadGame(admin, gameId);
+            if (loaded.ok) maybeResumeBots(admin, loaded.game);
+        }
+    }
+
+    return { version: meta.version, isOver: meta.is_over };
+}
+
 export type ApplyErrorCode =
     | "not_found"
     | "unknown_game"
