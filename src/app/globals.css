@@ -99,7 +99,6 @@ body::after {
 }
 
 @keyframes wildcard-sparkle {
-
     0%,
     100% {
         opacity: 0.2;
@@ -145,7 +144,6 @@ body::after {
 }
 
 @media (prefers-reduced-motion: reduce) {
-
     .wc-fade-in,
     .wc-pop-in {
         animation: none;
@@ -157,10 +155,12 @@ body::after {
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(105deg,
-            transparent 38%,
-            rgba(255, 255, 255, 0.16) 50%,
-            transparent 62%);
+    background: linear-gradient(
+        105deg,
+        transparent 38%,
+        rgba(255, 255, 255, 0.16) 50%,
+        transparent 62%
+    );
     animation: wildcard-shimmer 5s ease-in-out infinite;
     pointer-events: none;
     z-index: 20;
@@ -172,10 +172,12 @@ body::after {
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(105deg,
-            transparent 30%,
-            var(--card-effect-color, rgba(200, 170, 110, 0.55)) 50%,
-            transparent 70%);
+    background: linear-gradient(
+        105deg,
+        transparent 30%,
+        var(--card-effect-color, rgba(200, 170, 110, 0.55)) 50%,
+        transparent 70%
+    );
     animation: wildcard-shimmer 2s ease-in-out infinite;
     pointer-events: none;
     z-index: 20;
@@ -187,14 +189,16 @@ body::after {
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(125deg,
-            #ff000033,
-            #ff7f0033,
-            #ffff0033,
-            #00ff0033,
-            #0000ff33,
-            #8b00ff33,
-            #ff000033);
+    background: linear-gradient(
+        125deg,
+        #ff000033,
+        #ff7f0033,
+        #ffff0033,
+        #00ff0033,
+        #0000ff33,
+        #8b00ff33,
+        #ff000033
+    );
     background-size: 400% 400%;
     animation: wildcard-holo 3s linear infinite;
     mix-blend-mode: screen;
