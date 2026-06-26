@@ -220,6 +220,23 @@ export interface GameTableConfig<V> {
     /** Pure projection — no JSX, fully unit-testable. */
     mapView(view: V, ctx: TableContext): TableData;
     /**
+     * Optimistic prediction of the viewer's OWN move, applied client-side the
+     * instant they act so the board reacts without waiting on the server
+     * round-trip. Pure and best-effort: returns the predicted next view, or
+     * `null` to opt out (the client then falls back to the wait-for-server
+     * path). The server stays authoritative — its next view always overwrites
+     * the prediction, and a rejected action rolls the board back.
+     *
+     * Predict ONLY moves whose every effect is already visible to this viewer.
+     * Never predict a move that reveals a hidden card (drawing a face-down
+     * stock card, flipping the tableau card exposed by emptying a column, a
+     * simultaneous reveal): the predicted card would be a guess — return `null`
+     * and let the server reconcile a beat later. A predicted view may still
+     * diverge from the server on purely presentational fields it deliberately
+     * leaves stale (e.g. whose turn is next); that reconciles on the refetch.
+     */
+    predict?(view: V, action: GameAction, viewerId: string | null): V | null;
+    /**
      * Localized, user-friendly sentence for one history event — `null` hides
      * it (noise like per-step internals). Drives the log feed next to the
      * table; omitting the hook hides the feed for that game.

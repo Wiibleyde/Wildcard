@@ -149,6 +149,43 @@ async function logOf(admin: Admin, gameId: string): Promise<GameLogEntry[]> {
 }
 
 /**
+ * Assemble one viewer's redacted payload from an already-loaded module + state.
+ * The single place that shapes a {@link GameClientPayload}, shared by the full
+ * read ({@link getGameClientState}) and the action commit ({@link applyAction},
+ * which returns the actor's fresh payload in the POST response so the client
+ * needs no follow-up GET). `isOverFlag` is the DB column: an admin force-end
+ * flips it without touching `state`, so `module.isOver(state)` alone would miss
+ * it.
+ */
+function buildClientPayload(
+    gameId: string,
+    moduleId: string,
+    version: number,
+    isOverFlag: boolean,
+    module: AnyGameModule,
+    state: GameState,
+    viewerId: string | null,
+    players: GamePlayer[],
+    log: GameLogEntry[],
+): GameClientPayload {
+    const cs = clientState(module, state, viewerId);
+    return {
+        gameId,
+        moduleId,
+        version,
+        phase: state.phase,
+        isOver: cs.isOver || isOverFlag,
+        currentPlayerId: state.currentPlayerId,
+        view: cs.view,
+        legalActions: cs.legalActions,
+        outcome: module.outcome(state),
+        players,
+        log,
+        viewerId,
+    };
+}
+
+/**
  * Build the redacted payload for one viewer. `viewerId` that is not seated is
  * treated as a spectator (`null` view, no legal actions).
  */
@@ -173,7 +210,6 @@ export async function getGameClientState(
         viewerId !== null && state.players.some((p) => p.id === viewerId);
     const effectiveViewer = isPlayer ? viewerId : null;
 
-    const cs = clientState(module, state, effectiveViewer);
     const [players, log] = await Promise.all([
         playersOf(admin, state),
         logOf(admin, gameId),
@@ -181,22 +217,17 @@ export async function getGameClientState(
 
     return {
         ok: true,
-        payload: {
-            gameId: meta.id,
-            moduleId: meta.module_id,
-            version: meta.version,
-            phase: state.phase,
-            // An admin force-end flips the column without touching `state`, so
-            // `module.isOver(state)` stays false — the DB flag is the override.
-            isOver: cs.isOver || meta.is_over,
-            currentPlayerId: state.currentPlayerId,
-            view: cs.view,
-            legalActions: cs.legalActions,
-            outcome: module.outcome(state),
+        payload: buildClientPayload(
+            meta.id,
+            meta.module_id,
+            meta.version,
+            meta.is_over,
+            module,
+            state,
+            effectiveViewer,
             players,
             log,
-            viewerId: effectiveViewer,
-        },
+        ),
     };
 }
 
@@ -467,6 +498,13 @@ export type ApplyActionResult =
           ok: true;
           version: number;
           events: readonly GameEvent[];
+          /**
+           * The actor's fresh redacted payload, built from the just-committed
+           * state. Returned in the POST response so the client adopts it
+           * directly instead of firing a follow-up GET — one round-trip per
+           * move instead of two, and one state load instead of two.
+           */
+          payload: GameClientPayload;
       }
     | {
           ok: false;
@@ -605,6 +643,25 @@ export async function applyAction(
 
     record("ok");
 
+    // Build the actor's fresh payload straight from the in-memory committed
+    // state — the client adopts it from the POST response, no follow-up GET.
+    // (`logOf` now includes the action just inserted above.)
+    const [players, log] = await Promise.all([
+        playersOf(admin, newState),
+        logOf(admin, gameId),
+    ]);
+    const payload = buildClientPayload(
+        gameId,
+        meta.module_id,
+        newVersion,
+        isOver,
+        module,
+        newState,
+        actorId,
+        players,
+        log,
+    );
+
     if (isOver) {
         await admin
             .from("rooms")
@@ -634,7 +691,7 @@ export async function applyAction(
         );
     }
 
-    return { ok: true, version: newVersion, events: result.events };
+    return { ok: true, version: newVersion, events: result.events, payload };
 }
 
 export type EndGameResult =

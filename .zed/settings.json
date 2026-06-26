@@ -55,7 +55,8 @@
         },
         "CSS": {
             "tab_size": 4,
-            "language_servers": ["tailwindcss-language-server", "..."]
+            "language_servers": ["tailwindcss-language-server", "biome", "..."],
+            "formatter": { "language_server": { "name": "biome" } }
         }
     },
 

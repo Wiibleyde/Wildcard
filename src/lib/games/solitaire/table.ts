@@ -6,7 +6,12 @@ import {
     type TableControl,
     type TableZoneInstance,
 } from "../table/types";
-import type { SolitaireAction, SolitaireView } from "./solitaire";
+import type {
+    SolitaireAction,
+    SolitaireColumnView,
+    SolitaireFoundationView,
+    SolitaireView,
+} from "./solitaire";
 
 /** Empty-foundation hint: the suit it collects, so the board reads at a glance. */
 const SUIT_SYMBOL: Record<Suit, string> = {
@@ -21,6 +26,37 @@ type Drop = { readonly zoneKey: string; readonly action: SolitaireAction };
 
 function suitOf(card: CardDescriptor): Suit | null {
     return card.type === "suited" ? card.suit : null;
+}
+
+/** Immutably push `card` onto its foundation (bump top + count). */
+function pushFoundation(
+    foundations: readonly SolitaireFoundationView[],
+    suit: Suit,
+    card: CardDescriptor,
+): SolitaireFoundationView[] {
+    return foundations.map((f) =>
+        f.suit === suit ? { ...f, top: card, count: f.count + 1 } : f,
+    );
+}
+
+/** Immutably replace one column's face-up run. */
+function replaceUp(
+    tableau: readonly SolitaireColumnView[],
+    column: number,
+    up: readonly CardDescriptor[],
+): SolitaireColumnView[] {
+    return tableau.map((c, i) => (i === column ? { ...c, up } : c));
+}
+
+/** Immutably append cards to one column's face-up run. */
+function appendUp(
+    tableau: readonly SolitaireColumnView[],
+    column: number,
+    cards: readonly CardDescriptor[],
+): SolitaireColumnView[] {
+    return tableau.map((c, i) =>
+        i === column ? { ...c, up: [...c.up, ...cards] } : c,
+    );
 }
 
 /**
@@ -59,6 +95,79 @@ export const solitaireTable = registerTable<SolitaireView>({
             fill: true,
         },
     ],
+
+    /**
+     * Optimistic prediction of the viewer's own move — the card slides to its
+     * destination immediately, no round-trip. Only moves whose every effect is
+     * already on the board are predicted; anything that would reveal a hidden
+     * card returns `null` (the server reconciles a beat later):
+     * - `draw` / `autoFinish` — turn over face-down stock cards;
+     * - `foundationToTableau` — the card now exposed under the foundation top is
+     *   not in the view (only the top leaks);
+     * - emptying a column's last face-up card flips the face-down one beneath.
+     */
+    predict(view, action) {
+        const a = action as SolitaireAction;
+        switch (a.type) {
+            case "wasteToFoundation": {
+                const card = view.waste.at(-1);
+                const s = card && suitOf(card);
+                if (!card || !s) return null;
+                return {
+                    ...view,
+                    waste: view.waste.slice(0, -1),
+                    foundations: pushFoundation(view.foundations, s, card),
+                };
+            }
+            case "wasteToTableau": {
+                const card = view.waste.at(-1);
+                if (!card) return null;
+                return {
+                    ...view,
+                    waste: view.waste.slice(0, -1),
+                    tableau: appendUp(view.tableau, a.column, [card]),
+                };
+            }
+            case "tableauToFoundation": {
+                const col = view.tableau[a.column];
+                const card = col?.up.at(-1);
+                const s = card && suitOf(card);
+                if (!col || !card || !s) return null;
+                // Emptying the last face-up card flips a hidden one — bail.
+                if (col.up.length === 1 && col.downCount > 0) return null;
+                return {
+                    ...view,
+                    foundations: pushFoundation(view.foundations, s, card),
+                    tableau: replaceUp(
+                        view.tableau,
+                        a.column,
+                        col.up.slice(0, -1),
+                    ),
+                };
+            }
+            case "tableauToTableau": {
+                const from = view.tableau[a.from];
+                if (!from || a.count < 1 || a.count > from.up.length) {
+                    return null;
+                }
+                const cut = from.up.length - a.count;
+                const run = from.up.slice(cut);
+                const leftover = from.up.slice(0, cut);
+                // Moving the whole run off a column with hidden cards flips one.
+                if (leftover.length === 0 && from.downCount > 0) return null;
+                return {
+                    ...view,
+                    tableau: appendUp(
+                        replaceUp(view.tableau, a.from, leftover),
+                        a.to,
+                        run,
+                    ),
+                };
+            }
+            default:
+                return null;
+        }
+    },
 
     mapView(view, ctx) {
         const legal = ctx.legalActions as readonly SolitaireAction[];

@@ -45,5 +45,6 @@ export async function POST(
         ok: true,
         version: result.version,
         events: result.events,
+        payload: result.payload,
     });
 }

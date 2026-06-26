@@ -83,6 +83,62 @@ export const presidentTable = registerTable<PresidentView>({
 
     rankTitle: (rank, total, ctx) => rankTitle(ctx, rank, total),
 
+    /**
+     * Optimistic prediction of the viewer's own play/pass: the chosen cards
+     * leave the hand and land on the trick immediately, no round-trip. The turn
+     * is blanked so `mapView` stops treating it as ours (the fan and Pass
+     * disable themselves) until the server reconciles. Trick-closing sweeps (a
+     * 2, a carré, the last opponent passing) are the server's to settle — those
+     * reconcile a beat later; the prediction only commits to the hand leaving.
+     */
+    predict(view, action, viewerId) {
+        if (viewerId === null) return null;
+        const a = action as PresidentAction;
+        if (a.type !== "play" && a.type !== "pass") return null;
+        const self = view.players.find((p) => p.playerId === viewerId);
+        // Only the player on turn can act — guard a stale click from desyncing.
+        if (!self || view.currentPlayerId !== viewerId) return null;
+
+        if (a.type === "pass") {
+            return {
+                ...view,
+                currentPlayerId: "",
+                players: view.players.map((p) =>
+                    p.playerId === viewerId ? { ...p, passed: true } : p,
+                ),
+            };
+        }
+
+        const hand = self.hand;
+        if (!hand) return null;
+        const playedKeys = new Set(a.cards.map(cardKey));
+        // Every played card must really be in hand, or the click is stale.
+        if (playedKeys.size !== a.cards.length) return null;
+        if (![...playedKeys].every((k) => hand.some((c) => cardKey(c) === k))) {
+            return null;
+        }
+        const first = a.cards[0];
+        if (first?.type !== "suited") return null;
+
+        const nextHand = hand.filter((c) => !playedKeys.has(cardKey(c)));
+        // A fresh lead clears the just-won trick still on display; otherwise the
+        // play stacks onto the running pile.
+        const showingLast = view.pile.length === 0 && view.lastTrick.length > 0;
+        const basePile = showingLast ? [] : view.pile;
+        return {
+            ...view,
+            currentPlayerId: "",
+            combo: { rank: first.rank, count: a.cards.length },
+            pile: [...basePile, { playerId: viewerId, cards: a.cards }],
+            lastTrick: showingLast ? [] : view.lastTrick,
+            players: view.players.map((p) =>
+                p.playerId === viewerId
+                    ? { ...p, hand: nextHand, handCount: nextHand.length }
+                    : p,
+            ),
+        };
+    },
+
     mapView(view, ctx) {
         const self = view.players.find((p) => p.playerId === ctx.viewerId);
         const isYourTurn = !ctx.isOver && view.currentPlayerId === ctx.viewerId;
