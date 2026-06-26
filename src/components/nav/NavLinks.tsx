@@ -8,6 +8,7 @@ import {
     PlayIcon,
     ShieldIcon,
     ShopIcon,
+    TrophyIcon,
 } from "./NavIcons";
 import { isActive } from "./navUtils";
 
@@ -50,6 +51,14 @@ export function NavLinks({
             color: "#48c97a",
             glow: "rgba(72,201,122,0.1)",
             suit: "♥",
+        },
+        {
+            href: "/leaderboard",
+            label: t("leaderboard"),
+            icon: <TrophyIcon />,
+            color: "#ff9d3c",
+            glow: "rgba(255,157,60,0.1)",
+            suit: "♦",
         },
         {
             href: "/shop",

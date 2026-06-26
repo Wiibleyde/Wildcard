@@ -15,6 +15,7 @@ import { getGameModule } from "@/lib/games";
 import { createClient } from "@/lib/supabase/server";
 import { publicStorageUrl } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
+import { levelForXp } from "@/lib/xp/xp";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type PlayerXP = Database["public"]["Tables"]["player_xp"]["Row"];
@@ -41,7 +42,7 @@ export async function ProfilePage({ lang }: { lang: string }) {
     const profile = profileRes.data as Profile | null;
     const playerXP = xpRes.data as PlayerXP | null;
     const xp = playerXP?.xp ?? 0;
-    const level = Math.floor(xp / 500) + 1;
+    const level = levelForXp(xp);
 
     const ratings: EloRatingRow[] = (eloRes.data ?? []).map((row) => ({
         moduleId: row.module_id,

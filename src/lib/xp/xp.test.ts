@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { computeXpAwards, PARTICIPATION_XP, WIN_XP } from "./xp";
+import {
+    computeXpAwards,
+    levelForXp,
+    PARTICIPATION_XP,
+    WIN_XP,
+    xpBreakdown,
+    xpForLevel,
+    xpProgress,
+} from "./xp";
 
 const rankings = (...ids: string[]) => ids.map((playerId) => ({ playerId }));
 
@@ -48,5 +56,51 @@ describe("computeXpAwards", () => {
         expect(
             awards.every((x) => x.amount === PARTICIPATION_XP + WIN_XP),
         ).toBe(true);
+    });
+});
+
+describe("exponential level curve", () => {
+    it("level 1 starts at 0 XP", () => {
+        expect(xpForLevel(1)).toBe(0);
+        expect(levelForXp(0)).toBe(1);
+    });
+
+    it("each level costs GROWTH× more than the last", () => {
+        // 1→2: 300, 2→3: 360, 3→4: 432
+        expect(xpForLevel(2)).toBe(300);
+        expect(xpForLevel(3)).toBe(660);
+        expect(xpForLevel(4)).toBe(1092);
+    });
+
+    it("the curve is strictly increasing and accelerating", () => {
+        const costs = [1, 2, 3, 4, 5, 6].map(
+            (l) => xpForLevel(l + 1) - xpForLevel(l),
+        );
+        for (let i = 1; i < costs.length; i++) {
+            expect(costs[i]).toBeGreaterThan(costs[i - 1]);
+        }
+    });
+
+    it("lands on the exact level at every threshold boundary", () => {
+        for (let level = 1; level <= 30; level++) {
+            const at = xpForLevel(level);
+            expect(levelForXp(at)).toBe(level);
+            expect(levelForXp(at - 1)).toBe(Math.max(1, level - 1));
+            expect(levelForXp(at + 1)).toBe(level);
+        }
+    });
+
+    it("reports progress 0 at a threshold and ~1 just before the next", () => {
+        expect(xpProgress(xpForLevel(3))).toBe(0);
+        expect(xpProgress(xpForLevel(4) - 1)).toBeGreaterThan(0.99);
+    });
+
+    it("breakdown xpToNext + xpIntoLevel spans the level", () => {
+        const xp = 500; // somewhere inside level 2 (300..675)
+        const { level, xpIntoLevel, xpToNext } = xpBreakdown(xp);
+        expect(level).toBe(2);
+        expect(xpIntoLevel).toBe(xp - xpForLevel(2));
+        expect(xpToNext).toBe(xpForLevel(3) - xp);
+        expect(xpIntoLevel + xpToNext).toBe(xpForLevel(3) - xpForLevel(2));
     });
 });

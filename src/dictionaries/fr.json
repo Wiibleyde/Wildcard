@@ -16,6 +16,7 @@
     "navigation": {
         "home": "Accueil",
         "play": "Jouer",
+        "leaderboard": "Classement",
         "shop": "Boutique",
         "style": "Style",
         "coins": "jetons",
@@ -97,6 +98,16 @@
         "ratings_empty": "Aucune partie classée pour l'instant",
         "ratings_played": "parties",
         "ratings_wins": "V"
+    },
+    "leaderboard": {
+        "title": "Classement",
+        "subtitle": "Les meilleurs joueurs par jeu, classés à l'ELO.",
+        "rating": "ELO",
+        "games": "parties",
+        "wins": "victoires",
+        "you": "Vous",
+        "empty": "Aucun classement pour ce jeu pour l'instant.",
+        "empty_all": "Aucune partie classée pour l'instant. Lancez une partie pour apparaître au classement !"
     },
     "history": {
         "title": "Historique des parties",
