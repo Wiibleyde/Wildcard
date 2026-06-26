@@ -23,45 +23,41 @@ export interface LeaderboardGame {
 }
 
 /**
- * Per-game ELO standings, best rating first. Reads the publicly-readable
- * `player_elo` rows (RLS allows SELECT to everyone) joined to `profiles` for the
- * display name + avatar. Ratings are written server-side from each game's
- * `outcome()` (see {@link recordEloForGame}); this is a pure read-only
- * projection — the browser can never forge a rating here.
+ * Per-game ELO standings, best rating first. Delegates ranking to the
+ * `leaderboard` SQL function, which uses a window function over the publicly
+ * readable `player_elo` rows (RLS allows SELECT to everyone) joined to
+ * `profiles` for the display name + avatar, and returns only the top `topN` per
+ * module — the whole table never crosses the wire. Ratings are written
+ * server-side from each game's `outcome()` (see {@link recordEloForGame}); this
+ * is a pure read-only projection — the browser can never forge a rating here.
  *
- * Rows are returned already ordered by rating desc, so the first `topN` seen per
- * module are that game's top players. Games appear in catalog order; a game with
- * no rated player yet is simply absent.
+ * Rows arrive ordered by module then in-module rank, so the per-module top
+ * players are already in display order. Games appear in catalog order; a game
+ * with no rated player yet is simply absent.
+ *
+ * A query failure is thrown, not swallowed: an error and "no rated games yet"
+ * must never render as the same empty board.
  */
 export async function getLeaderboard(
     supabase: ServerClient,
     topN: number = LEADERBOARD_TOP_N,
 ): Promise<LeaderboardGame[]> {
-    const { data, error } = await supabase
-        .from("player_elo")
-        .select(
-            "user_id, module_id, rating, games_played, wins, profiles(username, avatar_url)",
-        )
-        .order("rating", { ascending: false });
+    const { data, error } = await supabase.rpc("leaderboard", {
+        p_top_n: topN,
+    });
 
-    if (error || !data) return [];
+    if (error) {
+        throw new Error(`getLeaderboard failed: ${error.message}`);
+    }
 
     const byModule = new Map<string, LeaderboardEntry[]>();
-    for (const row of data) {
-        // Embedded to-one relation; defensively handle the array shape supabase
-        // sometimes infers, and skip rows whose profile was deleted.
-        const profile = Array.isArray(row.profiles)
-            ? row.profiles[0]
-            : row.profiles;
-        if (!profile) continue;
-
+    for (const row of data ?? []) {
         const list = byModule.get(row.module_id) ?? [];
         byModule.set(row.module_id, list);
-        if (list.length >= topN) continue;
         list.push({
             userId: row.user_id,
-            username: profile.username,
-            avatarPath: profile.avatar_url,
+            username: row.username,
+            avatarPath: row.avatar_url,
             rating: row.rating,
             gamesPlayed: row.games_played,
             wins: row.wins,

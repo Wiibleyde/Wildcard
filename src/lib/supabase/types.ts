@@ -542,6 +542,21 @@ export type Database = {
                 };
                 Returns: undefined;
             };
+            leaderboard: {
+                Args: {
+                    p_top_n?: number;
+                };
+                Returns: {
+                    module_id: string;
+                    user_id: string;
+                    username: string;
+                    avatar_url: string | null;
+                    rating: number;
+                    games_played: number;
+                    wins: number;
+                    rank: number;
+                }[];
+            };
             match_history: {
                 Args: {
                     p_user_id: string;
