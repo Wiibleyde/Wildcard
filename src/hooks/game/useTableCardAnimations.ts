@@ -1,7 +1,7 @@
 "use client";
 
 import { useGSAP } from "@gsap/react";
-import { type RefObject, useRef } from "react";
+import { type RefObject, useCallback, useRef } from "react";
 import { getPlayAnimation, prefersReducedMotion } from "@/lib/card/animations";
 import type { CardTheme } from "@/lib/card/types";
 import type { TableData } from "@/lib/games/table/types";
@@ -44,10 +44,13 @@ export function useTableCardAnimations(
         { dependencies: [data], scope: rootRef },
     );
 
-    const registerCard = (id: string) => (el: HTMLDivElement | null) => {
-        if (el) cardRefs.current.set(id, el);
-        else cardRefs.current.delete(id);
-    };
+    const registerCard = useCallback(
+        (id: string) => (el: HTMLDivElement | null) => {
+            if (el) cardRefs.current.set(id, el);
+            else cardRefs.current.delete(id);
+        },
+        [],
+    );
 
     return { rootRef, registerCard };
 }

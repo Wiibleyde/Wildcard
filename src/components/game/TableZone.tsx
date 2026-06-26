@@ -59,7 +59,9 @@ export function TableZone({ instance, template, ctx }: TableZoneProps) {
         // biome-ignore lint/a11y/useKeyWithClickEvents: pile click affordance — keyboard play is served by the per-card actions; a dedicated a11y path is tracked separately.
         <div
             className={`flex flex-col items-center gap-1.5 ${
-                template.fill ? "min-w-0 flex-1 lg:h-full lg:min-h-0" : ""
+                template.fill
+                    ? "min-w-0 max-w-32 flex-1 lg:h-full lg:min-h-0"
+                    : ""
             } ${
                 template.arrangement === "fan"
                     ? "w-full lg:h-full lg:min-h-0"

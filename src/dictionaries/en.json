@@ -92,7 +92,11 @@
         "xp_to_next": "XP to next level",
         "edit_title": "Edit profile",
         "history": "Match history",
-        "history_desc": "Review your past games and their results"
+        "history_desc": "Review your past games and their results",
+        "ratings_title": "ELO Ranking",
+        "ratings_empty": "No rated games yet",
+        "ratings_played": "games",
+        "ratings_wins": "W"
     },
     "history": {
         "title": "Match history",
@@ -226,6 +230,9 @@
         "game_aborted": "Game ended by an administrator",
         "winners": "Winners",
         "back_to_lobby": "Back to lobby",
+        "xp_title": "Experience",
+        "level_short": "Lv.",
+        "level_up": "Level up!",
         "place_president": "President",
         "place_vice_president": "Vice-President",
         "place_neutral": "Neutral",

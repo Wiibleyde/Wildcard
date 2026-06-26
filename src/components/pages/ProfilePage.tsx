@@ -4,9 +4,14 @@ import { SignOutButton } from "@/components/auth/SignOutButton";
 import { DecoSuit } from "@/components/brand/DecoSuit";
 import { AvatarHero } from "@/components/profile/AvatarHero";
 import { LinkedAccounts } from "@/components/profile/LinkedAccounts";
+import {
+    type EloRatingRow,
+    ProfileEloCard,
+} from "@/components/profile/ProfileEloCard";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { ProfileXPCard } from "@/components/profile/ProfileXPCard";
 import { Link } from "@/i18n/navigation";
+import { getGameModule } from "@/lib/games";
 import { createClient } from "@/lib/supabase/server";
 import { publicStorageUrl } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
@@ -23,15 +28,28 @@ export async function ProfilePage({ lang }: { lang: string }) {
     } = await supabase.auth.getUser();
     if (!user) redirect(`/${lang}/login`);
 
-    const [profileRes, xpRes] = await Promise.all([
+    const [profileRes, xpRes, eloRes] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", user.id).single(),
         supabase.from("player_xp").select("*").eq("user_id", user.id).single(),
+        supabase
+            .from("player_elo")
+            .select("module_id, rating, games_played, wins")
+            .eq("user_id", user.id)
+            .order("rating", { ascending: false }),
     ]);
 
     const profile = profileRes.data as Profile | null;
     const playerXP = xpRes.data as PlayerXP | null;
     const xp = playerXP?.xp ?? 0;
     const level = Math.floor(xp / 500) + 1;
+
+    const ratings: EloRatingRow[] = (eloRes.data ?? []).map((row) => ({
+        moduleId: row.module_id,
+        moduleName: getGameModule(row.module_id)?.name ?? row.module_id,
+        rating: row.rating,
+        gamesPlayed: row.games_played,
+        wins: row.wins,
+    }));
 
     const linkedProviders = (user.identities ?? []).map((i) => i.provider);
 
@@ -162,6 +180,8 @@ export async function ProfilePage({ lang }: { lang: string }) {
                         <LinkedAccounts linkedProviders={linkedProviders} />
                     </div>
                 </div>
+
+                <ProfileEloCard ratings={ratings} />
 
                 <Link
                     href="/profile/history"

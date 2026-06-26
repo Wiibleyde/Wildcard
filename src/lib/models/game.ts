@@ -12,6 +12,8 @@ import type {
 } from "@/lib/engine/types";
 import { getGameModule } from "@/lib/games";
 import { recordGameFinished, recordMove } from "@/lib/metrics/registry";
+import { recordEloForGame } from "@/lib/models/elo";
+import { recordXpForGame } from "@/lib/models/xp";
 import type { Database } from "@/lib/supabase/types";
 
 type Admin = SupabaseClient<Database>;
@@ -147,6 +149,43 @@ async function logOf(admin: Admin, gameId: string): Promise<GameLogEntry[]> {
 }
 
 /**
+ * Assemble one viewer's redacted payload from an already-loaded module + state.
+ * The single place that shapes a {@link GameClientPayload}, shared by the full
+ * read ({@link getGameClientState}) and the action commit ({@link applyAction},
+ * which returns the actor's fresh payload in the POST response so the client
+ * needs no follow-up GET). `isOverFlag` is the DB column: an admin force-end
+ * flips it without touching `state`, so `module.isOver(state)` alone would miss
+ * it.
+ */
+function buildClientPayload(
+    gameId: string,
+    moduleId: string,
+    version: number,
+    isOverFlag: boolean,
+    module: AnyGameModule,
+    state: GameState,
+    viewerId: string | null,
+    players: GamePlayer[],
+    log: GameLogEntry[],
+): GameClientPayload {
+    const cs = clientState(module, state, viewerId);
+    return {
+        gameId,
+        moduleId,
+        version,
+        phase: state.phase,
+        isOver: cs.isOver || isOverFlag,
+        currentPlayerId: state.currentPlayerId,
+        view: cs.view,
+        legalActions: cs.legalActions,
+        outcome: module.outcome(state),
+        players,
+        log,
+        viewerId,
+    };
+}
+
+/**
  * Build the redacted payload for one viewer. `viewerId` that is not seated is
  * treated as a spectator (`null` view, no legal actions).
  */
@@ -171,7 +210,6 @@ export async function getGameClientState(
         viewerId !== null && state.players.some((p) => p.id === viewerId);
     const effectiveViewer = isPlayer ? viewerId : null;
 
-    const cs = clientState(module, state, effectiveViewer);
     const [players, log] = await Promise.all([
         playersOf(admin, state),
         logOf(admin, gameId),
@@ -179,23 +217,64 @@ export async function getGameClientState(
 
     return {
         ok: true,
-        payload: {
-            gameId: meta.id,
-            moduleId: meta.module_id,
-            version: meta.version,
-            phase: state.phase,
-            // An admin force-end flips the column without touching `state`, so
-            // `module.isOver(state)` stays false — the DB flag is the override.
-            isOver: cs.isOver || meta.is_over,
-            currentPlayerId: state.currentPlayerId,
-            view: cs.view,
-            legalActions: cs.legalActions,
-            outcome: module.outcome(state),
+        payload: buildClientPayload(
+            meta.id,
+            meta.module_id,
+            meta.version,
+            meta.is_over,
+            module,
+            state,
+            effectiveViewer,
             players,
             log,
-            viewerId: effectiveViewer,
-        },
+        ),
     };
+}
+
+export interface GameVersionInfo {
+    readonly version: number;
+    readonly isOver: boolean;
+}
+
+/**
+ * Cheap "did anything change?" probe for the poll/doorbell hot path. Reads only
+ * the small public meta row — no secret `state`, no action log, no `view()`
+ * projection — so a client can poll it at the bot-move cadence for a handful of
+ * bytes and pull the full redacted payload ({@link getGameClientState}) only
+ * once `version` has actually advanced past what it holds.
+ *
+ * Bot self-heal still piggybacks on the read, but only on the rare *idle* path:
+ * a live game (and a healthy bot chain pacing its moves) bumps `updated_at` well
+ * inside the stall window, so the heavy state load needed to confirm a stranded
+ * chain runs only after the row has sat untouched past {@link STALL_RESUME_MS} —
+ * never on a normal tick.
+ */
+export async function getGameVersion(
+    admin: Admin,
+    gameId: string,
+): Promise<GameVersionInfo | null> {
+    const { data: meta } = await admin
+        .from("games")
+        .select("version, is_over, bot_ids, current_player_id, updated_at")
+        .eq("id", gameId)
+        .maybeSingle();
+    if (!meta) return null;
+
+    if (!meta.is_over && meta.bot_ids.length > 0) {
+        const idleMs = Date.now() - new Date(meta.updated_at).getTime();
+        // Sequential: only a bot on turn can be stranded. Simultaneous
+        // (current_player_id null): a bot *might* drive the round — confirm with
+        // state. Either way we touch state only once genuinely stale.
+        const maybeBotTurn =
+            meta.current_player_id === null ||
+            meta.bot_ids.includes(meta.current_player_id);
+        if (maybeBotTurn && idleMs >= STALL_RESUME_MS) {
+            const loaded = await loadGame(admin, gameId);
+            if (loaded.ok) maybeResumeBots(admin, loaded.game);
+        }
+    }
+
+    return { version: meta.version, isOver: meta.is_over };
 }
 
 export type ApplyErrorCode =
@@ -406,6 +485,8 @@ export async function advanceBots(
                 .update({ status: "finished" })
                 .eq("id", roomId);
             recordGameFinished(module.id, durationSeconds(createdAt));
+            await recordEloForGame(admin, module.id, outcome, botIds);
+            await recordXpForGame(admin, outcome, botIds);
         }
     }
 
@@ -417,6 +498,13 @@ export type ApplyActionResult =
           ok: true;
           version: number;
           events: readonly GameEvent[];
+          /**
+           * The actor's fresh redacted payload, built from the just-committed
+           * state. Returned in the POST response so the client adopts it
+           * directly instead of firing a follow-up GET — one round-trip per
+           * move instead of two, and one state load instead of two.
+           */
+          payload: GameClientPayload;
       }
     | {
           ok: false;
@@ -555,12 +643,33 @@ export async function applyAction(
 
     record("ok");
 
+    // Build the actor's fresh payload straight from the in-memory committed
+    // state — the client adopts it from the POST response, no follow-up GET.
+    // (`logOf` now includes the action just inserted above.)
+    const [players, log] = await Promise.all([
+        playersOf(admin, newState),
+        logOf(admin, gameId),
+    ]);
+    const payload = buildClientPayload(
+        gameId,
+        meta.module_id,
+        newVersion,
+        isOver,
+        module,
+        newState,
+        actorId,
+        players,
+        log,
+    );
+
     if (isOver) {
         await admin
             .from("rooms")
             .update({ status: "finished" })
             .eq("id", meta.room_id);
         recordGameFinished(module.id, durationSeconds(meta.created_at));
+        await recordEloForGame(admin, meta.module_id, outcome, meta.bot_ids);
+        await recordXpForGame(admin, outcome, meta.bot_ids);
     }
 
     // Let any bots now on turn play out AFTER the response: the human's card
@@ -582,7 +691,7 @@ export async function applyAction(
         );
     }
 
-    return { ok: true, version: newVersion, events: result.events };
+    return { ok: true, version: newVersion, events: result.events, payload };
 }
 
 export type EndGameResult =
