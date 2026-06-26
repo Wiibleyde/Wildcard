@@ -1,17 +1,8 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { useXPBarAnimation } from "@/hooks/profile/useXPBarAnimation";
-
-const XP_PER_LEVEL = 500;
-
-function xpStats(xp: number) {
-    const level = Math.floor(xp / XP_PER_LEVEL) + 1;
-    const xpInLevel = xp % XP_PER_LEVEL;
-    const xpToNext = XP_PER_LEVEL - xpInLevel;
-    const progress = xpInLevel / XP_PER_LEVEL;
-    return { level, xpInLevel, xpToNext, progress };
-}
+import { xpBreakdown } from "@/lib/xp/xp";
 
 type Props = {
     xp: number;
@@ -20,7 +11,8 @@ type Props = {
 export function ProfileXPCard({ xp }: Props) {
     "use no memo";
     const t = useTranslations("profile");
-    const { level, xpToNext, progress } = xpStats(xp);
+    const format = useFormatter();
+    const { level, xpToNext, progress } = xpBreakdown(xp);
     const { containerRef, barRef, xpNumRef } = useXPBarAnimation(xp, progress);
 
     return (
@@ -91,7 +83,7 @@ export function ProfileXPCard({ xp }: Props) {
                 className="text-xs font-semibold mt-1.5 text-right"
                 style={{ color: "#7a6a50" }}
             >
-                {xpToNext.toLocaleString()} {t("xp_to_next")}
+                {format.number(xpToNext)} {t("xp_to_next")}
             </p>
         </div>
     );

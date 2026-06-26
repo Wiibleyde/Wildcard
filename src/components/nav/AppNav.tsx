@@ -5,6 +5,7 @@ import { getUserRole, roleAtLeast } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";
 import { publicStorageUrl } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
+import { levelForXp } from "@/lib/xp/xp";
 import { Brand } from "./Brand";
 import { NavActions } from "./NavActions";
 import { NavAvatar } from "./NavAvatar";
@@ -13,10 +14,6 @@ import { SidebarDesktop } from "./SidebarDesktop";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type PlayerXP = Database["public"]["Tables"]["player_xp"]["Row"];
-
-function xpLevel(xp: number) {
-    return Math.floor(xp / 500) + 1;
-}
 
 export async function AppNav({ user }: { user: User }) {
     const supabase = await createClient();
@@ -34,7 +31,7 @@ export async function AppNav({ user }: { user: User }) {
     const profile = profileRes.data as Profile | null;
     const xpRow = xpRes.data as Pick<PlayerXP, "xp"> | null;
     const xp = xpRow?.xp ?? 0;
-    const level = xpLevel(xp);
+    const level = levelForXp(xp);
 
     const avatarUrl = profile?.avatar_url
         ? publicStorageUrl("avatars", profile.avatar_url)
