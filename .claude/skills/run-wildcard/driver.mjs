@@ -134,6 +134,7 @@ if (mode === "shoot") {
         lobby: "/fr/lobby",
         profile: "/fr/profile",
         history: "/fr/profile/history",
+        leaderboard: "/fr/leaderboard",
         customize: "/fr/customize",
         preview: "/fr/customize/preview",
         room: `/fr/lobby/${lobbyRoom.code}`,

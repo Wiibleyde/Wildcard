@@ -16,6 +16,7 @@
     "navigation": {
         "home": "Home",
         "play": "Play",
+        "leaderboard": "Leaderboard",
         "shop": "Shop",
         "style": "Style",
         "coins": "coins",
@@ -97,6 +98,16 @@
         "ratings_empty": "No rated games yet",
         "ratings_played": "games",
         "ratings_wins": "W"
+    },
+    "leaderboard": {
+        "title": "Leaderboard",
+        "subtitle": "The top players per game, ranked by ELO.",
+        "rating": "ELO",
+        "games": "games",
+        "wins": "wins",
+        "you": "You",
+        "empty": "No rankings for this game yet.",
+        "empty_all": "No rated games yet. Play a match to climb the leaderboard!"
     },
     "history": {
         "title": "Match history",
