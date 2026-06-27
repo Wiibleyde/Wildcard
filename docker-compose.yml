@@ -50,21 +50,16 @@ services:
         condition: service_healthy
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB} # read at runtime by migrate.sh
     volumes:
       - ./supabase/migrations:/migrations:ro
       - ./supabase/seed.sql:/seed.sql:ro
       - ./supabase/init/zzz-fix-auth-schema.sh:/fix-auth-schema.sh:ro
-    command: >
-      sh -c "
-        echo 'Fixing auth schema (image/gotrue version mismatch)...';
-        sh /fix-auth-schema.sh;
-        for f in $$(ls /migrations/*.sql 2>/dev/null | sort); do
-          echo \"Applying $$f...\";
-          psql -h db -U postgres -d ${POSTGRES_DB} -f $$f || true;
-        done;
-        psql -h db -U postgres -d ${POSTGRES_DB} -f /seed.sql || true;
-        echo 'Migrations done.'
-      "
+      - ./supabase/migrate.sh:/migrate.sh:ro
+    # Version-tracked runner: each migration applies at most once and a real
+    # error aborts the run (see supabase/migrate.sh). Replaces the old
+    # replay-everything loop that hid failures behind `|| true`.
+    command: ["sh", "/migrate.sh"]
 
   # ──────────────────────────────────────────────────────────────────────────
   # API Gateway
@@ -148,10 +143,6 @@ services:
       GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID: ${SUPABASE_AUTH_GOOGLE_CLIENT_ID}
       GOTRUE_EXTERNAL_GOOGLE_SECRET: ${SUPABASE_AUTH_GOOGLE_SECRET}
       GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI: ${API_EXTERNAL_URL}/auth/v1/callback
-      GOTRUE_EXTERNAL_APPLE_ENABLED: ${ENABLE_APPLE_SIGNUP}
-      GOTRUE_EXTERNAL_APPLE_CLIENT_ID: ${SUPABASE_AUTH_APPLE_CLIENT_ID}
-      GOTRUE_EXTERNAL_APPLE_SECRET: ${SUPABASE_AUTH_APPLE_SECRET}
-      GOTRUE_EXTERNAL_APPLE_REDIRECT_URI: ${API_EXTERNAL_URL}/auth/v1/callback
 
   # ──────────────────────────────────────────────────────────────────────────
   # REST API (PostgREST)
@@ -238,6 +229,10 @@ services:
   # ──────────────────────────────────────────────────────────────────────────
   app:
     container_name: wildcard-app
+    # CD pulls this from GHCR (set APP_IMAGE in .env.docker, e.g.
+    # ghcr.io/wiibleyde/wildcard:latest). Local dev leaves the default → `up
+    # --build` builds and tags the image locally. Same Dockerfile, both paths.
+    image: ${APP_IMAGE:-wildcard-app:local}
     build:
       context: .
     restart: unless-stopped
