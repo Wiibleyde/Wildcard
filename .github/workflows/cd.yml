@@ -1,0 +1,104 @@
+name: CD
+
+# Build ONE config-free image and publish it to GHCR; optionally deploy it.
+# The image embeds no public config — SUPABASE_URL / ANON_KEY / UMAMI_* are read
+# at RUNTIME from the container env (see Dockerfile). So a single artifact runs
+# in any environment: build once here, deploy by pulling, parameterise on start.
+
+on:
+  # Build only after CI is green on main — tests gate the published image.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  # Tagged releases (v1.2.3) get their own immutable, semver-tagged image.
+  push:
+    tags: ["v*"]
+  # Manual trigger (Actions tab) — rebuild/redeploy on demand.
+  workflow_dispatch:
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false # never abort a deploy mid-flight
+
+env:
+  # GHCR requires a lowercase path; github.repository is "Wiibleyde/Wildcard"
+  # (mixed case), so it's hardcoded here rather than derived.
+  IMAGE: ghcr.io/wiibleyde/wildcard
+
+jobs:
+  build-push:
+    name: Build & push image
+    runs-on: ubuntu-latest
+    # Skip when the gating CI run failed; tags / manual dispatch always build.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    permissions:
+      contents: read
+      packages: write # push to GHCR
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # On workflow_run the default ref is the branch tip; check out the exact
+          # commit CI validated instead, so the image matches the tested code.
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive tags & labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.event_name == 'workflow_run' }}
+            type=sha,format=long,enable=${{ github.event_name == 'workflow_run' }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to server
+    needs: build-push
+    runs-on: ubuntu-latest
+    # DORMANT until a server exists. Flip it on with a repo variable:
+    #   Settings → Secrets and variables → Actions → Variables → DEPLOY_ENABLED=true
+    # Until then this job is skipped and CD just builds+publishes the image.
+    if: vars.DEPLOY_ENABLED == 'true'
+    environment: production
+    permissions:
+      contents: read
+      packages: read # GITHUB_TOKEN pulls the image on the server
+    steps:
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          # Pipes the run's GITHUB_TOKEN to the host to pull from GHCR. Prefer a
+          # long-lived PAT logged in once on the server? Drop the docker login
+          # line and pre-authenticate the host instead.
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.DEPLOY_PATH }}"
+            git pull --ff-only
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+            ./scripts/deploy.sh

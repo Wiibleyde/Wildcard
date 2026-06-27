@@ -36,7 +36,7 @@ alter table public.profiles replica identity full;
 alter publication supabase_realtime add table public.profiles;
 
 -- ============================================================
--- Auto-create profile on sign-up (Discord / Google / Apple / email)
+-- Auto-create profile on sign-up (Discord / Google / email)
 -- Username derived from OAuth metadata with uniqueness enforcement
 -- ============================================================
 create or replace function public.handle_new_user()
@@ -49,7 +49,7 @@ declare
   final_username text;
   counter       int := 0;
 begin
-  -- Discord sends user_name, Google/Apple send name
+  -- Discord sends user_name, Google sends name
   base_username := coalesce(
     new.raw_user_meta_data->>'user_name',
     new.raw_user_meta_data->>'name',

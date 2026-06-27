@@ -138,7 +138,7 @@ wildcard/
 │   │   └── supabase/
 │   │       ├── client.ts     # Client navigateur
 │   │       ├── server.ts     # Client Server Components / API Routes
-│   │       ├── auth.ts       # signInWithOAuth (Discord/Google/Apple), signOut
+│   │       ├── auth.ts       # signInWithOAuth (Discord/Google), signOut
 │   │       └── types.ts      # Types DB (auto-généré)
 │   └── proxy.ts              # Session refresh Supabase + redirect i18n
 ├── supabase/
@@ -164,22 +164,38 @@ wildcard/
 ### RLS (Row Level Security)
 
 - **`profiles`** : lecture publique, écriture/mise à jour par le propriétaire uniquement
-- Un trigger `on_auth_user_created` crée automatiquement un profil à l'inscription (compatible Discord, Google, Apple, email)
+- Un trigger `on_auth_user_created` crée automatiquement un profil à l'inscription (compatible Discord, Google, email)
 
 ### Créer une migration
 
 ```bash
 bun run db:new-migration -- <nom>
 # → crée supabase/migrations/<timestamp>_<nom>.sql
-# Éditer le fichier, puis : bun run db:push
-# Regénérer les types : bun run db:types
+# Éditer le fichier, puis appliquer :
+bun run db:migrate        # n'applique QUE les fichiers non encore appliqués
+bun run db:types          # regénérer les types TypeScript
 ```
+
+#### Suivi des versions (`schema_migrations`)
+
+`bun run db:migrate` lance `supabase/migrate.sh` (service `db-migrate`). Chaque
+fichier est appliqué **au plus une fois** : la version (nom de fichier) est
+enregistrée dans `public.schema_migrations`. Re-lancer = no-op, plus de mur
+d'erreurs « already exists ».
+
+- Chaque migration tourne dans **une transaction** (`ON_ERROR_STOP`) : une vraie
+  erreur SQL annule le fichier et **interrompt le run** (exit ≠ 0) — un échec
+  casse le déploiement au lieu d'être masqué.
+- **Bootstrap** : sur une base déjà au niveau HEAD mais sans historique (table
+  `profiles` présente, `schema_migrations` vide), tous les fichiers actuels sont
+  marqués appliqués **sans être rejoués** (baseline). Une base vierge applique
+  tout normalement.
 
 ---
 
 ## Authentification
 
-Providers OAuth configurés : **Discord**, **Google**, **Apple**.
+Providers OAuth configurés : **Discord**, **Google**.
 
 Activer un provider :
 1. Créer l'app dans la console du provider
@@ -393,7 +409,6 @@ https://api.wildcard.example.com/auth/v1/callback
 |---|---|
 | Discord | discord.com/developers |
 | Google | console.cloud.google.com/apis/credentials |
-| Apple | developer.apple.com/account/resources/identifiers |
 
 Activer dans `.env.docker` puis redémarrer auth :
 
@@ -413,11 +428,12 @@ docker compose --env-file .env.docker restart auth
 bun run db:new-migration -- <nom>
 # Éditer supabase/migrations/<timestamp>_<nom>.sql
 
-# Appliquer en prod (service db-migrate est one-shot, relancer manuellement)
-PGPASSWORD=$(grep POSTGRES_PASSWORD .env.docker | cut -d= -f2) \
-  psql -h localhost -U postgres -d postgres \
-  -f supabase/migrations/<timestamp>_<nom>.sql
+# Appliquer en prod — le runner versionné n'applique que les fichiers nouveaux.
+docker compose --env-file .env.docker run --rm db-migrate
 ```
+
+> En CD, `scripts/deploy.sh` lance déjà cette étape à chaque déploiement
+> (cf. *Déploiement continu*). Un fichier déjà appliqué est ignoré.
 
 ### 6 — Mise à jour de l'application
 
@@ -442,4 +458,69 @@ docker compose --env-file .env.docker restart <service>     # redémarrer un ser
 ```bash
 docker compose --env-file .env.docker down -v
 docker compose --env-file .env.docker up -d --build
+```
+
+---
+
+## Intégration & déploiement continus (CI/CD)
+
+Deux workflows GitHub Actions, séparés par responsabilité :
+
+| Workflow | Fichier | Déclencheur | Rôle |
+|---|---|---|---|
+| **CI** | `.github/workflows/ci.yml` | push `main`, toute PR | lint (Biome) · tests (Vitest) · build Next |
+| **CD** | `.github/workflows/cd.yml` | CI vert sur `main` · tag `v*` · manuel | build + push image GHCR · déploiement (optionnel) |
+
+### Principe — *build once, deploy by pull*
+
+L'image est **sans config publique** : `SUPABASE_URL`, `ANON_KEY`, `UMAMI_*` sont
+lues au **runtime** depuis l'env du conteneur (cf. `Dockerfile`). Un **seul
+artefact** tourne donc dans n'importe quel environnement. La pipeline le build
+une fois, le publie sur **GHCR**, et le serveur le récupère par `docker pull` —
+aucune reconstruction côté serveur.
+
+1. **CI** valide le commit (lint + test + build).
+2. À CI vert sur `main`, **CD** build l'image et la pousse sur
+   `ghcr.io/wiibleyde/wildcard` (tags `latest` + `sha-<commit>`). Les tags Git
+   `v1.2.3` produisent en plus une image semver immuable.
+3. Le job `deploy` se connecte en SSH au serveur, `pull` la nouvelle image,
+   applique les migrations et redémarre le conteneur app (`scripts/deploy.sh`).
+
+> **État actuel : pas de serveur.** Le job `deploy` est **dormant** (gardé par la
+> variable `DEPLOY_ENABLED`). Sans serveur, CD se contente de **builder et
+> publier l'image** à chaque merge sur `main` — déjà fonctionnel et vérifiable
+> dans l'onglet *Packages* du dépôt.
+
+### Activer le déploiement (quand le serveur existe)
+
+1. **Préparer le serveur** une fois (cf. *Déploiement — On-Premise* ci-dessus) :
+   cloner dans `/opt/wildcard`, remplir `.env.docker`, `up -d --build` initial.
+2. Dans `.env.docker` du serveur, pointer l'image publiée :
+   ```bash
+   APP_IMAGE=ghcr.io/wiibleyde/wildcard:latest
+   ```
+3. Dans **GitHub → Settings → Secrets and variables → Actions** :
+
+   | Type | Nom | Valeur |
+   |---|---|---|
+   | Variable | `DEPLOY_ENABLED` | `true` |
+   | Secret | `DEPLOY_HOST` | IP / domaine du serveur |
+   | Secret | `DEPLOY_USER` | utilisateur SSH |
+   | Secret | `DEPLOY_SSH_KEY` | clé privée SSH (sans passphrase) |
+   | Secret | `DEPLOY_PATH` | `/opt/wildcard` |
+
+   `GITHUB_TOKEN` (auto) sert à `docker login ghcr.io` côté serveur — aucun PAT à
+   gérer. (Alternative : se logger une fois sur le serveur avec un PAT et retirer
+   la ligne `docker login` du workflow.)
+
+À partir de là, chaque merge sur `main` (CI vert) déploie tout seul.
+
+### Déploiement / rollback manuel
+
+Sur le serveur, `scripts/deploy.sh` fait le pull + migrations + restart :
+
+```bash
+cd /opt/wildcard && git pull
+./scripts/deploy.sh                 # déploie APP_IMAGE (ex. :latest)
+./scripts/deploy.sh sha-<commit>    # rollback sur un commit précis
 ```
