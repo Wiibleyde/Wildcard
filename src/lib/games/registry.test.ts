@@ -18,7 +18,7 @@ describe("game registry", () => {
             gameCatalog()
                 .map((g) => g.id)
                 .sort(),
-        ).toEqual(["bataille", "president", "solitaire"]);
+        ).toEqual(["bataille", "president", "solitaire", "tarot"]);
     });
 
     it("plays a full bataille through the type-erased registry", () => {
@@ -48,6 +48,28 @@ describe("game registry", () => {
         if (!module) return;
 
         let state = createGame(module, seats(4), 999);
+        let guard = 0;
+        while (!module.isOver(state) && guard++ < 10000) {
+            const actor = state.currentPlayerId;
+            expect(actor).not.toBeNull();
+            if (!actor) break;
+            const legal = module.legalActions(state, actor);
+            expect(legal.length).toBeGreaterThan(0);
+            const res = dispatch(module, state, legal[0], actor);
+            expect(res.ok).toBe(true);
+            if (res.ok) state = res.state;
+        }
+
+        expect(module.isOver(state)).toBe(true);
+        expect(module.outcome(state)?.rankings.length).toBe(4);
+    });
+
+    it("plays tarot through its three phases using only legalActions", () => {
+        const module = getGameModule("tarot");
+        expect(module).toBeDefined();
+        if (!module) return;
+
+        let state = createGame(module, seats(4), 2024);
         let guard = 0;
         while (!module.isOver(state) && guard++ < 10000) {
             const actor = state.currentPlayerId;
