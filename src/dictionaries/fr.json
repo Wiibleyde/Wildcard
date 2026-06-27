@@ -218,6 +218,18 @@
             "quadClosesTrick": {
                 "label": "Le carré ferme le pli",
                 "description": "Compléter quatre cartes du même rang balaie le pli."
+            },
+            "gardeSansContre": {
+                "label": "Garde Sans / Contre",
+                "description": "Autorise les enchères Garde Sans (×4) et Garde Contre (×6)."
+            },
+            "petitAuBout": {
+                "label": "Petit au bout",
+                "description": "+10 (×contrat) au camp qui gagne le dernier pli avec le Petit."
+            },
+            "slam": {
+                "label": "Chelem",
+                "description": "±200 si un camp remporte tous les plis (chelem non annoncé)."
             }
         }
     },
@@ -258,6 +270,7 @@
         "error_illegal": "Coup illégal",
         "error_generic": "Une erreur est survenue",
         "rank_J": "Valet",
+        "rank_C": "Cavalier",
         "rank_Q": "Dame",
         "rank_K": "Roi",
         "rank_A": "As",
@@ -282,7 +295,33 @@
         "moves": "{n} coups",
         "empty_column": "Roi",
         "log_to_foundation": "{rank}{suit} monte en fondation",
-        "log_recycle": "La pioche est recyclée"
+        "log_recycle": "La pioche est recyclée",
+        "tarot_your_bid": "À toi d'enchérir",
+        "tarot_your_ecart": "Compose ton écart",
+        "tarot_bid_petite": "Petite",
+        "tarot_bid_garde": "Garde",
+        "tarot_bid_garde_sans": "Garde Sans",
+        "tarot_bid_garde_contre": "Garde Contre",
+        "tarot_excuse": "L'Excuse",
+        "tarot_trump": "Atout {index}",
+        "tarot_the_chien": "Le chien",
+        "tarot_taker": "Preneur",
+        "tarot_ecart_progress": "Écart : {n}/6",
+        "tarot_bidding_status": "Meilleure enchère : {bid}",
+        "tarot_bidding_none": "Enchères en cours",
+        "tarot_contract_status": "{contract} · Preneur : {name}",
+        "tarot_result_made": "Contrat réussi (+{points})",
+        "tarot_result_failed": "Contrat chuté (−{points})",
+        "tarot_made": "réussit",
+        "tarot_failed": "chute",
+        "tarot_log_bid": "{name} annonce {bid}",
+        "tarot_log_passed_out": "Tout le monde passe — donne annulée",
+        "tarot_log_contract": "{name} prend : {contract}",
+        "tarot_log_chien": "Le chien est dévoilé",
+        "tarot_log_ecart": "L'écart est constitué",
+        "tarot_log_played": "{name} joue {card}",
+        "tarot_log_trick": "{name} remporte le pli",
+        "tarot_log_over": "{name} {result} son contrat"
     },
     "realtime": {
         "reconnecting": "Reconnexion en cours…"

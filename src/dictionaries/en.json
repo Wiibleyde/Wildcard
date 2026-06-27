@@ -218,6 +218,18 @@
             "quadClosesTrick": {
                 "label": "A quad closes the trick",
                 "description": "Completing four cards of one rank sweeps the trick."
+            },
+            "gardeSansContre": {
+                "label": "Guard Without / Against",
+                "description": "Allow the Guard Without (×4) and Guard Against (×6) bids."
+            },
+            "petitAuBout": {
+                "label": "Petit au bout",
+                "description": "+10 (×contract) to the side that wins the last trick with the Petit."
+            },
+            "slam": {
+                "label": "Slam",
+                "description": "±200 when one side wins every trick (unannounced slam)."
             }
         }
     },
@@ -258,6 +270,7 @@
         "error_illegal": "Illegal move",
         "error_generic": "Something went wrong",
         "rank_J": "Jack",
+        "rank_C": "Knight",
         "rank_Q": "Queen",
         "rank_K": "King",
         "rank_A": "Ace",
@@ -282,7 +295,33 @@
         "moves": "{n} moves",
         "empty_column": "King",
         "log_to_foundation": "{rank}{suit} goes up to the foundation",
-        "log_recycle": "The stock is recycled"
+        "log_recycle": "The stock is recycled",
+        "tarot_your_bid": "Your bid",
+        "tarot_your_ecart": "Build your discard",
+        "tarot_bid_petite": "Petite",
+        "tarot_bid_garde": "Guard",
+        "tarot_bid_garde_sans": "Guard Without",
+        "tarot_bid_garde_contre": "Guard Against",
+        "tarot_excuse": "The Excuse",
+        "tarot_trump": "Trump {index}",
+        "tarot_the_chien": "The dog",
+        "tarot_taker": "Taker",
+        "tarot_ecart_progress": "Discard: {n}/6",
+        "tarot_bidding_status": "Highest bid: {bid}",
+        "tarot_bidding_none": "Bidding in progress",
+        "tarot_contract_status": "{contract} · Taker: {name}",
+        "tarot_result_made": "Contract made (+{points})",
+        "tarot_result_failed": "Contract failed (−{points})",
+        "tarot_made": "makes",
+        "tarot_failed": "falls",
+        "tarot_log_bid": "{name} bids {bid}",
+        "tarot_log_passed_out": "Everyone passes — deal void",
+        "tarot_log_contract": "{name} takes: {contract}",
+        "tarot_log_chien": "The dog is revealed",
+        "tarot_log_ecart": "The discard is set",
+        "tarot_log_played": "{name} plays {card}",
+        "tarot_log_trick": "{name} wins the trick",
+        "tarot_log_over": "{name} {result} the contract"
     },
     "realtime": {
         "reconnecting": "Reconnecting…"
