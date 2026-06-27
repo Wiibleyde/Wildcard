@@ -59,7 +59,8 @@ jobs:
       - name: Install dependencies
         if: steps.node-modules.outputs.cache-hit != 'true'
         run: bun install --frozen-lockfile
-      - run: bun run lint
+      # `biome ci` = check, read-only, with GitHub Actions annotations on PRs.
+      - run: bun run lint:ci
 
   test:
     name: Run tests
