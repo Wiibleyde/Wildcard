@@ -2,67 +2,21 @@ import type { Locale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { DecoSuit } from "@/components/brand/DecoSuit";
 import { LogoCard } from "@/components/brand/LogoCard";
+import { GameCard } from "@/components/lobby/GameCard";
 import { GameButton } from "@/components/ui/GameButton";
 import { Link } from "@/i18n/navigation";
+import { buildPlayCatalog } from "@/lib/games/catalog";
+import {
+    buildPlaySections,
+    gameLabels,
+    type Translate,
+} from "@/lib/games/catalogView";
 
-type GameId = "bataille" | "president" | "kems" | "belote";
-
-type GameEntry = {
-    id: GameId;
-    name: string;
-    suits: string;
-    players: string;
-    available: boolean;
-    accentColor: string;
-    shadowColor: string;
-};
-
-/** Game names are proper nouns — descriptions live in the dictionaries. */
-const GAMES: GameEntry[] = [
-    {
-        id: "bataille",
-        name: "Bataille",
-        suits: "♠ ♥",
-        players: "2",
-        available: true,
-        accentColor: "#e04040",
-        shadowColor: "#8a1010",
-    },
-    {
-        id: "president",
-        name: "Président",
-        suits: "♦ ♣",
-        players: "3–6",
-        available: true,
-        accentColor: "#f5c516",
-        shadowColor: "#8a6800",
-    },
-    {
-        id: "kems",
-        name: "Kems",
-        suits: "♥ ♣",
-        players: "4",
-        available: false,
-        accentColor: "#48c97a",
-        shadowColor: "#1a6038",
-    },
-    {
-        id: "belote",
-        name: "Belote",
-        suits: "♠ ♦",
-        players: "4",
-        available: false,
-        accentColor: "#a78bfa",
-        shadowColor: "#4a2a90",
-    },
-];
-
-const GAME_DESC_KEY = {
-    bataille: "game_desc_bataille",
-    president: "game_desc_president",
-    kems: "game_desc_kems",
-    belote: "game_desc_belote",
-} as const;
+const STEPS = [
+    { suit: "♠", accent: "#f5c516" },
+    { suit: "♥", accent: "#48c97a" },
+    { suit: "♦", accent: "#ff9d3c" },
+] as const;
 
 export default async function Home({
     params,
@@ -73,15 +27,21 @@ export default async function Home({
     setRequestLocale(lang);
     const t = await getTranslations("navigation");
     const tHome = await getTranslations("home");
+    // Loosen next-intl's strict key type for the catalog view's dynamic keys.
+    const tg = (await getTranslations("games")) as unknown as Translate;
+
+    const games = buildPlayCatalog();
+    const sections = buildPlaySections(games, tg);
 
     return (
         <div
-            className="min-h-screen px-4 xl:px-10 pt-8 md:pt-12 pb-16"
+            className="min-h-screen px-4 pt-8 pb-16 md:pt-12 xl:px-10"
             style={{ background: "#0d0a05" }}
         >
-            <div className="max-w-lg lg:max-w-5xl xl:max-w-7xl mx-auto flex flex-col gap-10">
+            <div className="mx-auto flex max-w-lg flex-col gap-12 lg:max-w-5xl xl:max-w-7xl">
+                {/* Hero */}
                 <div
-                    className="relative rounded-2xl overflow-hidden px-8 py-12 xl:py-16 flex flex-col items-center text-center"
+                    className="relative flex flex-col items-center overflow-hidden rounded-2xl px-8 py-12 text-center xl:py-16"
                     style={{
                         background:
                             "linear-gradient(160deg, #1e1408 0%, #0d0a05 60%)",
@@ -117,146 +77,149 @@ export default async function Home({
 
                         <div>
                             <h1
-                                className="text-5xl xl:text-6xl font-black tracking-tight"
+                                className="text-5xl font-black tracking-tight xl:text-6xl"
                                 style={{ color: "#faf2e2" }}
                             >
                                 Wildcard
                             </h1>
                             <p
-                                className="mt-2 text-lg font-semibold"
+                                className="mx-auto mt-3 max-w-md text-lg font-semibold"
                                 style={{ color: "#9a8870" }}
                             >
-                                {tHome("subtitle")}
+                                {tHome("hero_tagline")}
                             </p>
                         </div>
 
-                        <GameButton href="/lobby" variant="green" size="lg">
-                            <span style={{ fontSize: "1.1em" }}>♠</span>
-                            {t("play")}
-                            <span style={{ fontSize: "1.1em" }}>♥</span>
-                        </GameButton>
+                        <div className="flex flex-col items-center gap-3 sm:flex-row">
+                            <GameButton href="/lobby" variant="green" size="lg">
+                                <span style={{ fontSize: "1.1em" }}>♠</span>
+                                {tHome("cta_play")}
+                                <span style={{ fontSize: "1.1em" }}>♥</span>
+                            </GameButton>
+                            <Link
+                                href="/leaderboard"
+                                className="rounded-xl px-6 py-3 text-sm font-bold transition-transform active:scale-95"
+                                style={{
+                                    background: "rgba(255,255,255,0.04)",
+                                    color: "#faf2e2",
+                                    border: "2px solid #3d2d18",
+                                }}
+                            >
+                                {t("leaderboard")}
+                            </Link>
+                        </div>
                     </div>
                 </div>
 
-                <div>
+                {/* How it works */}
+                <div className="flex flex-col gap-5">
                     <h2
-                        className="text-xs font-bold uppercase tracking-widest mb-5"
+                        className="text-xs font-bold uppercase tracking-widest"
                         style={{ color: "#7a6a50" }}
                     >
-                        {tHome("games_section")}
+                        {tHome("how_title")}
                     </h2>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        {GAMES.map((game) => (
+                    <div className="grid gap-4 sm:grid-cols-3">
+                        {STEPS.map((step, i) => (
                             <div
-                                key={game.id}
-                                className="relative rounded-xl overflow-hidden flex flex-col"
+                                key={step.suit}
+                                className="relative flex flex-col gap-2 overflow-hidden rounded-2xl p-5"
                                 style={{
                                     background: "#1c1510",
-                                    border: `2px solid ${game.available ? `${game.accentColor}55` : "#3d2d18"}`,
-                                    boxShadow: game.available
-                                        ? `0 0 20px ${game.accentColor}18`
-                                        : undefined,
+                                    border: "2px solid #3d2d18",
                                 }}
                             >
-                                <div
-                                    className="flex items-center justify-between px-4 pt-5 pb-4"
-                                    style={{
-                                        borderBottom: `1px solid ${game.available ? `${game.accentColor}30` : "#3d2d18"}`,
-                                    }}
-                                >
+                                <div className="flex items-center gap-3">
                                     <span
-                                        className="text-2xl font-black leading-none"
+                                        className="flex h-9 w-9 items-center justify-center rounded-lg text-lg font-black"
                                         style={{
-                                            color: game.available
-                                                ? game.accentColor
-                                                : "#4a3820",
+                                            background: `${step.accent}1a`,
+                                            color: step.accent,
                                         }}
                                     >
-                                        {game.suits}
+                                        {step.suit}
                                     </span>
                                     <span
-                                        className="text-xs font-bold px-2 py-0.5 rounded-full"
-                                        style={
-                                            game.available
-                                                ? {
-                                                      background: `${game.accentColor}18`,
-                                                      color: game.accentColor,
-                                                      border: `1px solid ${game.accentColor}40`,
-                                                  }
-                                                : {
-                                                      background:
-                                                          "rgba(255,255,255,0.04)",
-                                                      color: "#7a6a50",
-                                                      border: "1px solid #3d2d18",
-                                                  }
-                                        }
+                                        className="text-xs font-black uppercase tracking-widest"
+                                        style={{ color: step.accent }}
                                     >
-                                        {game.available
-                                            ? tHome("available")
-                                            : tHome("coming_soon")}
+                                        {tHome("step")} {i + 1}
                                     </span>
                                 </div>
-
-                                <div className="flex-1 p-4 flex flex-col gap-3">
-                                    <div>
-                                        <h3
-                                            className="font-black text-lg leading-tight"
-                                            style={{
-                                                color: game.available
-                                                    ? "#faf2e2"
-                                                    : "#6a5a40",
-                                            }}
-                                        >
-                                            {game.name}
-                                        </h3>
-                                        <p
-                                            className="text-xs font-semibold mt-0.5 leading-snug"
-                                            style={{ color: "#7a6a50" }}
-                                        >
-                                            {tHome(GAME_DESC_KEY[game.id])}
-                                        </p>
-                                    </div>
-
-                                    <div
-                                        className="text-xs font-bold"
-                                        style={{ color: "#9a8870" }}
-                                    >
-                                        {tHome("players_count", {
-                                            count: game.players,
-                                        })}
-                                    </div>
-
-                                    {game.available ? (
-                                        <Link
-                                            href="/lobby"
-                                            className="mt-auto flex items-center justify-center gap-2 py-2.5 rounded-lg font-bold text-sm"
-                                            style={{
-                                                background: game.accentColor,
-                                                color: "#0d0a05",
-                                                boxShadow: `0 3px 0 0 ${game.shadowColor}`,
-                                                transition:
-                                                    "transform 80ms ease, box-shadow 80ms ease",
-                                            }}
-                                        >
-                                            {tHome("play_now")}
-                                        </Link>
-                                    ) : (
-                                        <div
-                                            className="mt-auto py-2.5 rounded-lg font-bold text-sm text-center"
-                                            style={{
-                                                background:
-                                                    "rgba(255,255,255,0.03)",
-                                                color: "#4a3820",
-                                                border: "1px solid #3d2d18",
-                                            }}
-                                        >
-                                            {tHome("in_development")}
-                                        </div>
+                                <h3
+                                    className="text-base font-black leading-tight"
+                                    style={{ color: "#faf2e2" }}
+                                >
+                                    {tHome(
+                                        `step${i + 1}_title` as "step1_title",
                                     )}
-                                </div>
+                                </h3>
+                                <p
+                                    className="text-sm font-semibold leading-snug"
+                                    style={{ color: "#9a8870" }}
+                                >
+                                    {tHome(`step${i + 1}_desc` as "step1_desc")}
+                                </p>
                             </div>
                         ))}
                     </div>
+                </div>
+
+                {/* Games by category */}
+                <div className="flex flex-col gap-8">
+                    <h2
+                        className="text-2xl font-black xl:text-3xl"
+                        style={{ color: "#faf2e2" }}
+                    >
+                        {tHome("games_title")}
+                    </h2>
+                    {sections.map((section) => (
+                        <section
+                            key={section.id}
+                            className="flex flex-col gap-4"
+                        >
+                            <div className="flex items-center gap-3">
+                                <h3
+                                    className="text-xs font-bold uppercase tracking-widest"
+                                    style={{ color: section.accent }}
+                                >
+                                    {section.label}
+                                </h3>
+                                <span
+                                    className="h-px flex-1"
+                                    style={{ background: "#2a2012" }}
+                                />
+                            </div>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                                {section.games.map((g) => {
+                                    const { categoryLabel, description, meta } =
+                                        gameLabels(g, tg);
+                                    return (
+                                        <GameCard
+                                            key={g.id}
+                                            game={g}
+                                            categoryLabel={categoryLabel}
+                                            description={description}
+                                            meta={meta}
+                                            footer={
+                                                <Link
+                                                    href="/lobby"
+                                                    className="flex items-center justify-center rounded-xl py-2.5 font-black text-sm transition-transform active:scale-95"
+                                                    style={{
+                                                        background: g.accent,
+                                                        color: "#0d0a05",
+                                                        boxShadow: `0 3px 0 0 ${g.shadow}`,
+                                                    }}
+                                                >
+                                                    {tHome("play_now")}
+                                                </Link>
+                                            }
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    ))}
                 </div>
             </div>
         </div>

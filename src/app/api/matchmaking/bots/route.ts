@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/api/auth";
-import { createRoom, ROOM_ERROR_STATUS } from "@/lib/models/room";
+import { MATCH_ERROR_STATUS, playWithBots } from "@/lib/models/matchmaking";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+/** POST — stop searching and deal a private game filled with bots, right now. */
 export async function POST(request: Request) {
     const auth = await requireUser();
     if (!auth.ok) return auth.response;
 
     const body = (await request.json().catch(() => ({}))) as {
         moduleId?: unknown;
-        visibility?: unknown;
     };
     if (typeof body.moduleId !== "string") {
         return NextResponse.json(
@@ -17,22 +17,15 @@ export async function POST(request: Request) {
             { status: 400 },
         );
     }
-    // Hand-made rooms are private (code-only) unless explicitly public.
-    const visibility = body.visibility === "public" ? "public" : "private";
 
     const admin = createAdminClient();
-    const result = await createRoom(
-        admin,
-        auth.user.id,
-        body.moduleId,
-        visibility,
-    );
+    const result = await playWithBots(admin, auth.user.id, body.moduleId);
     if (!result.ok) {
         return NextResponse.json(
             { error: result.error },
-            { status: ROOM_ERROR_STATUS[result.error] },
+            { status: MATCH_ERROR_STATUS[result.error] },
         );
     }
 
-    return NextResponse.json({ code: result.code, roomId: result.roomId });
+    return NextResponse.json({ gameId: result.gameId });
 }

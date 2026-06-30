@@ -36,14 +36,17 @@ export function useRoomAction() {
         router.push(`/lobby/${codeFromData(data)}`);
     }
 
-    function createRoom(moduleId: string) {
+    function createRoom(
+        moduleId: string,
+        visibility: "public" | "private" = "private",
+    ) {
         return run(
             "create",
             () =>
                 fetch("/api/rooms", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ moduleId }),
+                    body: JSON.stringify({ moduleId, visibility }),
                 }),
             (data) => data.code ?? "",
         );

@@ -6,6 +6,8 @@ import { presidentTable } from "./president/table";
 import { solitaire } from "./solitaire/solitaire";
 import { solitaireTable } from "./solitaire/table";
 import type { AnyGameTableConfig } from "./table/types";
+import { tarotTable } from "./tarot/table";
+import { tarot } from "./tarot/tarot";
 
 /**
  * The game catalog. Every native module is registered here under its `id`; the
@@ -16,6 +18,7 @@ export const GAMES: Record<string, AnyGameModule> = {
     [bataille.id]: registerGame(bataille),
     [president.id]: registerGame(president),
     [solitaire.id]: registerGame(solitaire),
+    [tarot.id]: registerGame(tarot),
 };
 
 /**
@@ -27,6 +30,7 @@ export const GAME_TABLES: Record<string, AnyGameTableConfig> = {
     [bataille.id]: batailleTable,
     [president.id]: presidentTable,
     [solitaire.id]: solitaireTable,
+    [tarot.id]: tarotTable,
 };
 
 /** Resolve a module by id, or `undefined` for an unknown game. */
