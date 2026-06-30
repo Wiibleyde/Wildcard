@@ -57,6 +57,49 @@ function nextFreeSeat(taken: readonly number[]): number {
 }
 
 /**
+ * Insert one fresh `rooms` row, retrying the rare invite-code collision. The
+ * single place "how a room is born" lives — `createRoom` and the matchmaker
+ * (`seatAndStart`) both go through here so the collision policy, columns and
+ * retry count never drift between them.
+ *
+ * `id` is optional: the matchmaker pre-allocates the room id (it stamps queue
+ * tickets with it *before* the row exists), while hand-made rooms let the DB
+ * generate one. `botCount` seeds the lobby's computer-player count.
+ */
+export async function insertRoom(
+    admin: Admin,
+    params: {
+        moduleId: string;
+        hostId: string;
+        visibility: "public" | "private";
+        id?: string;
+        botCount?: number;
+    },
+): Promise<Result<{ roomId: string; code: string }>> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+        const code = makeCode();
+        const { data, error } = await admin
+            .from("rooms")
+            .insert({
+                ...(params.id ? { id: params.id } : {}),
+                code,
+                module_id: params.moduleId,
+                host_id: params.hostId,
+                visibility: params.visibility,
+                ...(params.botCount !== undefined
+                    ? { bot_count: params.botCount }
+                    : {}),
+            })
+            .select("id")
+            .single();
+        if (!error) return { ok: true, roomId: data.id, code };
+        if (error.code === "23505") continue; // code collision — new code, retry
+        return { ok: false, error: "db_error", message: error.message };
+    }
+    return { ok: false, error: "db_error", message: "code clash" };
+}
+
+/**
  * Create a fresh lobby for `moduleId`, seating the host at seat 0. Retries on
  * the (rare) invite-code collision.
  */
@@ -68,31 +111,18 @@ export async function createRoom(
 ): Promise<Result<{ code: string; roomId: string }>> {
     if (!getGameModule(moduleId)) return { ok: false, error: "unknown_game" };
 
-    let roomId: string | null = null;
-    let code = "";
-    for (let attempt = 0; attempt < 5 && !roomId; attempt++) {
-        code = makeCode();
-        const { data, error } = await admin
-            .from("rooms")
-            .insert({ code, module_id: moduleId, host_id: hostId, visibility })
-            .select("id")
-            .single();
-        if (error) {
-            if (error.code === "23505") continue; // code collision — retry
-            return { ok: false, error: "db_error", message: error.message };
-        }
-        roomId = data.id;
-    }
-    if (!roomId) return { ok: false, error: "db_error", message: "code clash" };
+    const room = await insertRoom(admin, { moduleId, hostId, visibility });
+    if (!room.ok) return room;
 
     const { error: seatError } = await admin
         .from("room_players")
-        .insert({ room_id: roomId, user_id: hostId, seat: 0 });
+        .insert({ room_id: room.roomId, user_id: hostId, seat: 0 });
     if (seatError) {
+        await admin.from("rooms").delete().eq("id", room.roomId); // no orphan
         return { ok: false, error: "db_error", message: seatError.message };
     }
 
-    return { ok: true, code, roomId };
+    return { ok: true, code: room.code, roomId: room.roomId };
 }
 
 /** Seat `userId` in the lobby with the given code. Idempotent if already in. */

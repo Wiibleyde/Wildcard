@@ -5,18 +5,12 @@ import { LogoCard } from "@/components/brand/LogoCard";
 import { GameCard } from "@/components/lobby/GameCard";
 import { GameButton } from "@/components/ui/GameButton";
 import { Link } from "@/i18n/navigation";
+import { buildPlayCatalog } from "@/lib/games/catalog";
 import {
-    buildPlayCatalog,
-    GAME_CATEGORIES,
-    type PlayGame,
-} from "@/lib/games/catalog";
-
-const DIFFICULTY_KEY = [
-    "",
-    "difficulty_easy",
-    "difficulty_medium",
-    "difficulty_hard",
-] as const;
+    buildPlaySections,
+    gameLabels,
+    type Translate,
+} from "@/lib/games/catalogView";
 
 const STEPS = [
     { suit: "♠", accent: "#f5c516" },
@@ -33,37 +27,11 @@ export default async function Home({
     setRequestLocale(lang);
     const t = await getTranslations("navigation");
     const tHome = await getTranslations("home");
-    const tg = await getTranslations("games");
+    // Loosen next-intl's strict key type for the catalog view's dynamic keys.
+    const tg = (await getTranslations("games")) as unknown as Translate;
 
     const games = buildPlayCatalog();
-    const sections = GAME_CATEGORIES.map((cat) => ({
-        id: cat.id,
-        accent: cat.accent,
-        label: tg(`cat_${cat.id}` as "cat_duel"),
-        games: games.filter((g) => g.category === cat.id),
-    })).filter((s) => s.games.length > 0);
-
-    function metaFor(g: PlayGame) {
-        const players =
-            g.maxPlayers === 1
-                ? tg("players_solo")
-                : g.minPlayers === g.maxPlayers
-                  ? tg("players_exact", { n: g.minPlayers })
-                  : tg("players_range", {
-                        min: g.minPlayers,
-                        max: g.maxPlayers,
-                    });
-        return {
-            categoryLabel: tg(`cat_${g.category}` as "cat_duel"),
-            description: tg(`desc_${g.id}` as "desc_bataille"),
-            meta: {
-                players,
-                duration: tg("duration", { min: g.durationMin }),
-                difficulty: tg(DIFFICULTY_KEY[g.difficulty]),
-                comingSoon: tg("coming_soon"),
-            },
-        };
-    }
+    const sections = buildPlaySections(games, tg);
 
     return (
         <div
@@ -225,7 +193,7 @@ export default async function Home({
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                                 {section.games.map((g) => {
                                     const { categoryLabel, description, meta } =
-                                        metaFor(g);
+                                        gameLabels(g, tg);
                                     return (
                                         <GameCard
                                             key={g.id}

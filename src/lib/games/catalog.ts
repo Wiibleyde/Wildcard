@@ -93,9 +93,6 @@ const DISPLAY: Record<string, GameDisplayMeta> = {
     },
 };
 
-/** Stable display order for the cards (available first, then coming soon). */
-const ORDER = ["bataille", "president", "tarot", "solitaire", "belote", "kems"];
-
 /**
  * One game as the play UI needs it: engine facts when available, display meta
  * always. `available` games have a registered module and can be played now.
@@ -116,22 +113,28 @@ export interface PlayGame {
     readonly matchmaking: boolean;
 }
 
+let CACHE: PlayGame[] | null = null;
+
 /**
- * Build the merged, serialisable play catalog (server-side; passed to client
+ * The merged, serialisable play catalog (server-side; passed to client
  * components). Engine games override the placeholder name/range; coming-soon
  * games fall back to their declared `comingSoon` block.
+ *
+ * `DISPLAY`'s key order IS the display order (available first, then coming
+ * soon) — it's the single list of every game shown, so there's no separate
+ * order array to keep in sync. The result is input-free, so it's built once and
+ * memoised for every page render.
  */
 export function buildPlayCatalog(): PlayGame[] {
+    if (CACHE) return CACHE;
+
     const engine = new Map(gameCatalog().map((g) => [g.id, g]));
-    const games: PlayGame[] = [];
-    for (const id of ORDER) {
-        const meta = DISPLAY[id];
-        if (!meta) continue;
+    CACHE = Object.entries(DISPLAY).map(([id, meta]) => {
         const mod = engine.get(id);
         const available = mod !== undefined;
         const min = mod?.minPlayers ?? meta.comingSoon?.minPlayers ?? 2;
         const max = mod?.maxPlayers ?? meta.comingSoon?.maxPlayers ?? 4;
-        games.push({
+        return {
             id,
             name: mod?.name ?? meta.comingSoon?.name ?? id,
             category: meta.category,
@@ -144,7 +147,7 @@ export function buildPlayCatalog(): PlayGame[] {
             maxPlayers: max,
             available,
             matchmaking: available && max > 1,
-        });
-    }
-    return games;
+        };
+    });
+    return CACHE;
 }

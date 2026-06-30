@@ -82,6 +82,9 @@ export function useMatchmaking(userId: string) {
     }, [handleStatus]);
 
     // Realtime doorbell on our ticket → refetch the authoritative status.
+    // (useTicketChannel already falls back to a 2s poll while the socket is
+    // down — so no extra polling loop here; forming is driven server-side by
+    // enqueue + its bounded retry.)
     useTicketChannel(userId, refresh);
 
     const quickMatch = useCallback(
@@ -110,10 +113,14 @@ export function useMatchmaking(userId: string) {
     );
 
     const cancel = useCallback(async () => {
-        active.current = false;
         setState({ phase: "idle" });
+        // leaveQueue (no `all`) drops only a still-searching ticket; if a match
+        // landed in the click window it survives. Re-read the authoritative
+        // status so we walk into that game (active stays true → handleStatus
+        // navigates) instead of silently abandoning a live match.
         await fetch("/api/matchmaking", { method: "DELETE" }).catch(() => {});
-    }, []);
+        await refresh();
+    }, [refresh]);
 
     const playBots = useCallback(
         async (moduleId: string) => {
@@ -127,6 +134,13 @@ export function useMatchmaking(userId: string) {
             });
             const data = await res.json();
             if (!res.ok) {
+                // A human match grabbed our ticket in the same instant: there's
+                // a real game incoming, so stay on the "matched" overlay and let
+                // the realtime doorbell walk us in (don't navigate from here).
+                if (data.error === "match_in_progress") {
+                    navigating.current = false;
+                    return;
+                }
                 navigating.current = false;
                 setState({ phase: "error", code: data.error ?? "generic" });
                 return;

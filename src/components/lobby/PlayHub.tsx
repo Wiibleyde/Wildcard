@@ -4,7 +4,12 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { useMatchmaking } from "@/hooks/lobby/useMatchmaking";
 import { useRoomAction } from "@/hooks/lobby/useRoomAction";
-import { GAME_CATEGORIES, type PlayGame } from "@/lib/games/catalog";
+import type { PlayGame } from "@/lib/games/catalog";
+import {
+    buildPlaySections,
+    gameLabels,
+    type Translate,
+} from "@/lib/games/catalogView";
 import { GameCard } from "./GameCard";
 import { MatchmakingOverlay } from "./MatchmakingOverlay";
 
@@ -13,48 +18,15 @@ interface Props {
     readonly games: PlayGame[];
 }
 
-const DIFFICULTY_KEY = [
-    "",
-    "difficulty_easy",
-    "difficulty_medium",
-    "difficulty_hard",
-] as const;
-
 export function PlayHub({ userId, games }: Props) {
     const t = useTranslations("lobby");
-    const tg = useTranslations("games");
+    // Loosen next-intl's strict key type for the catalog view's dynamic keys.
+    const tg = useTranslations("games") as unknown as Translate;
     const { state, quickMatch, cancel, playBots } = useMatchmaking(userId);
     const { busy, error: roomError, createRoom, joinRoom } = useRoomAction();
     const [code, setCode] = useState("");
 
-    const sections = GAME_CATEGORIES.map((cat) => ({
-        id: cat.id,
-        accent: cat.accent,
-        label: tg(`cat_${cat.id}` as "cat_duel"),
-        games: games.filter((g) => g.category === cat.id),
-    })).filter((s) => s.games.length > 0);
-
-    function metaFor(g: PlayGame) {
-        const players =
-            g.maxPlayers === 1
-                ? tg("players_solo")
-                : g.minPlayers === g.maxPlayers
-                  ? tg("players_exact", { n: g.minPlayers })
-                  : tg("players_range", {
-                        min: g.minPlayers,
-                        max: g.maxPlayers,
-                    });
-        return {
-            categoryLabel: tg(`cat_${g.category}` as "cat_duel"),
-            description: tg(`desc_${g.id}` as "desc_bataille"),
-            meta: {
-                players,
-                duration: tg("duration", { min: g.durationMin }),
-                difficulty: tg(DIFFICULTY_KEY[g.difficulty]),
-                comingSoon: tg("coming_soon"),
-            },
-        };
-    }
+    const sections = buildPlaySections(games, tg);
 
     const activeGame =
         state.phase === "searching"
@@ -150,7 +122,7 @@ export function PlayHub({ userId, games }: Props) {
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                         {section.games.map((g) => {
                             const { categoryLabel, description, meta } =
-                                metaFor(g);
+                                gameLabels(g, tg);
                             return (
                                 <GameCard
                                     key={g.id}
