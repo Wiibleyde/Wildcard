@@ -40,7 +40,7 @@ export const ROOM_ERROR_STATUS: Record<RoomErrorCode, number> = {
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 5;
 
-function makeCode(): string {
+export function makeCode(): string {
     const bytes = new Uint8Array(CODE_LENGTH);
     crypto.getRandomValues(bytes);
     let out = "";
@@ -64,6 +64,7 @@ export async function createRoom(
     admin: Admin,
     hostId: string,
     moduleId: string,
+    visibility: "public" | "private" = "private",
 ): Promise<Result<{ code: string; roomId: string }>> {
     if (!getGameModule(moduleId)) return { ok: false, error: "unknown_game" };
 
@@ -73,7 +74,7 @@ export async function createRoom(
         code = makeCode();
         const { data, error } = await admin
             .from("rooms")
-            .insert({ code, module_id: moduleId, host_id: hostId })
+            .insert({ code, module_id: moduleId, host_id: hostId, visibility })
             .select("id")
             .single();
         if (error) {

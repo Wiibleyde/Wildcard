@@ -304,6 +304,7 @@ export type Database = {
                     module_id: string;
                     host_id: string;
                     status: "lobby" | "playing" | "finished";
+                    visibility: "public" | "private";
                     current_game_id: string | null;
                     bot_count: number;
                     rules: Record<string, boolean>;
@@ -315,6 +316,7 @@ export type Database = {
                     module_id: string;
                     host_id: string;
                     status?: "lobby" | "playing" | "finished";
+                    visibility?: "public" | "private";
                     current_game_id?: string | null;
                     bot_count?: number;
                     rules?: Record<string, boolean>;
@@ -326,6 +328,7 @@ export type Database = {
                     module_id?: string;
                     host_id?: string;
                     status?: "lobby" | "playing" | "finished";
+                    visibility?: "public" | "private";
                     current_game_id?: string | null;
                     bot_count?: number;
                     rules?: Record<string, boolean>;
@@ -519,6 +522,34 @@ export type Database = {
                     },
                 ];
             };
+            matchmaking_tickets: {
+                Row: {
+                    user_id: string;
+                    module_id: string;
+                    room_id: string | null;
+                    created_at: string;
+                };
+                Insert: {
+                    user_id: string;
+                    module_id: string;
+                    room_id?: string | null;
+                    created_at?: string;
+                };
+                Update: {
+                    user_id?: string;
+                    module_id?: string;
+                    room_id?: string | null;
+                    created_at?: string;
+                };
+                Relationships: [
+                    {
+                        foreignKeyName: "matchmaking_tickets_user_id_fkey";
+                        columns: ["user_id"];
+                        referencedRelation: "profiles";
+                        referencedColumns: ["id"];
+                    },
+                ];
+            };
         };
         Views: Record<string, never>;
         Functions: {
@@ -541,6 +572,17 @@ export type Database = {
                     }[];
                 };
                 Returns: undefined;
+            };
+            match_make: {
+                Args: {
+                    p_module_id: string;
+                    p_min: number;
+                    p_max: number;
+                };
+                Returns: {
+                    room_id: string;
+                    user_id: string;
+                }[];
             };
             leaderboard: {
                 Args: {
