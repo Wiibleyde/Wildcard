@@ -147,15 +147,18 @@ export function PreviewPage({ deckId, boardId, backHref }: Props) {
     const playArea = <PlayArea cards={table} players={players} />;
 
     return (
-        <div className="flex flex-col h-[calc(100dvh-4rem)] md:h-screen bg-wc-surface">
+        <div className="flex h-[calc(100dvh-4rem)] flex-col bg-wc-bg md:h-screen">
             <div
-                className="shrink-0 flex items-center justify-between px-4 py-3 border-b"
-                style={{ borderColor: "rgba(255,255,255,0.08)" }}
+                className="flex shrink-0 items-center justify-between px-4 py-3"
+                style={{
+                    borderBottom: "3px solid var(--ink)",
+                    background: "var(--panel-d)",
+                }}
             >
                 <Link
                     href={backHref}
-                    className="flex items-center gap-2 text-sm font-semibold"
-                    style={{ color: "#7c8699" }}
+                    className="flex items-center gap-2 font-display text-sm"
+                    style={{ color: "var(--muted)" }}
                 >
                     <svg
                         viewBox="0 0 20 20"
@@ -174,7 +177,7 @@ export function PreviewPage({ deckId, boardId, backHref }: Props) {
 
                 <div className="flex items-center gap-3">
                     <div className="flex flex-col items-end gap-0.5">
-                        <span className="text-[10px] text-wc-sub uppercase tracking-wider">
+                        <span className="text-wc-label text-wc-sub uppercase tracking-wider">
                             {t("cards")}
                         </span>
                         <div className="flex items-center gap-1.5">
@@ -192,7 +195,7 @@ export function PreviewPage({ deckId, boardId, backHref }: Props) {
                         style={{ background: "rgba(255,255,255,0.10)" }}
                     />
                     <div className="flex flex-col items-end gap-0.5">
-                        <span className="text-[10px] text-wc-sub uppercase tracking-wider">
+                        <span className="text-wc-label text-wc-sub uppercase tracking-wider">
                             {t("board")}
                         </span>
                         <div className="flex items-center gap-1.5">

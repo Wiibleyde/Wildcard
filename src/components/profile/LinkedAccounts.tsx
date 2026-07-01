@@ -68,30 +68,23 @@ export function LinkedAccounts({ linkedProviders }: Props) {
                 return (
                     <div
                         key={provider.id}
-                        className="flex items-center justify-between px-4 py-3 rounded-xl"
-                        style={{
-                            background: isLinked
-                                ? `${provider.accentColor}08`
-                                : "rgba(255,255,255,0.03)",
-                            border: `2px solid ${isLinked ? `${provider.accentColor}25` : "#3d2d18"}`,
-                        }}
+                        className="panel flat flex items-center justify-between px-4 py-3"
                     >
                         <div className="flex items-center gap-3">
                             {provider.icon}
                             <span
                                 className="text-sm font-bold"
-                                style={{ color: "#faf2e2" }}
+                                style={{ color: "var(--ink)" }}
                             >
                                 {provider.label}
                             </span>
                         </div>
                         {isLinked ? (
                             <div
-                                className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider px-2.5 py-1 rounded-full"
+                                className="stamp"
                                 style={{
-                                    background: `${provider.accentColor}18`,
-                                    color: provider.accentColor,
-                                    border: `1px solid ${provider.accentColor}35`,
+                                    background: provider.accentColor,
+                                    color: "var(--accent-ink)",
                                 }}
                             >
                                 <svg
@@ -113,11 +106,10 @@ export function LinkedAccounts({ linkedProviders }: Props) {
                                 type="button"
                                 onClick={() => handleLink(provider.id)}
                                 disabled={linking === provider.id}
-                                className="text-xs font-black uppercase tracking-wider px-2.5 py-1 rounded-full cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                className="wc-btn text-xs px-3 py-1.5 disabled:opacity-40"
                                 style={{
-                                    background: "rgba(245,197,22,0.1)",
-                                    color: "#f5c516",
-                                    border: "1px solid rgba(245,197,22,0.25)",
+                                    background: "var(--gold)",
+                                    color: "var(--ink)",
                                 }}
                             >
                                 {linking === provider.id ? "…" : t("link")}

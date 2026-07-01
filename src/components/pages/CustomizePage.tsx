@@ -38,31 +38,14 @@ export function CustomizePage({
         .filter(Boolean) as BoardTheme[];
 
     return (
-        <div
-            className="min-h-screen px-4 xl:px-10 pt-6 md:pt-10 pb-16"
-            style={{ background: "#0d0a05" }}
-        >
+        <div className="min-h-screen px-4 xl:px-10 pt-6 md:pt-10 pb-16">
             <div className="max-w-lg lg:max-w-5xl xl:max-w-7xl mx-auto flex flex-col gap-5">
-                <div
-                    className="rounded-2xl px-6 py-5"
-                    style={{
-                        background:
-                            "linear-gradient(150deg, #211708 0%, #0d0a05 70%)",
-                        border: "2px solid rgba(245,197,22,0.18)",
-                    }}
-                >
-                    <h1
-                        className="text-2xl xl:text-3xl font-black tracking-tight"
-                        style={{ color: "#faf2e2" }}
-                    >
-                        ♦ {t("title")}
+                <div className="panel-d px-6 py-5">
+                    <h1 className="text-2xl xl:text-3xl font-display flex items-center gap-2 text-wc-cream">
+                        <span style={{ color: "var(--red)" }}>♦</span>{" "}
+                        {t("title")}
                     </h1>
-                    <p
-                        className="text-sm font-semibold mt-1"
-                        style={{ color: "#7a6a50" }}
-                    >
-                        {t("subtitle")}
-                    </p>
+                    <p className="sub text-sm mt-1">{t("subtitle")}</p>
                 </div>
 
                 <div className="lg:grid lg:grid-cols-2 lg:gap-5 flex flex-col gap-5 lg:flex-none">

@@ -76,14 +76,11 @@ export default async function Page({
         me?.role === "spectator" ? "spectator" : "player";
 
     return (
-        <div
-            className="min-h-screen px-4 xl:px-10 pt-8 md:pt-12 pb-16"
-            style={{ background: "#0d0a05" }}
-        >
-            <div className="max-w-lg lg:max-w-2xl xl:max-w-3xl mx-auto flex flex-col gap-6">
+        <div className="min-h-screen px-4 pt-8 pb-16 md:pt-12 xl:px-10">
+            <div className="mx-auto flex max-w-lg flex-col gap-6 lg:max-w-2xl xl:max-w-3xl">
                 <h1
-                    className="text-2xl xl:text-3xl font-black"
-                    style={{ color: "#faf2e2" }}
+                    className="font-display text-3xl xl:text-4xl"
+                    style={{ color: "var(--cream)" }}
                 >
                     {t("title")}
                 </h1>

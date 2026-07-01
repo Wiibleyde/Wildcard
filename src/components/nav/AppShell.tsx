@@ -15,7 +15,7 @@ export function AppShell({ appNav, authed, children }: Props) {
             value={{ collapsed: false, toggle: () => {} }}
         >
             {appNav}
-            <div className={authed ? "pb-16 md:pb-0 md:pl-60 xl:pl-68" : ""}>
+            <div className={authed ? "pb-20 md:pb-0 md:pl-59" : ""}>
                 {children}
             </div>
         </NavCollapseContext.Provider>

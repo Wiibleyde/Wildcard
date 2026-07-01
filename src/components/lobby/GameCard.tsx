@@ -34,62 +34,65 @@ export function GameCard({
 
     return (
         <div
-            className="group wc-block relative flex flex-col overflow-hidden rounded-2xl transition-transform duration-150 hover:-translate-y-1"
-            style={{
-                background: "#1c1510",
-                border: `2px solid ${available ? `${accent}66` : "#4a3822"}`,
-                opacity: available ? 1 : 0.72,
-            }}
+            className={`group panel relative flex flex-col overflow-hidden p-5 ${available ? "lift" : ""}`}
+            style={{ opacity: available ? 1 : 0.85 }}
         >
-            {/* Faint suit watermark for flair. */}
+            {/* Faint suit watermark for flair — low-opacity ink on cream. */}
             <span
                 aria-hidden
-                className="pointer-events-none absolute -right-4 -top-6 select-none font-black leading-none"
+                className="font-display pointer-events-none absolute -top-8 -right-3 select-none leading-none"
                 style={{
-                    fontSize: "9rem",
-                    color: available ? accent : "#4a3820",
-                    opacity: available ? 0.07 : 0.05,
+                    fontSize: "10rem",
+                    color: "var(--ink)",
+                    opacity: available ? 0.06 : 0.04,
                     transform: "rotate(8deg)",
                 }}
             >
                 {primarySuit}
             </span>
 
-            <div className="relative z-10 flex flex-1 flex-col gap-4 p-5">
-                <div className="flex items-start justify-between gap-2">
+            <div className="relative z-10 flex flex-1 flex-col gap-4">
+                <div className="flex items-start justify-between gap-3">
+                    {/* Chunky rotated glyph tile holding the game's suits. */}
                     <span
-                        className="text-2xl font-black leading-none tracking-tight"
-                        style={{ color: available ? accent : "#4a3820" }}
+                        className="flex h-12 items-center justify-center rounded-xl px-3 font-display text-xl leading-none"
+                        style={{
+                            background: available ? accent : "var(--cream2)",
+                            color: available ? "var(--ink)" : "#5a5340",
+                            border: "2.5px solid var(--ink)",
+                            boxShadow: "0 4px 0 var(--ink)",
+                            transform: "rotate(-4deg)",
+                        }}
                     >
                         {suits}
                     </span>
                     {available ? (
                         <span
                             role="img"
-                            className="flex items-center gap-1"
+                            className="mt-1 flex items-center gap-1.5"
                             title={meta.difficulty}
                             aria-label={meta.difficulty}
                         >
                             {[1, 2, 3].map((pip) => (
                                 <span
                                     key={pip}
-                                    className="h-1.5 w-1.5 rounded-full"
+                                    className="h-2.5 w-2.5 rounded-xs"
                                     style={{
                                         background:
                                             pip <= difficulty
                                                 ? accent
-                                                : "#3d2d18",
+                                                : "var(--cream2)",
+                                        border: "2px solid var(--ink)",
                                     }}
                                 />
                             ))}
                         </span>
                     ) : (
                         <span
-                            className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                            className="stamp mt-1"
                             style={{
-                                background: "rgba(255,255,255,0.04)",
-                                color: "#7a6a50",
-                                border: "1px solid #3d2d18",
+                                background: "var(--cream2)",
+                                color: "#5a5340",
                             }}
                         >
                             {meta.comingSoon}
@@ -97,21 +100,23 @@ export function GameCard({
                     )}
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <h3
-                            className="text-xl font-black leading-tight"
-                            style={{ color: available ? "#faf2e2" : "#6a5a40" }}
+                            className="font-display text-2xl leading-tight"
+                            style={{
+                                color: available ? "var(--ink)" : "#5a5340",
+                            }}
                         >
                             {game.name}
                         </h3>
                         <span
-                            className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                            className="stamp"
                             style={{
                                 background: available
-                                    ? `${accent}18`
-                                    : "rgba(255,255,255,0.03)",
-                                color: available ? accent : "#7a6a50",
+                                    ? accent
+                                    : "var(--cream2)",
+                                color: available ? "var(--ink)" : "#5a5340",
                             }}
                         >
                             {categoryLabel}
@@ -119,19 +124,31 @@ export function GameCard({
                     </div>
                     <p
                         className="text-sm font-semibold leading-snug"
-                        style={{ color: "#9a8870" }}
+                        style={{ color: "#5a5340" }}
                     >
                         {description}
                     </p>
                 </div>
 
-                <div
-                    className="mt-auto flex items-center gap-3 text-xs font-bold"
-                    style={{ color: "#7a6a50" }}
-                >
-                    <span>{meta.players}</span>
-                    <span style={{ color: "#3d2d18" }}>•</span>
-                    <span>{meta.duration}</span>
+                <div className="mt-auto flex flex-wrap items-center gap-2">
+                    <span
+                        className="stamp"
+                        style={{
+                            background: "var(--cream)",
+                            color: "var(--ink)",
+                        }}
+                    >
+                        {meta.players}
+                    </span>
+                    <span
+                        className="stamp"
+                        style={{
+                            background: "var(--cream)",
+                            color: "var(--ink)",
+                        }}
+                    >
+                        {meta.duration}
+                    </span>
                 </div>
 
                 {available && footer ? (

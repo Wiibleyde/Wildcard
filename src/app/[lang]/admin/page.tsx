@@ -35,41 +35,31 @@ export default async function AdminPage({
     ]);
 
     return (
-        <div
-            className="min-h-screen px-4 xl:px-10 pt-8 md:pt-12 pb-16"
-            style={{ background: "#0d0a05" }}
-        >
+        <div className="min-h-screen px-4 xl:px-10 pt-8 md:pt-12 pb-16">
             <div className="max-w-lg lg:max-w-5xl xl:max-w-7xl mx-auto flex flex-col gap-8">
                 <header className="flex flex-col gap-2">
                     <div className="flex items-center gap-3 flex-wrap">
-                        <h1
-                            className="text-2xl xl:text-3xl font-black"
-                            style={{ color: "#faf2e2" }}
-                        >
+                        <h1 className="h-xl text-2xl xl:text-3xl">
                             {t("title")}
                         </h1>
                         <span
-                            className="text-[11px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider"
+                            className="stamp"
                             style={{
                                 background: isAdmin
-                                    ? "rgba(245,197,22,0.15)"
-                                    : "rgba(167,139,250,0.15)",
-                                color: isAdmin ? "#f5c516" : "#26ccba",
-                                border: `1px solid ${isAdmin ? "rgba(245,197,22,0.3)" : "rgba(167,139,250,0.3)"}`,
+                                    ? "var(--gold)"
+                                    : "var(--purple)",
+                                color: isAdmin
+                                    ? "var(--ink)"
+                                    : "var(--accent-ink)",
                             }}
                         >
                             {isAdmin ? t("role_admin") : t("role_moderator")}
                         </span>
                     </div>
-                    <p
-                        className="text-sm font-semibold"
-                        style={{ color: "#9a8870" }}
-                    >
-                        {t("subtitle")}
-                    </p>
+                    <p className="sub text-sm">{t("subtitle")}</p>
                 </header>
 
-                <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_400px] gap-6 items-start">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_22.5rem] xl:grid-cols-[1fr_25rem] gap-6 items-start">
                     <OngoingGamesPanel games={games} canEnd={isAdmin} />
 
                     {isAdmin && settings && (

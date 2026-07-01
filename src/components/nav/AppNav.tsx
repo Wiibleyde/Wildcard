@@ -52,13 +52,13 @@ export async function AppNav({ user }: { user: User }) {
             />
 
             <header
-                className="md:hidden sticky top-0 z-40"
+                className="sticky top-0 z-40 md:hidden"
                 style={{
-                    background: "#0f0b07",
-                    borderBottom: "2px solid #3d2d18",
+                    background: "var(--panel-d2)",
+                    borderBottom: "3px solid var(--ink)",
                 }}
             >
-                <div className="flex items-center justify-between px-4 h-14">
+                <div className="flex h-14 items-center justify-between px-4">
                     <Brand size="sm" />
 
                     <div className="flex items-center gap-2">
@@ -75,11 +75,13 @@ export async function AppNav({ user }: { user: User }) {
                         </Link>
 
                         <span
-                            className="text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-wider"
+                            className="rounded-md border-2 px-2 py-1 uppercase"
                             style={{
-                                background: "rgba(167,139,250,0.15)",
-                                color: "#26ccba",
-                                border: "1px solid rgba(167,139,250,0.25)",
+                                fontFamily: "var(--pixel)",
+                                fontSize: "9px",
+                                background: "var(--cream)",
+                                color: "var(--ink)",
+                                borderColor: "var(--ink)",
                             }}
                         >
                             {tProfile("level_short")} {level}
@@ -89,12 +91,11 @@ export async function AppNav({ user }: { user: User }) {
             </header>
 
             <nav
-                className="md:hidden fixed bottom-0 left-0 right-0 z-40"
+                className="fixed right-0 bottom-0 left-0 z-40 flex md:hidden"
                 style={{
-                    background: "#0f0b07",
-                    borderTop: "2px solid #3d2d18",
-                    height: "68px",
-                    boxShadow: "0 -4px 20px rgba(0,0,0,0.4)",
+                    background: "var(--panel-d2)",
+                    borderTop: "3px solid var(--ink)",
+                    padding: "8px 8px calc(8px + env(safe-area-inset-bottom))",
                 }}
             >
                 <NavLinks variant="bottom" canModerate={canModerate} />

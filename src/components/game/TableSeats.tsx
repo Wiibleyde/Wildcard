@@ -1,7 +1,6 @@
 "use client";
 
 import { Card } from "@/components/card/Card";
-import { BoardPill } from "@/components/ui/BoardPill";
 import type { BoardTheme } from "@/lib/board/types";
 import { getCardTheme } from "@/lib/card/themes";
 import { FACE_DOWN_CARD } from "@/lib/card/utils";
@@ -15,11 +14,7 @@ interface TableSeatsProps {
     deckStyleOf: (playerId: string) => string | undefined;
 }
 
-export function TableSeats({
-    seats,
-    boardTheme,
-    deckStyleOf,
-}: TableSeatsProps) {
+export function TableSeats({ seats, deckStyleOf }: TableSeatsProps) {
     if (seats.length === 0) return null;
 
     return (
@@ -28,7 +23,6 @@ export function TableSeats({
                 <SeatChip
                     key={seat.playerId}
                     seat={seat}
-                    boardTheme={boardTheme}
                     deckStyleId={deckStyleOf(seat.playerId)}
                 />
             ))}
@@ -38,21 +32,43 @@ export function TableSeats({
 
 function SeatChip({
     seat,
-    boardTheme,
     deckStyleId,
 }: {
     seat: TableSeat;
-    boardTheme: BoardTheme;
     deckStyleId: string | undefined;
 }) {
     const seatTheme = getCardTheme(deckStyleId);
+    const active = seat.isTurn;
 
     return (
-        <div className="flex flex-col items-center gap-1">
-            <BoardPill theme={boardTheme} outlined={seat.isTurn}>
-                {seat.name}
-            </BoardPill>
-            {seat.handCount !== null && (
+        <div className="flex flex-col items-center gap-1.5">
+            <div
+                className="flex items-center gap-2 rounded-full border-nb px-3.5 py-1.5"
+                style={{
+                    background: active ? "var(--gold)" : "var(--panel-d)",
+                    borderColor: "var(--ink)",
+                    boxShadow: "0 4px 0 var(--ink)",
+                }}
+            >
+                <span
+                    className="font-display text-sm leading-none"
+                    style={{ color: active ? "var(--ink)" : "var(--cream)" }}
+                >
+                    {seat.name}
+                </span>
+                {seat.handCount !== null && (
+                    <span
+                        className="font-pixel text-wc-micro leading-none"
+                        style={{
+                            fontFamily: "var(--pixel)",
+                            color: active ? "#6a4f14" : "var(--muted)",
+                        }}
+                    >
+                        {seat.handCount}
+                    </span>
+                )}
+            </div>
+            {seat.handCount !== null && seat.handCount > 0 && (
                 <div className="flex">
                     {Array.from({
                         length: Math.min(seat.handCount, SEAT_HAND_MAX),
@@ -60,7 +76,10 @@ function SeatChip({
                         <div
                             // biome-ignore lint/suspicious/noArrayIndexKey: positional face-down placeholders, no identity
                             key={i}
-                            className="w-6 first:ml-0 -ml-3 xl:w-8 xl:-ml-4"
+                            className="-ml-3 w-6 first:ml-0 xl:-ml-4 xl:w-8"
+                            style={{
+                                filter: "drop-shadow(0 3px 0 rgba(11,18,32,0.35))",
+                            }}
                         >
                             <Card
                                 card={FACE_DOWN_CARD}
@@ -73,8 +92,8 @@ function SeatChip({
             )}
             {seat.status && (
                 <span
-                    className="text-[11px] font-semibold xl:text-xs"
-                    style={{ color: boardTheme.badge.textColor }}
+                    className="font-display text-wc-tag xl:text-xs"
+                    style={{ color: active ? "var(--gold)" : "var(--muted)" }}
                 >
                     {seat.status}
                 </span>

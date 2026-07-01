@@ -10,7 +10,10 @@ export async function GuestNav() {
     return (
         <header
             className="sticky top-0 z-40"
-            style={{ background: "#0f0b07", borderBottom: "2px solid #3d2d18" }}
+            style={{
+                background: "var(--panel-d2)",
+                borderBottom: "3px solid var(--ink)",
+            }}
         >
             <div className="flex items-center justify-between px-4 xl:px-10 h-14">
                 <Brand size="sm" />

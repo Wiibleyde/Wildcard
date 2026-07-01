@@ -64,27 +64,15 @@ export async function ProfilePage({ lang }: { lang: string }) {
         : null;
 
     return (
-        <div
-            className="min-h-screen px-4 xl:px-10 pt-6 md:pt-10 pb-16"
-            style={{ background: "#0d0a05" }}
-        >
+        <div className="min-h-screen px-4 xl:px-10 pt-6 md:pt-10 pb-16">
             <div className="max-w-lg lg:max-w-4xl xl:max-w-6xl mx-auto flex flex-col gap-5">
-                <div
-                    className="relative rounded-2xl overflow-hidden"
-                    style={{
-                        background:
-                            "linear-gradient(150deg, #231808 0%, #0d0a05 65%)",
-                        border: "2px solid rgba(245,197,22,0.28)",
-                        boxShadow:
-                            "0 6px 0 0 rgba(0,0,0,0.4), 0 14px 30px rgba(0,0,0,0.45)",
-                    }}
-                >
+                <div className="panel-d relative overflow-hidden">
                     <DecoSuit
                         suit="♠"
                         style={{
                             fontSize: "18rem",
-                            opacity: 0.03,
-                            color: "#f5c516",
+                            opacity: 0.06,
+                            color: "var(--cream)",
                             top: "-3rem",
                             right: "-2rem",
                             transform: "rotate(8deg)",
@@ -94,8 +82,11 @@ export async function ProfilePage({ lang }: { lang: string }) {
                     <div className="relative z-10 p-6 xl:p-8">
                         <div className="flex items-start justify-between mb-6">
                             <span
-                                className="text-xs font-bold uppercase tracking-widest"
-                                style={{ color: "#7a6a50" }}
+                                className="stamp"
+                                style={{
+                                    background: "var(--gold)",
+                                    color: "var(--ink)",
+                                }}
                             >
                                 {t("title")}
                             </span>
@@ -111,25 +102,24 @@ export async function ProfilePage({ lang }: { lang: string }) {
                             )}
                             <div className="flex-1 min-w-0">
                                 <h1
-                                    className="text-3xl xl:text-4xl font-black truncate leading-tight tracking-tight"
-                                    style={{ color: "#faf2e2" }}
+                                    className="font-display text-3xl xl:text-4xl truncate leading-tight"
+                                    style={{ color: "var(--cream)" }}
                                 >
                                     {profile?.username ?? "—"}
                                 </h1>
                                 <div className="flex flex-wrap items-center gap-2 mt-2">
                                     <span
-                                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-black uppercase tracking-wider"
+                                        className="stamp"
                                         style={{
-                                            background: "rgba(245,197,22,0.12)",
-                                            color: "#f5c516",
-                                            border: "2px solid rgba(245,197,22,0.3)",
+                                            background: "var(--purple)",
+                                            color: "var(--accent-ink)",
                                         }}
                                     >
                                         ♟ {t("level_short")} {level}
                                     </span>
                                     <span
                                         className="text-xs font-semibold"
-                                        style={{ color: "#7a6a50" }}
+                                        style={{ color: "var(--muted)" }}
                                     >
                                         {t("member_since")} {memberSince}
                                     </span>
@@ -144,16 +134,13 @@ export async function ProfilePage({ lang }: { lang: string }) {
                 </div>
 
                 <div className="lg:grid lg:grid-cols-2 lg:gap-5 flex flex-col gap-5 lg:flex-none">
-                    <div
-                        className="rounded-xl p-6 border"
-                        style={{
-                            background: "#1c1510",
-                            borderColor: "#3d2d18",
-                        }}
-                    >
+                    <div className="panel-d p-6">
                         <h2
-                            className="text-xs font-bold uppercase tracking-widest mb-5"
-                            style={{ color: "#7a6a50" }}
+                            className="stamp mb-5"
+                            style={{
+                                background: "var(--blue)",
+                                color: "var(--accent-ink)",
+                            }}
                         >
                             {t("edit_title")}
                         </h2>
@@ -166,16 +153,13 @@ export async function ProfilePage({ lang }: { lang: string }) {
                         )}
                     </div>
 
-                    <div
-                        className="rounded-xl p-6 border"
-                        style={{
-                            background: "#1c1510",
-                            borderColor: "#3d2d18",
-                        }}
-                    >
+                    <div className="panel-d p-6">
                         <h2
-                            className="text-xs font-bold uppercase tracking-widest mb-5"
-                            style={{ color: "#7a6a50" }}
+                            className="stamp mb-5"
+                            style={{
+                                background: "var(--blue)",
+                                color: "var(--accent-ink)",
+                            }}
                         >
                             {t("linked_accounts")}
                         </h2>
@@ -187,26 +171,28 @@ export async function ProfilePage({ lang }: { lang: string }) {
 
                 <Link
                     href="/profile/history"
-                    className="group rounded-xl p-6 border flex items-center justify-between gap-4 transition-colors"
-                    style={{ background: "#1c1510", borderColor: "#3d2d18" }}
+                    className="panel-d lift group p-6 flex items-center justify-between gap-4"
                 >
                     <div className="min-w-0">
                         <h2
-                            className="text-xs font-bold uppercase tracking-widest mb-1"
-                            style={{ color: "#7a6a50" }}
+                            className="stamp mb-2"
+                            style={{
+                                background: "var(--gold)",
+                                color: "var(--ink)",
+                            }}
                         >
                             {t("history")}
                         </h2>
                         <p
                             className="text-sm font-semibold"
-                            style={{ color: "#9a8870" }}
+                            style={{ color: "var(--muted)" }}
                         >
                             {t("history_desc")}
                         </p>
                     </div>
                     <span
-                        className="text-2xl font-black shrink-0 transition-transform group-hover:translate-x-1"
-                        style={{ color: "#f5c516" }}
+                        className="font-display text-2xl shrink-0 transition-transform group-hover:translate-x-1"
+                        style={{ color: "var(--gold)" }}
                         aria-hidden="true"
                     >
                         →

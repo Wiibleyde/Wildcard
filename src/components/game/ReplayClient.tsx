@@ -70,21 +70,13 @@ export function ReplayClient({
                 </p>
                 <p
                     className="text-sm font-semibold"
-                    style={{ color: "#9a8870" }}
+                    style={{ color: "var(--muted)" }}
                 >
                     {t("expired")}
                 </p>
-                <Link
-                    href="/profile/history"
-                    className="rounded-lg px-4 py-2 font-black text-sm"
-                    style={{
-                        background: "rgba(245,197,22,0.12)",
-                        border: "2px solid rgba(245,197,22,0.3)",
-                        color: "#f5c516",
-                    }}
-                >
+                <GameButton href="/profile/history" variant="gold" size="sm">
                     ← {t("back")}
-                </Link>
+                </GameButton>
             </div>
         );
     }
@@ -93,7 +85,7 @@ export function ReplayClient({
     const table = getGameTable(payload.moduleId);
     if (!table) {
         return (
-            <div className="p-8 text-center" style={{ color: "#9a8870" }}>
+            <div className="p-8 text-center" style={{ color: "var(--muted)" }}>
                 {payload.moduleId}
             </div>
         );
@@ -104,15 +96,15 @@ export function ReplayClient({
             <div className="mx-auto flex w-full max-w-3xl items-center justify-between xl:max-w-5xl 2xl:max-w-7xl">
                 <Link
                     href="/profile/history"
-                    className="text-xs font-bold uppercase tracking-widest"
-                    style={{ color: "#7a6a50" }}
+                    className="wc-link text-xs font-bold uppercase tracking-widest"
+                    style={{ color: "var(--muted)" }}
                 >
                     ← {t("back")}
                 </Link>
                 {payload.adminEnded && (
                     <span
                         className="text-xs font-semibold"
-                        style={{ color: "#9a8870" }}
+                        style={{ color: "var(--muted)" }}
                     >
                         {t("admin_ended")}
                     </span>
@@ -131,10 +123,7 @@ export function ReplayClient({
                 onIllegal={noop}
             />
 
-            <div
-                className="mx-auto flex w-full max-w-3xl flex-col gap-3 rounded-2xl p-3 sm:p-4 xl:max-w-5xl 2xl:max-w-7xl"
-                style={{ background: "#1c1510", border: "2px solid #3d2d18" }}
-            >
+            <div className="panel-d mx-auto flex w-full max-w-3xl flex-col gap-3 p-3 sm:p-4 xl:max-w-5xl 2xl:max-w-7xl">
                 <div className="flex items-center gap-3">
                     <GameButton
                         variant="ghost"
@@ -157,7 +146,7 @@ export function ReplayClient({
                     </GameButton>
                     <span
                         className="ml-auto text-sm font-black tabular-nums"
-                        style={{ color: "#faf2e2" }}
+                        style={{ color: "var(--cream)" }}
                     >
                         {index === 0
                             ? t("deal")

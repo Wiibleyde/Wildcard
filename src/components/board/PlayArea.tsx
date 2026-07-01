@@ -80,7 +80,7 @@ export function PlayArea({
                             />
                         </div>
                         {owner && (
-                            <p className="mt-1 truncate text-center text-[10px] font-semibold text-white/60">
+                            <p className="mt-1 truncate text-center text-wc-label font-semibold text-white/60">
                                 {owner.username}
                             </p>
                         )}

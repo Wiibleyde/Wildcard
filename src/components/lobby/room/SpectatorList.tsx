@@ -11,13 +11,16 @@ export function SpectatorList({ spectators, hostId }: Props) {
     return (
         <div className="flex flex-col gap-3">
             <h3
-                className="text-xs font-bold uppercase tracking-widest"
-                style={{ color: "#7a6a50" }}
+                className="font-display text-base"
+                style={{ color: "var(--cream)" }}
             >
                 {t("spectators")} · {spectators.length}
             </h3>
             {spectators.length === 0 ? (
-                <p className="text-xs font-bold" style={{ color: "#4a3820" }}>
+                <p
+                    className="text-xs font-semibold"
+                    style={{ color: "var(--muted)" }}
+                >
                     {t("no_spectators")}
                 </p>
             ) : (
@@ -25,16 +28,17 @@ export function SpectatorList({ spectators, hostId }: Props) {
                     {spectators.map((s) => (
                         <li
                             key={s.userId}
-                            className="flex items-center gap-2 rounded-xl px-3 py-2"
+                            className="flex items-center gap-2 rounded-xl border-nb px-3 py-2"
                             style={{
-                                background: "#1c1510",
-                                border: "1px solid #3d2d18",
+                                background: "var(--panel-d)",
+                                borderColor: "var(--ink)",
+                                boxShadow: "0 3px 0 var(--ink)",
                             }}
                         >
                             <span aria-hidden>👁</span>
                             <span
-                                className="truncate font-bold text-sm"
-                                style={{ color: "#9a8870" }}
+                                className="truncate font-display text-sm"
+                                style={{ color: "var(--muted)" }}
                             >
                                 {s.username}
                                 {s.userId === hostId

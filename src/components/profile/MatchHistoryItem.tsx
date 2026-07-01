@@ -1,24 +1,13 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Link } from "@/i18n/navigation";
+import { GameButton } from "@/components/ui/GameButton";
 import type { MatchHistoryEntry, MatchResult } from "@/lib/models/history";
 
-const RESULT_STYLE: Record<
-    MatchResult,
-    { bg: string; border: string; fg: string }
-> = {
-    win: {
-        bg: "rgba(72,201,122,0.12)",
-        border: "rgba(72,201,122,0.4)",
-        fg: "#48c97a",
-    },
-    loss: {
-        bg: "rgba(224,64,64,0.12)",
-        border: "rgba(224,64,64,0.4)",
-        fg: "#e04040",
-    },
-    none: { bg: "rgba(255,255,255,0.04)", border: "#3d2d18", fg: "#9a8870" },
+const RESULT_STYLE: Record<MatchResult, { bg: string; fg: string }> = {
+    win: { bg: "var(--green)", fg: "var(--ink)" },
+    loss: { bg: "var(--red)", fg: "var(--accent-ink)" },
+    none: { bg: "var(--cream2)", fg: "var(--ink)" },
 };
 
 type Props = {
@@ -41,31 +30,24 @@ export function MatchHistoryItem({
     const opponents = entry.players.filter((p) => !p.isYou);
 
     return (
-        <li
-            className="rounded-xl p-4 xl:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
-            style={{ background: "#1c1510", border: "2px solid #3d2d18" }}
-        >
+        <li className="panel p-4 xl:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4 min-w-0">
                 <span
-                    className="inline-flex shrink-0 items-center px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider"
-                    style={{
-                        background: rs.bg,
-                        border: `2px solid ${rs.border}`,
-                        color: rs.fg,
-                    }}
+                    className="stamp shrink-0"
+                    style={{ background: rs.bg, color: rs.fg }}
                 >
                     {t(`result_${entry.result}`)}
                 </span>
                 <div className="min-w-0">
                     <div
-                        className="font-black truncate"
-                        style={{ color: "#faf2e2" }}
+                        className="font-display truncate"
+                        style={{ color: "var(--ink)" }}
                     >
                         {entry.moduleName}
                     </div>
                     <div
                         className="text-xs font-semibold mt-0.5 truncate"
-                        style={{ color: "#9a8870" }}
+                        style={{ color: "#5a5340" }}
                     >
                         {playedAtLabel}
                         {opponents.length > 0 && (
@@ -94,18 +76,16 @@ export function MatchHistoryItem({
                         disabled={pinBusy}
                         title={pinned ? t("unpin") : t("pin_hint")}
                         aria-pressed={pinned}
-                        className="rounded-lg px-3 py-2 font-black text-sm transition-transform active:scale-95 disabled:opacity-50"
+                        className="wc-btn text-sm px-3 py-2 disabled:opacity-50"
                         style={
                             pinned
                                 ? {
-                                      background: "rgba(245,197,22,0.16)",
-                                      border: "2px solid rgba(245,197,22,0.5)",
-                                      color: "#f5c516",
+                                      background: "var(--gold)",
+                                      color: "var(--ink)",
                                   }
                                 : {
-                                      background: "rgba(255,255,255,0.04)",
-                                      border: "2px solid #3d2d18",
-                                      color: "#9a8870",
+                                      background: "var(--cream2)",
+                                      color: "var(--ink)",
                                   }
                         }
                     >
@@ -117,27 +97,23 @@ export function MatchHistoryItem({
                     <span
                         aria-disabled="true"
                         title={t("replay_expired_hint")}
-                        className="rounded-lg px-4 py-2 font-black text-sm text-center cursor-not-allowed opacity-50"
+                        className="rounded-wc-btn px-4 py-2 font-display text-sm text-center cursor-not-allowed opacity-50"
                         style={{
-                            background: "rgba(255,255,255,0.04)",
-                            border: "2px solid #3d2d18",
-                            color: "#7a6a50",
+                            background: "var(--cream2)",
+                            border: "2.5px solid var(--ink)",
+                            color: "#5a5340",
                         }}
                     >
                         {t("replay_expired")}
                     </span>
                 ) : (
-                    <Link
+                    <GameButton
                         href={`/replay/${entry.gameId}`}
-                        className="rounded-lg px-4 py-2 font-black text-sm text-center transition-transform active:scale-95"
-                        style={{
-                            background: "rgba(245,197,22,0.12)",
-                            border: "2px solid rgba(245,197,22,0.3)",
-                            color: "#f5c516",
-                        }}
+                        variant="gold"
+                        size="sm"
                     >
                         {t("replay")}
-                    </Link>
+                    </GameButton>
                 )}
             </div>
         </li>

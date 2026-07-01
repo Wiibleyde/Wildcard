@@ -4,7 +4,7 @@
  */
 
 /** Gold ramp behind the "W" logo card, coin chip and avatar initials. */
-export const GOLD_GRADIENT = "linear-gradient(135deg, #f5c516, #c49010)";
+export const GOLD_GRADIENT = "linear-gradient(135deg, #ffc23d, #e0980f)";
 
 /** Gold→red ring framing avatars. */
-export const GOLD_RED_GRADIENT = "linear-gradient(135deg, #f5c516, #e04040)";
+export const GOLD_RED_GRADIENT = "linear-gradient(135deg, #ffc23d, #ff4b3b)";

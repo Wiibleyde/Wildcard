@@ -13,8 +13,8 @@ export function MutationStatus({ status }: Props) {
     if (status === "pending") {
         return (
             <span
-                className="inline-block w-3 h-3 rounded-full border-2 border-t-transparent animate-spin"
-                style={{ borderColor: "#f5c516" }}
+                className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-t-transparent"
+                style={{ borderColor: "var(--gold)" }}
             />
         );
     }
@@ -23,7 +23,7 @@ export function MutationStatus({ status }: Props) {
         return (
             <span
                 className="text-xs font-bold normal-case tracking-normal"
-                style={{ color: "#e04040" }}
+                style={{ color: "var(--red)" }}
             >
                 {tCommon("error")}
             </span>

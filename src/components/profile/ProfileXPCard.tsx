@@ -20,18 +20,17 @@ export function ProfileXPCard({ xp }: Props) {
             <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                     <span
-                        className="text-xs font-black uppercase tracking-widest"
-                        style={{ color: "#7a6a50" }}
+                        className="stamp"
+                        style={{
+                            background: "var(--purple)",
+                            color: "var(--accent-ink)",
+                        }}
                     >
                         {t("xp_title")}
                     </span>
                     <span
-                        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-black"
-                        style={{
-                            background: "rgba(167,139,250,0.15)",
-                            color: "#26ccba",
-                            border: "1px solid rgba(167,139,250,0.3)",
-                        }}
+                        className="font-display text-sm"
+                        style={{ color: "var(--cream)" }}
                     >
                         {t("level_short")} {level}
                     </span>
@@ -39,14 +38,14 @@ export function ProfileXPCard({ xp }: Props) {
                 <div className="text-right">
                     <span
                         ref={xpNumRef}
-                        className="text-xl font-black tabular-nums"
-                        style={{ color: "#faf2e2" }}
+                        className="font-display text-xl tabular-nums"
+                        style={{ color: "var(--cream)" }}
                     >
                         {xp}
                     </span>
                     <span
                         className="text-xs font-bold ml-1"
-                        style={{ color: "#7a6a50" }}
+                        style={{ color: "var(--muted)" }}
                     >
                         XP
                     </span>
@@ -54,34 +53,25 @@ export function ProfileXPCard({ xp }: Props) {
             </div>
 
             <div
-                className="relative h-3 rounded-full overflow-hidden"
+                className="relative h-4 rounded-full overflow-hidden"
                 style={{
-                    background: "rgba(255,255,255,0.06)",
-                    border: "1px solid rgba(255,255,255,0.08)",
+                    background: "#d6c79c",
+                    border: "2.5px solid var(--ink)",
                 }}
             >
                 <div
                     ref={barRef}
-                    className="h-full rounded-full relative overflow-hidden"
+                    className="h-full relative"
                     style={{
-                        background:
-                            "linear-gradient(90deg, #0e9e8e, #26ccba, #7af0e2)",
+                        background: "var(--purple)",
                         width: "0%",
                     }}
-                >
-                    <div
-                        className="absolute inset-x-0 top-0 h-1/2 rounded-full"
-                        style={{
-                            background:
-                                "linear-gradient(180deg, rgba(255,255,255,0.3) 0%, transparent 100%)",
-                        }}
-                    />
-                </div>
+                />
             </div>
 
             <p
                 className="text-xs font-semibold mt-1.5 text-right"
-                style={{ color: "#7a6a50" }}
+                style={{ color: "var(--muted)" }}
             >
                 {format.number(xpToNext)} {t("xp_to_next")}
             </p>

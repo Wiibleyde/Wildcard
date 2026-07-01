@@ -18,18 +18,18 @@ export function BoardPill({
 }: BoardPillProps) {
     const style =
         tone === "accent"
-            ? { background: theme.accentColor, color: "#0d0a05" }
+            ? { background: theme.accentColor, color: "var(--ink)" }
             : buildBadgeStyle(theme);
-    const weight = tone === "accent" ? "font-black" : "font-semibold";
 
     return (
         <span
-            className={`rounded-full px-3 py-1 text-xs ${weight} backdrop-blur-sm xl:text-sm`}
+            className="inline-flex items-center rounded-full border-nb px-3 py-1 font-display text-xs xl:text-sm"
             style={{
                 ...style,
-                outline: outlined
-                    ? `2px solid ${theme.accentColor}`
-                    : undefined,
+                borderColor: "var(--ink)",
+                boxShadow: outlined
+                    ? `0 0 0 3px ${theme.accentColor}, 0 4px 0 var(--ink)`
+                    : "0 4px 0 var(--ink)",
             }}
         >
             {children}

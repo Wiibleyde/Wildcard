@@ -1,64 +1,428 @@
 @import "tailwindcss";
 
-/* ── Wildcard design tokens ───────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   Wildcard — v2 neobrutalism design system
+   Palette: deep cobalt + vermilion + cream, saturated arcade.
+   Signature: thick ink outlines (2.5px) + hard offset shadows (0 Npx 0 ink),
+   cream panels on deep blue, Lilita One display + Silkscreen pixel labels.
+   Ported 1:1 from the Wildcard v2 design prototype.
+   ══════════════════════════════════════════════════════════════════════════ */
 
 @theme {
-    --color-wc-surface: #0d0a05;
-    --color-wc-panel: #1c1510;
-    --color-wc-border: #4a3822;
-    --color-wc-edge: #080503;
-    --color-wc-text: #f0e8d4;
+    /* ── neobrutalism palette (Tailwind utilities: bg-wc-ink, text-wc-cream…) ── */
+    --color-wc-ink: #0b1220; /* outlines, hard shadows, text on cream */
+    --color-wc-bg: #12294a; /* app background — deep cobalt */
+    --color-wc-bg-line: #1c3a63; /* texture hairline on dark */
+    --color-wc-cream: #f7edd4; /* cards, light panels */
+    --color-wc-cream2: #ecdcb4; /* deeper cream */
+    --color-wc-panel-d: #0e2138; /* dark-blue panel (HUD / chrome) */
+    --color-wc-panel-d2: #0a1a2e; /* darkest blue (sidebar) */
+    --color-wc-muted: #93a8c8; /* blue-gray secondary text on dark */
+    --color-wc-blue: #3b8cff;
+    --color-wc-red: #ff4b3b; /* primary accent / hearts */
+    --color-wc-gold: #ffc23d;
+    --color-wc-green: #38cf78;
+    --color-wc-purple: #9b6cf2;
+    --color-wc-felt: #10684b;
+    --color-wc-felt-d: #08402e;
+    --color-wc-accent-ink: #fff7ee;
+
+    /* ── legacy token names remapped onto the new palette so every existing
+         bg-wc-* / text-wc-* utility across the app keeps working, now in the
+         neobrutalism family. Migrate call-sites to the names above over time. */
+    --color-wc-surface: #12294a; /* was #0d0a05 */
+    --color-wc-panel: #0e2138; /* was #1c1510 */
+    --color-wc-border: #0b1220; /* was #4a3822 → ink */
+    --color-wc-edge: #0b1220;
+    --color-wc-text: #f7edd4;
     --color-wc-heading: #faf2e2;
-    --color-wc-muted: #9a8870;
-    --color-wc-sub: #7a6a50;
-    --color-wc-gold: #f5c516;
-    --color-wc-gold-dim: oklch(from #f5c516 l c h / 0.12);
-    --color-wc-xp: #26ccba;
-    --color-wc-xp-dim: oklch(from #26ccba l c h / 0.18);
-    --color-wc-red: #e04040;
-    --color-wc-green: #48c97a;
+    --color-wc-sub: #6f86a8;
+    --color-wc-gold-dim: oklch(from #ffc23d l c h / 0.14);
+    --color-wc-xp: #9b6cf2; /* was teal → purple (gems / xp) */
+    --color-wc-xp-dim: oklch(from #9b6cf2 l c h / 0.18);
 
-    --font-size-wc-label: 0.6875rem;
-    --letter-spacing-wc-cap: 0.07em;
+    /* pixel-stamp font sizes (v4 --text-* namespace → text-wc-micro/label/tag) */
+    --text-wc-micro: 0.5625rem; /* 9px */
+    --text-wc-label: 0.625rem; /* 10px */
+    --text-wc-tag: 0.6875rem; /* 11px */
+    --tracking-wc-cap: 0.02em;
 
-    /* Balatro-chunky radius — override Tailwind's soft defaults app-wide so
-       every rounded-* utility renders low & tactile, not pill-soft SaaS. */
-    --radius-sm: 2px;
-    --radius-md: 3px;
-    --radius-lg: 4px;
-    --radius-xl: 6px;
-    --radius-2xl: 7px;
-    --radius-3xl: 10px;
+    /* Chunky neobrutalism radii — override Tailwind's soft defaults so every
+       rounded-* utility renders tactile, not pill-soft SaaS. */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 10px;
+    --radius-xl: 12px;
+    --radius-2xl: 16px;
+    --radius-3xl: 20px;
 
-    --radius-wc-panel: 7px;
+    --radius-wc-panel: 16px;
     --radius-wc-card: 8px;
-    --radius-wc-btn: 6px;
-    --radius-wc-icon: 5px;
+    --radius-wc-btn: 13px;
+    --radius-wc-icon: 11px;
+}
+
+/* ── raw CSS aliases — let components use var(--ink)/var(--gold)/.panel exactly
+      as the design prototype does, for pixel-parity restyles. --accent is set
+      per-user at runtime; falls back to red. ─────────────────────────────────── */
+:root {
+    --ink: #0b1220;
+    --bg: #12294a;
+    --bg-line: #1c3a63;
+    --cream: #f7edd4;
+    --cream2: #ecdcb4;
+    --panel-d: #0e2138;
+    --panel-d2: #0a1a2e;
+    --muted: #93a8c8;
+    --blue: #3b8cff;
+    --red: #ff4b3b;
+    --gold: #ffc23d;
+    --green: #38cf78;
+    --purple: #9b6cf2;
+    --felt: #10684b;
+    --felt-d: #08402e;
+    --accent: #ff4b3b;
+    --accent-ink: #fff7ee;
+
+    --disp: var(--font-display), "Lilita One", system-ui, sans-serif;
+    --pixel: var(--font-pixel), "Silkscreen", ui-monospace, monospace;
+    --body: var(--font-body), "Hanken Grotesk", system-ui, sans-serif;
 }
 
 /* ── Base ─────────────────────────────────────────────────────────────────── */
 
 @layer base {
-    body {
-        font-family: var(--font-nunito), system-ui, sans-serif;
+    * {
+        box-sizing: border-box;
     }
 
-    /* Display face — distinctive grotesque for headings & brand, tightly
-       tracked. Body keeps the rounded sans for readability. */
+    body {
+        font-family: var(--body);
+        color: var(--cream);
+        background: var(--bg);
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+        /* tactile dot-grid texture — no gradient slop */
+        background-image:
+            radial-gradient(rgba(255, 255, 255, 0.028) 1.4px, transparent 1.5px),
+            radial-gradient(rgba(0, 0, 0, 0.1) 1.4px, transparent 1.5px);
+        background-size:
+            22px 22px,
+            22px 22px;
+        background-position:
+            0 0,
+            11px 11px;
+        background-attachment: fixed;
+    }
+
     h1,
     h2,
+    h3,
+    h4,
     .font-display {
-        font-family:
-            var(--font-display), var(--font-nunito), system-ui, sans-serif;
-        letter-spacing: -0.02em;
+        font-family: var(--disp);
+        font-weight: 400;
+        letter-spacing: 0.01em;
+    }
+
+    ::selection {
+        background: var(--red);
+        color: #fff;
+    }
+
+    ::-webkit-scrollbar {
+        width: 12px;
+        height: 12px;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: var(--panel-d);
+        border-radius: 0;
+        border: 3px solid var(--bg);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #16304f;
     }
 }
 
-/* ── Game button 3D press effect ─────────────────────────────────────────── */
+/* ── Tactile primitives ───────────────────────────────────────────────────── */
 
+/* neobrutalism ink-outline width — the design's signature 2.5px stroke, as a
+   real utility so markup uses `border-nb` (+ a border-color util) not `border-[2.5px]` */
+@utility border-nb {
+    border-width: 2.5px;
+}
+
+/* chunky cream panel: thick ink outline + hard offset shadow, zero glow */
+.panel {
+    background: var(--cream);
+    color: var(--ink);
+    border: 2.5px solid var(--ink);
+    border-radius: 16px;
+    box-shadow: 0 6px 0 var(--ink);
+}
+.panel-d {
+    background: var(--panel-d);
+    color: var(--cream);
+    border: 2.5px solid var(--ink);
+    border-radius: 16px;
+    box-shadow: 0 6px 0 var(--ink);
+}
+.flat {
+    box-shadow: none !important;
+}
+
+/* pixel stamp label — replaces uppercase-tracking pill slop */
+.stamp {
+    font-family: var(--pixel);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px 4px;
+    border-radius: 7px;
+    border: 2px solid var(--ink);
+    white-space: nowrap;
+}
+
+/* chunky button — set bg/color/size inline or via variant helpers */
+.wc-btn {
+    font-family: var(--disp);
+    letter-spacing: 0.02em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    border: 2.5px solid var(--ink);
+    border-radius: 13px;
+    box-shadow: 0 4px 0 var(--ink);
+    transition:
+        transform 0.08s cubic-bezier(0.3, 0.8, 0.3, 1),
+        box-shadow 0.08s,
+        filter 0.12s;
+    -webkit-tap-highlight-color: transparent;
+}
+.wc-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 0 var(--ink);
+    filter: brightness(1.04);
+}
+.wc-btn:active:not(:disabled) {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 var(--ink);
+}
+.wc-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+    transform: none;
+    box-shadow: 0 4px 0 var(--ink);
+    filter: none;
+}
+
+/* generic interactive lift for cards / tiles */
+.lift {
+    transition:
+        transform 0.12s cubic-bezier(0.3, 0.8, 0.3, 1),
+        box-shadow 0.12s;
+}
+.lift:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 9px 0 var(--ink);
+}
+.lift:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 var(--ink);
+}
+
+/* small interactive helpers (chips, emote/icon buttons, friend rows) */
+.wc-friend {
+    transition: background 0.12s;
+}
+.wc-friend:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+.wc-emote,
+.wc-iconbtn,
+.wc-chip {
+    transition:
+        transform 0.1s,
+        box-shadow 0.1s,
+        filter 0.12s,
+        background 0.12s;
+}
+.wc-emote:hover,
+.wc-chip:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 0 var(--ink);
+}
+.wc-emote:active,
+.wc-chip:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 var(--ink);
+}
+.wc-iconbtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 0 var(--ink);
+}
+.wc-iconbtn:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 var(--ink);
+}
+
+.wc-link {
+    font-family: var(--disp);
+}
+.wc-link:hover {
+    color: var(--cream);
+}
+
+/* headings */
+.h-xl {
+    font-family: var(--disp);
+    font-size: clamp(30px, 4.2vw, 48px);
+    line-height: 0.98;
+    color: var(--cream);
+    margin: 0;
+}
+.h-lg {
+    font-family: var(--disp);
+    font-size: clamp(22px, 3vw, 30px);
+    line-height: 1;
+    margin: 0;
+}
+.sub {
+    color: var(--muted);
+    font-weight: 500;
+}
+
+/* chunky range input (settings / create-table) */
+.wc-range {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 10px;
+    border-radius: 99px;
+    background: var(--panel-d2);
+    border: 2.5px solid var(--ink);
+    outline: none;
+}
+.wc-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: var(--gold);
+    border: 2.5px solid var(--ink);
+    cursor: pointer;
+    box-shadow: 0 3px 0 var(--ink);
+}
+.wc-range::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: var(--gold);
+    border: 2.5px solid var(--ink);
+    cursor: pointer;
+}
+
+/* ── Shell: sidebar nav / logo mark / profile chip / mobile bottom-nav ─────── */
+
+.wc-logo-mark {
+    display: grid;
+    place-items: center;
+    background: var(--red);
+    color: #fff;
+    border: 2.5px solid var(--ink);
+    box-shadow: 0 4px 0 var(--ink);
+    font-family: var(--disp);
+    line-height: 1;
+    transform: rotate(-4deg);
+}
+
+.wc-nav {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 11px 13px;
+    border-radius: 12px;
+    background: none;
+    border: 2.5px solid transparent;
+    cursor: pointer;
+    color: var(--muted);
+    font-family: var(--disp);
+    font-size: 17px;
+    text-align: left;
+    transition:
+        color 0.12s,
+        background 0.12s,
+        transform 0.08s;
+}
+.wc-nav:hover {
+    color: var(--cream);
+    background: #12243f;
+}
+.wc-nav--on {
+    background: var(--cream);
+    color: var(--ink);
+    border-color: var(--ink);
+    box-shadow: 0 4px 0 var(--ink);
+}
+.wc-nav--on:hover {
+    background: var(--cream);
+    color: var(--ink);
+}
+
+.wc-me {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 9px;
+    border-radius: 13px;
+    background: #10233f;
+    border: 2.5px solid var(--ink);
+    cursor: pointer;
+    box-shadow: 0 4px 0 var(--ink);
+    transition:
+        transform 0.08s,
+        box-shadow 0.08s;
+}
+.wc-me:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 0 var(--ink);
+}
+.wc-me:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 var(--ink);
+}
+
+.wc-bnav {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--muted);
+    font-family: var(--disp);
+    font-size: 12px;
+    padding: 6px 0;
+    transition: color 0.12s;
+}
+.wc-bnav--on {
+    color: var(--gold);
+}
+
+/* ── legacy 3D button (GameButton) — kept working, hard ink shadow fits ─────── */
 .btn-game {
     --btn-depth: 4px;
-    --btn-shadow: #000;
+    --btn-shadow: var(--ink);
     box-shadow: 0 var(--btn-depth) 0 0 var(--btn-shadow);
     transition:
         transform 80ms ease,
@@ -66,63 +430,241 @@
     cursor: pointer;
     user-select: none;
 }
-
 .btn-game:active:not(:disabled):not([aria-disabled="true"]) {
     transform: translateY(var(--btn-depth));
     box-shadow: 0 0 0 0 var(--btn-shadow);
 }
-
 .btn-game:disabled,
 .btn-game[aria-disabled="true"] {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
-/* ── Balatro chunky block — surfaces read as tactile objects: a hard offset
-      "sits-on-the-table" shadow instead of a diffuse floating blur. ───────── */
-
+/* legacy chunky block — remapped to a hard ink offset (was diffuse blur) */
 .wc-block {
     box-shadow:
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.05),
-        0 4px 0 0 rgba(0, 0, 0, 0.45),
-        0 9px 18px rgba(0, 0, 0, 0.4);
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
+        0 4px 0 0 var(--ink);
 }
 
-/* ── CRT cabinet vignette — darkened corners, arcade/Balatro screen feel ──── */
+/* ══════════════════════════════════════════════════════════════════════════
+   Keyframes — game juice (ported from prototype)
+   ══════════════════════════════════════════════════════════════════════════ */
 
-body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 9998;
-    background: radial-gradient(
-        ellipse at 50% 38%,
-        transparent 50%,
-        rgba(0, 0, 0, 0.5) 100%
-    );
+@keyframes wc-pop {
+    from {
+        transform: translateY(16px);
+    }
+    to {
+        transform: none;
+    }
+}
+.wc-screen {
+    animation: wc-pop 0.34s cubic-bezier(0.2, 0.9, 0.25, 1) both;
 }
 
-/* ── Grain overlay (Balatro-style texture) ───────────────────────────────── */
-
-body::after {
-    content: "";
-    position: fixed;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
-    opacity: 0.028;
-    pointer-events: none;
-    z-index: 9999;
-    mix-blend-mode: overlay;
+@keyframes wc-deal {
+    from {
+        opacity: 0;
+        transform: translateY(36px) rotate(var(--r, 0deg)) scale(0.8);
+    }
+    to {
+        opacity: 1;
+    }
 }
 
-/* ── Card visual effects ──────────────────────────────────────────────────── */
+@keyframes wc-drop-in {
+    0% {
+        opacity: 0;
+        transform: translateY(-40px) scale(1.25) rotate(var(--rot, 0deg));
+    }
+    60% {
+        opacity: 1;
+        transform: translateY(4px) scale(0.97) rotate(var(--rot, 0deg));
+    }
+    100% {
+        transform: translateY(0) scale(1) rotate(var(--rot, 0deg));
+    }
+}
+.wc-trick-card {
+    animation: wc-drop-in 0.34s cubic-bezier(0.2, 1.2, 0.3, 1) both;
+}
+
+@keyframes wc-shake {
+    0%,
+    100% {
+        transform: translate(0, 0) rotate(0);
+    }
+    15% {
+        transform: translate(-8px, 4px) rotate(-0.6deg);
+    }
+    30% {
+        transform: translate(7px, -5px) rotate(0.5deg);
+    }
+    45% {
+        transform: translate(-6px, -3px) rotate(-0.4deg);
+    }
+    60% {
+        transform: translate(6px, 4px) rotate(0.4deg);
+    }
+    75% {
+        transform: translate(-4px, 2px) rotate(-0.2deg);
+    }
+}
+.wc-shake {
+    animation: wc-shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes wc-scorepop {
+    0% {
+        transform: scale(0.6) rotate(-6deg);
+    }
+    45% {
+        transform: scale(1.18) rotate(3deg);
+    }
+    70% {
+        transform: scale(0.94) rotate(-1deg);
+    }
+    100% {
+        transform: scale(1) rotate(0);
+    }
+}
+.wc-scorepop {
+    animation: wc-scorepop 0.5s cubic-bezier(0.2, 1.3, 0.35, 1) both;
+}
+
+@keyframes wc-flyup {
+    0% {
+        transform: translate(-50%, 0) scale(1);
+        opacity: 1;
+    }
+    70% {
+        opacity: 1;
+    }
+    100% {
+        transform: translate(-50%, -140px) scale(1.15);
+        opacity: 0;
+    }
+}
+.wc-flyup {
+    animation: wc-flyup 1s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+
+@keyframes wc-chipbump {
+    0% {
+        transform: scale(1);
+    }
+    40% {
+        transform: scale(1.35);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+.wc-bump {
+    animation: wc-chipbump 0.32s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+@keyframes wc-confetti-fall {
+    0% {
+        transform: translate(0, 0) rotate(0);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(var(--dx, 0), var(--dy, 600px))
+            rotate(var(--dr, 540deg));
+        opacity: 0;
+    }
+}
+.wc-confetto {
+    animation: wc-confetti-fall var(--dur, 1.2s) cubic-bezier(0.25, 0.6, 0.4, 1)
+        forwards;
+}
+
+@keyframes wc-float {
+    0%,
+    100% {
+        transform: translateY(0) rotate(var(--rot, 0deg));
+    }
+    50% {
+        transform: translateY(-7px) rotate(var(--rot, 0deg));
+    }
+}
+
+@keyframes wc-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+.wc-spinner {
+    animation: wc-spin 0.9s steps(8) infinite;
+}
+
+@keyframes wc-banner-in {
+    0% {
+        transform: scale(0.72) rotate(-3deg);
+    }
+    60% {
+        transform: scale(1.05) rotate(1deg);
+    }
+    100% {
+        transform: scale(1) rotate(0);
+    }
+}
+.wc-banner-in {
+    animation: wc-banner-in 0.5s cubic-bezier(0.2, 1.3, 0.35, 1) both;
+}
+
+/* ── Modal / dialog entrance (kept from prior system) ─────────────────────── */
+@keyframes wildcard-fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+@keyframes wildcard-pop-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+.wc-fade-in {
+    animation: wildcard-fade-in 140ms ease-out;
+}
+.wc-pop-in {
+    animation: wildcard-pop-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wc-screen,
+    .wc-trick-card,
+    .wc-shake,
+    .wc-scorepop,
+    .wc-flyup,
+    .wc-bump,
+    .wc-confetto,
+    .wc-spinner,
+    .wc-banner-in,
+    .wc-fade-in,
+    .wc-pop-in {
+        animation: none !important;
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Card visual effects (shimmer / foil / holographic) — unchanged, Card uses them
+   ══════════════════════════════════════════════════════════════════════════ */
 
 @keyframes wildcard-shimmer {
     0% {
         transform: translateX(-160%) skewX(-20deg);
     }
-
     100% {
         transform: translateX(160%) skewX(-20deg);
     }
@@ -132,11 +674,9 @@ body::after {
     0% {
         background-position: 0% 50%;
     }
-
     50% {
         background-position: 100% 50%;
     }
-
     100% {
         background-position: 0% 50%;
     }
@@ -148,49 +688,9 @@ body::after {
         opacity: 0.2;
         transform: scale(0.8) rotate(0deg);
     }
-
     50% {
         opacity: 1;
         transform: scale(1.2) rotate(180deg);
-    }
-}
-
-/* ── Modal / dialog entrance ─────────────────────────────────────────────── */
-
-@keyframes wildcard-fade-in {
-    from {
-        opacity: 0;
-    }
-
-    to {
-        opacity: 1;
-    }
-}
-
-@keyframes wildcard-pop-in {
-    from {
-        opacity: 0;
-        transform: translateY(8px) scale(0.96);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
-}
-
-.wc-fade-in {
-    animation: wildcard-fade-in 140ms ease-out;
-}
-
-.wc-pop-in {
-    animation: wildcard-pop-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .wc-fade-in,
-    .wc-pop-in {
-        animation: none;
     }
 }
 

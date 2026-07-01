@@ -99,8 +99,8 @@ export function GameOverXp({ userId, won }: { userId: string; won: boolean }) {
                 );
                 tl.fromTo(
                     levelRef.current,
-                    { scale: 1.6, color: "#f5c516" },
-                    { scale: 1, color: "#26ccba", duration: 0.6 },
+                    { scale: 1.6, color: "#ffc23d" },
+                    { scale: 1, color: "#9b6cf2", duration: 0.6 },
                     "<",
                 );
             } else {
@@ -117,54 +117,71 @@ export function GameOverXp({ userId, won }: { userId: string; won: boolean }) {
     if (!xp.ready) return null;
 
     return (
-        <div ref={containerRef} className="w-full max-w-xs">
-            <div className="mb-2 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <span
-                        className="text-xs font-black uppercase tracking-widest"
-                        style={{ color: "#7a6a50" }}
-                    >
-                        {t("xp_title")}
-                    </span>
-                    <span
-                        className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-black"
-                        style={{
-                            background: "rgba(167,139,250,0.15)",
-                            color: "#26ccba",
-                            border: "1px solid rgba(167,139,250,0.3)",
-                        }}
-                    >
-                        {t("level_short")}{" "}
-                        <span ref={levelRef} className="ml-1 tabular-nums">
-                            {xp.levelBefore}
-                        </span>
-                    </span>
-                </div>
-                <span
-                    className="xp-gained-badge inline-flex items-center rounded-full px-2.5 py-0.5 text-sm font-black tabular-nums"
+        <div ref={containerRef} className="panel w-full max-w-xs p-3">
+            <div className="flex items-center gap-3">
+                {/* chunky ink-bordered reward tile */}
+                <div
+                    className="xp-gained-badge grid size-12 shrink-0 place-items-center rounded-xl border-nb font-display text-xl leading-none"
                     style={{
-                        background: "rgba(72,201,122,0.16)",
-                        color: "#48c97a",
-                        border: "1px solid rgba(72,201,122,0.35)",
+                        background: "var(--purple)",
+                        color: "var(--accent-ink)",
+                        borderColor: "var(--ink)",
+                        boxShadow: "0 3px 0 var(--ink)",
                     }}
+                    aria-hidden="true"
                 >
-                    +{xp.gained} XP
-                </span>
+                    XP
+                </div>
+
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                        <span
+                            className="stamp"
+                            style={{
+                                background: "var(--cream2)",
+                                color: "var(--ink)",
+                            }}
+                        >
+                            {t("xp_title")}
+                        </span>
+                        <span
+                            className="stamp"
+                            style={{
+                                background: "var(--purple)",
+                                color: "var(--accent-ink)",
+                            }}
+                        >
+                            {t("level_short")}{" "}
+                            <span ref={levelRef} className="tabular-nums">
+                                {xp.levelBefore}
+                            </span>
+                        </span>
+                    </div>
+
+                    <div
+                        className="mt-1.5 font-display text-2xl leading-none tabular-nums"
+                        style={{ color: "var(--purple)" }}
+                    >
+                        +{xp.gained}{" "}
+                        <span className="text-sm" style={{ color: "#5a5340" }}>
+                            XP
+                        </span>
+                    </div>
+                </div>
             </div>
 
             <div
-                className="relative h-3 overflow-hidden rounded-full"
+                className="relative mt-3 h-3 overflow-hidden rounded-full border-2"
                 style={{
-                    background: "rgba(255,255,255,0.06)",
-                    border: "1px solid rgba(255,255,255,0.08)",
+                    background: "var(--cream2)",
+                    borderColor: "var(--ink)",
                 }}
             >
                 <div
                     ref={barRef}
                     className="relative h-full overflow-hidden rounded-full"
                     style={{
-                        background:
-                            "linear-gradient(90deg, #0e9e8e, #26ccba, #7af0e2)",
+                        background: "var(--purple)",
                         width: "0%",
                     }}
                 >
@@ -182,8 +199,8 @@ export function GameOverXp({ userId, won }: { userId: string; won: boolean }) {
                 {xp.leveledUp ? (
                     <div
                         ref={levelUpRef}
-                        className="text-xs font-black uppercase tracking-wider"
-                        style={{ color: "#f5c516", opacity: 0 }}
+                        className="font-display text-xs uppercase tracking-wider"
+                        style={{ color: "var(--gold)", opacity: 0 }}
                     >
                         ★ {t("level_up")}
                     </div>
@@ -192,7 +209,7 @@ export function GameOverXp({ userId, won }: { userId: string; won: boolean }) {
                 )}
                 <span
                     className="text-xs font-bold tabular-nums"
-                    style={{ color: "#7a6a50" }}
+                    style={{ color: "#5a5340" }}
                 >
                     <span ref={numRef}>{xp.before}</span> XP
                 </span>

@@ -20,24 +20,11 @@ export async function LeaderboardPage() {
     ] = await Promise.all([supabase.auth.getUser(), getLeaderboard(supabase)]);
 
     return (
-        <div
-            className="min-h-screen px-4 xl:px-10 pt-6 md:pt-10 pb-16"
-            style={{ background: "#0d0a05" }}
-        >
+        <div className="min-h-screen px-4 xl:px-10 pt-6 md:pt-10 pb-16">
             <div className="max-w-lg lg:max-w-4xl xl:max-w-6xl 2xl:max-w-7xl mx-auto flex flex-col gap-6">
                 <div className="flex flex-col gap-2">
-                    <h1
-                        className="text-2xl xl:text-3xl font-black tracking-tight"
-                        style={{ color: "#faf2e2" }}
-                    >
-                        {t("title")}
-                    </h1>
-                    <p
-                        className="text-sm font-semibold"
-                        style={{ color: "#9a8870" }}
-                    >
-                        {t("subtitle")}
-                    </p>
+                    <h1 className="h-xl">{t("title")}</h1>
+                    <p className="sub text-sm">{t("subtitle")}</p>
                 </div>
 
                 <LeaderboardBoard games={games} viewerId={user?.id ?? null} />

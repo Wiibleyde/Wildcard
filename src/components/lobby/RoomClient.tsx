@@ -204,27 +204,28 @@ export function RoomClient({
     return (
         <div className="flex flex-col gap-6">
             <ReconnectingBanner status={conn} />
-            <div
-                className="rounded-2xl p-6 xl:p-8 flex flex-col items-center gap-3 text-center"
-                style={{ background: "#1c1510", border: "2px solid #3d2d18" }}
-            >
+            <div className="panel-d flex flex-col items-center gap-3 p-6 text-center xl:p-8">
                 <span
-                    className="text-xs font-bold uppercase tracking-widest"
-                    style={{ color: "#7a6a50" }}
+                    className="stamp max-w-full text-center"
+                    style={{
+                        background: "var(--cream)",
+                        color: "var(--ink)",
+                        whiteSpace: "normal",
+                    }}
                 >
                     {moduleName} · {t("share_hint")}
                 </span>
                 <button
                     type="button"
                     onClick={copyCode}
-                    className="text-5xl xl:text-6xl font-black tracking-[0.3em] transition-transform active:scale-95"
-                    style={{ color: "#f5c516" }}
+                    className="font-display text-5xl tracking-[0.25em] transition-transform active:scale-95 xl:text-6xl"
+                    style={{ color: "var(--gold)" }}
                 >
                     {code}
                 </button>
                 <span
-                    className="text-xs font-bold"
-                    style={{ color: copied ? "#48c97a" : "#9a8870" }}
+                    className="font-display text-xs"
+                    style={{ color: copied ? "var(--green)" : "var(--muted)" }}
                 >
                     {copied ? t("copied") : t("copy")}
                 </span>
@@ -243,8 +244,8 @@ export function RoomClient({
             {ruleToggles.length > 0 && (
                 <div className="flex flex-col gap-3">
                     <h3
-                        className="text-xs font-bold uppercase tracking-widest"
-                        style={{ color: "#7a6a50" }}
+                        className="font-display text-base"
+                        style={{ color: "var(--cream)" }}
                     >
                         {t("rules_title")}
                     </h3>
@@ -276,8 +277,8 @@ export function RoomClient({
 
             {error && (
                 <p
-                    className="text-sm font-semibold"
-                    style={{ color: "#e04040" }}
+                    className="font-display text-sm"
+                    style={{ color: "var(--red)" }}
                 >
                     {error}
                 </p>
@@ -287,17 +288,10 @@ export function RoomClient({
                 type="button"
                 onClick={toggleRole}
                 disabled={busy || (isSpectator && roomFull)}
-                className="rounded-xl py-3 font-bold text-sm disabled:opacity-50"
+                className="wc-btn py-3 text-sm"
                 style={{
-                    background: isSpectator
-                        ? "rgba(245,197,22,0.12)"
-                        : "rgba(167,139,250,0.12)",
-                    color: isSpectator ? "#f5c516" : "#26ccba",
-                    border: `1px solid ${
-                        isSpectator
-                            ? "rgba(245,197,22,0.4)"
-                            : "rgba(167,139,250,0.4)"
-                    }`,
+                    background: isSpectator ? "var(--gold)" : "var(--purple)",
+                    color: isSpectator ? "var(--ink)" : "var(--accent-ink)",
                 }}
             >
                 {isSpectator

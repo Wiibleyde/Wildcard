@@ -7,7 +7,6 @@ import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { GameButton } from "@/components/ui/GameButton";
 import { usePollingWithClock } from "@/hooks/usePollingWithClock";
 import type { OngoingGame } from "@/lib/models/admin";
-import { ADMIN, statusPillStyle } from "./adminTheme";
 import { GameRow } from "./GameRow";
 
 const REFRESH_MS = 10_000;
@@ -54,24 +53,18 @@ export function OngoingGamesPanel({ games, canEnd }: Props) {
     }
 
     return (
-        <section
-            className="rounded-2xl p-5 xl:p-6 flex flex-col gap-4"
-            style={{
-                background: "rgba(255,255,255,0.03)",
-                border: `1px solid ${ADMIN.border}`,
-            }}
-        >
+        <section className="panel-d p-5 xl:p-6 flex flex-col gap-4">
             <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                    <h2
-                        className="text-lg xl:text-xl font-black"
-                        style={{ color: ADMIN.text }}
-                    >
+                    <h2 className="font-display text-xl xl:text-2xl leading-none">
                         {t("ongoing_title")}
                     </h2>
                     <span
-                        className="text-xs font-black px-2 py-0.5 rounded-full"
-                        style={statusPillStyle}
+                        className="stamp"
+                        style={{
+                            background: "var(--green)",
+                            color: "var(--ink)",
+                        }}
                     >
                         {games.length}
                     </span>
@@ -89,7 +82,7 @@ export function OngoingGamesPanel({ games, canEnd }: Props) {
             {games.length === 0 ? (
                 <p
                     className="text-sm font-semibold py-8 text-center"
-                    style={{ color: ADMIN.textMuted }}
+                    style={{ color: "var(--muted)" }}
                 >
                     {t("no_games")}
                 </p>

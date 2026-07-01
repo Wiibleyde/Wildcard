@@ -23,14 +23,22 @@ export function TurnBanner({
 }) {
     return (
         <div
-            className="rounded-xl px-4 py-2 text-center text-sm font-black"
-            style={{
-                background: highlight
-                    ? "rgba(245,197,22,0.15)"
-                    : "rgba(255,255,255,0.04)",
-                color: highlight ? "#f5c516" : "#9a8870",
-                border: `1px solid ${highlight ? "#f5c51640" : "#3d2d18"}`,
-            }}
+            className="self-center rounded-wc-btn border-nb px-5 py-2 text-center font-display text-lg leading-none"
+            style={
+                highlight
+                    ? {
+                          background: "var(--gold)",
+                          color: "var(--ink)",
+                          borderColor: "var(--ink)",
+                          boxShadow: "0 4px 0 var(--ink)",
+                      }
+                    : {
+                          background: "var(--panel-d)",
+                          color: "var(--muted)",
+                          borderColor: "var(--ink)",
+                          boxShadow: "0 4px 0 var(--ink)",
+                      }
+            }
         >
             {label}
         </div>
@@ -54,18 +62,21 @@ export function GameOverOverlay({
 
     return (
         <div
-            className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 rounded-2xl px-6 text-center backdrop-blur-sm"
-            style={{ background: "rgba(13,10,5,0.82)" }}
+            className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-5 px-6 text-center backdrop-blur-sm"
+            style={{
+                background: "rgba(10,26,46,0.86)",
+                borderRadius: "clamp(1.125rem, 3vw, 2rem)",
+            }}
         >
             <span
-                className="text-xs font-bold uppercase tracking-widest"
-                style={{ color: "#7a6a50" }}
+                className="stamp"
+                style={{ background: "var(--cream)", color: "var(--red)" }}
             >
-                {t("game_over")}
+                ★ {t("game_over")}
             </span>
             <h2
-                className="text-4xl xl:text-5xl font-black"
-                style={{ color: won ? "#48c97a" : "#f5c516" }}
+                className="font-display text-4xl xl:text-5xl"
+                style={{ color: won ? "var(--green)" : "var(--gold)" }}
             >
                 {/* No outcome ⇒ the game was force-ended by an admin (no winner). */}
                 {!outcome
@@ -78,50 +89,56 @@ export function GameOverOverlay({
             </h2>
 
             {outcome && outcome.rankings.length > 0 && (
-                <ol className="flex w-full max-w-xs flex-col gap-1.5">
+                <ol className="flex w-full max-w-xs flex-col gap-2">
                     {outcome.rankings.map((r) => {
                         const title = titleOf?.(r.rank, total) ?? null;
                         const isMe = r.playerId === currentUserId;
                         return (
                             <li
                                 key={r.playerId}
-                                className="flex items-center justify-between gap-3 rounded-lg px-3 py-2"
+                                className="flex items-center justify-between gap-3 rounded-lg border-nb px-3 py-2"
                                 style={{
                                     background: isMe
-                                        ? "rgba(245,197,22,0.12)"
-                                        : "rgba(255,255,255,0.04)",
-                                    border: `1px solid ${
-                                        isMe ? "#f5c51640" : "#3d2d18"
-                                    }`,
+                                        ? "var(--cream)"
+                                        : "var(--cream2)",
+                                    borderColor: "var(--ink)",
+                                    boxShadow: "0 3px 0 var(--ink)",
                                 }}
                             >
                                 <span className="flex min-w-0 items-center gap-2">
                                     <span
-                                        className="font-black tabular-nums"
-                                        style={{ color: "#7a6a50" }}
+                                        className="font-display tabular-nums"
+                                        style={{
+                                            color: isMe
+                                                ? "var(--red)"
+                                                : "#8a7d55",
+                                        }}
                                     >
                                         {r.rank}
                                     </span>
                                     <span
-                                        className="truncate text-sm font-bold"
-                                        style={{ color: "#faf2e2" }}
+                                        className="truncate font-display text-base"
+                                        style={{ color: "var(--ink)" }}
                                     >
                                         {nameOf(players, r.playerId)}
                                     </span>
                                 </span>
                                 {title ? (
                                     <span
-                                        className="shrink-0 text-xs font-black uppercase tracking-wider"
-                                        style={{ color: "#f5c516" }}
+                                        className="stamp shrink-0"
+                                        style={{
+                                            background: "var(--gold)",
+                                            color: "var(--ink)",
+                                        }}
                                     >
                                         {title}
                                     </span>
                                 ) : typeof r.score === "number" ? (
                                     <span
-                                        className="shrink-0 text-sm font-bold"
-                                        style={{ color: "#9a8870" }}
+                                        className="shrink-0 font-display text-base"
+                                        style={{ color: "#5a5340" }}
                                     >
-                                        · {r.score}
+                                        {r.score}
                                     </span>
                                 ) : null}
                             </li>

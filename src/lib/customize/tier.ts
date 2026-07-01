@@ -7,28 +7,25 @@ export type TierKey =
     | "mystical"
     | "ethereal";
 
+/**
+ * Neobrutalism tier stamps — solid fills from the v2 palette, ready for a
+ * `.stamp` chip on a cream tile. Each entry is `[background, text]`, both
+ * bordered by ink from the `.stamp` class.
+ */
+const TIER_STAMP: Record<TierKey, readonly [string, string]> = {
+    common: ["var(--cream2)", "var(--ink)"],
+    uncommon: ["var(--green)", "var(--ink)"],
+    rare: ["var(--blue)", "var(--accent-ink)"],
+    epic: ["var(--purple)", "var(--accent-ink)"],
+    legendary: ["var(--gold)", "var(--ink)"],
+    mystical: ["var(--red)", "var(--accent-ink)"],
+    ethereal: ["var(--gold)", "var(--ink)"],
+};
+
 export function tierColor(tier: TierKey): string {
-    const map: Record<TierKey, string> = {
-        common: "rgba(156,163,175,0.15)",
-        uncommon: "rgba(74,222,128,0.15)",
-        rare: "rgba(96,165,250,0.15)",
-        epic: "rgba(167,139,250,0.15)",
-        legendary: "rgba(251,191,36,0.15)",
-        mystical: "rgba(251,113,133,0.15)",
-        ethereal: "rgba(232,196,104,0.20)",
-    };
-    return map[tier] ?? map.common;
+    return (TIER_STAMP[tier] ?? TIER_STAMP.common)[0];
 }
 
 export function tierTextColor(tier: TierKey): string {
-    const map: Record<TierKey, string> = {
-        common: "#9ca3af",
-        uncommon: "#4ade80",
-        rare: "#60a5fa",
-        epic: "#26ccba",
-        legendary: "#fbbf24",
-        mystical: "#fb7185",
-        ethereal: "#e8c468",
-    };
-    return map[tier] ?? map.common;
+    return (TIER_STAMP[tier] ?? TIER_STAMP.common)[1];
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
-import { GOLD_GRADIENT } from "@/lib/ui/brand";
 import { Brand } from "./Brand";
 import { NavActions } from "./NavActions";
 import { NavAvatar } from "./NavAvatar";
@@ -28,99 +27,67 @@ export function SidebarDesktop({
 }: Props) {
     return (
         <aside
-            className="hidden md:flex flex-col fixed top-0 left-0 h-screen z-40 w-60 xl:w-68"
+            className="fixed top-0 left-0 z-40 hidden h-screen w-59 flex-col gap-1.5 px-4 py-5 md:flex"
             style={{
-                background: "#0f0b07",
-                borderRight: "2px solid #3d2d18",
-                boxShadow: "4px 0 20px rgba(0,0,0,0.3)",
+                background: "var(--panel-d2)",
+                borderRight: "3px solid var(--ink)",
             }}
         >
-            <div
-                className="shrink-0 px-4 pt-5 pb-4"
-                style={{ borderBottom: "1px solid #2a1e0f" }}
-            >
+            <div className="px-1.5 pt-1 pb-3.5">
                 <Brand size="md" />
             </div>
 
-            <div className="flex-1 overflow-y-auto px-3 py-3">
-                <NavLinks
-                    variant="sidebar"
-                    shown={true}
-                    canModerate={canModerate}
-                />
+            <div className="flex-1 overflow-y-auto">
+                <NavLinks variant="sidebar" canModerate={canModerate} />
             </div>
 
-            <div
-                className="shrink-0 px-3 pb-4 pt-3 flex flex-col gap-2"
-                style={{ borderTop: "1px solid #2a1e0f" }}
-            >
-                <div
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl"
-                    style={{
-                        background: "rgba(245,197,22,0.06)",
-                        border: "1px solid rgba(245,197,22,0.15)",
-                    }}
-                >
-                    <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-black"
+            <div className="mt-auto flex flex-col gap-3">
+                <div className="flex gap-2">
+                    <span
+                        className="inline-flex items-center gap-1.5 rounded-full border-nb px-3 py-1 font-display text-sm"
                         style={{
-                            background: GOLD_GRADIENT,
-                            color: "#0d0a05",
+                            background: "var(--cream)",
+                            borderColor: "var(--ink)",
+                            color: "var(--ink)",
+                            boxShadow: "0 3px 0 var(--ink)",
                         }}
                     >
-                        $
-                    </div>
-                    <span
-                        className="font-black text-sm"
-                        style={{ color: "#f5c516" }}
-                    >
-                        0
-                    </span>
-                    <span
-                        className="text-xs font-semibold"
-                        style={{ color: "#7a6a50" }}
-                    >
-                        {coins}
+                        <span style={{ color: "var(--gold)" }}>◆</span>0
+                        <span
+                            className="font-body text-wc-tag font-semibold"
+                            style={{ color: "#7a7052" }}
+                        >
+                            {coins}
+                        </span>
                     </span>
                 </div>
 
                 <NavActions variant="sidebar" shown={true} />
 
-                <Link
-                    href="/profile"
-                    className="flex items-center gap-3 p-2.5 rounded-xl transition-all duration-150"
-                    style={{
-                        background: "rgba(255,255,255,0.03)",
-                        border: "1px solid #2a1e0f",
-                    }}
-                >
+                <Link href="/profile" className="wc-me">
                     <NavAvatar
                         avatarUrl={avatarUrl}
                         initial={initial}
                         username={profile?.username ?? null}
-                        sizePx={36}
-                        initialClassName="text-sm"
+                        sizePx={42}
+                        initialClassName="text-lg"
                     />
-
-                    <div className="flex-1 min-w-0">
+                    <div className="min-w-0">
                         <p
-                            className="text-sm font-black truncate leading-none"
-                            style={{ color: "#faf2e2" }}
+                            className="truncate font-display text-lg leading-none"
+                            style={{ color: "var(--cream)" }}
                         >
                             {profile?.username ?? "—"}
                         </p>
-                        <div className="flex items-center gap-1.5 mt-1">
-                            <span
-                                className="text-[10px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider"
-                                style={{
-                                    background: "rgba(167,139,250,0.15)",
-                                    color: "#26ccba",
-                                    border: "1px solid rgba(167,139,250,0.25)",
-                                }}
-                            >
-                                {levelShort} {level}
-                            </span>
-                        </div>
+                        <p
+                            className="mt-1 font-pixel text-wc-micro uppercase"
+                            style={{
+                                color: "var(--muted)",
+                                fontFamily: "var(--pixel)",
+                            }}
+                        >
+                            {levelShort} {level}
+                        </p>
                     </div>
                 </Link>
             </div>

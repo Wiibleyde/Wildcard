@@ -2,7 +2,11 @@
 
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
+import { GameButton } from "@/components/ui/GameButton";
 import type { PlayGame } from "@/lib/games/catalog";
+
+/** Stable ids for the (purely decorative) queue avatar discs. */
+const SEAT_IDS = ["you", "p2", "p3", "p4", "p5"] as const;
 
 interface Props {
     /** Game being searched (absent while we only know "matched"). */
@@ -38,60 +42,71 @@ export function MatchmakingOverlay({
     }, [matched]);
 
     const elapsed = Math.max(0, Math.floor((now - since) / 1000));
-    const accent = game?.accent ?? "#48c97a";
+    const accent = game?.accent ?? "var(--green)";
+    // Avatar discs: the searcher plus everyone else currently in the queue.
+    const seatIds = SEAT_IDS.slice(0, Math.max(1, Math.min(waiting + 1, 5)));
 
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
             style={{
-                background: "rgba(8,5,2,0.82)",
+                background: "rgba(11,18,32,0.82)",
                 backdropFilter: "blur(4px)",
             }}
         >
-            <div
-                className="relative flex w-full max-w-md flex-col items-center gap-6 rounded-3xl px-8 py-10 text-center"
-                style={{
-                    background:
-                        "linear-gradient(160deg, #1e1408 0%, #120d06 70%)",
-                    border: `2px solid ${accent}55`,
-                    boxShadow: `0 0 60px ${accent}22`,
-                }}
-            >
+            <div className="panel-d relative flex w-full max-w-md flex-col items-center gap-6 px-8 py-10 text-center">
                 {/* Spinner / found mark */}
                 <div className="relative flex h-24 w-24 items-center justify-center">
                     {!matched && (
                         <span
-                            className="absolute inset-0 animate-spin rounded-full"
+                            className="wc-spinner absolute inset-0"
                             style={{
-                                border: "3px solid rgba(255,255,255,0.06)",
-                                borderTopColor: accent,
-                                animationDuration: "1s",
+                                borderWidth: "4px",
+                                borderStyle: "solid",
+                                borderColor: "var(--panel-d2)",
+                                borderTopColor: "var(--gold)",
+                                borderRadius: 14,
                             }}
                         />
                     )}
                     <span
-                        className="text-5xl font-black leading-none"
-                        style={{ color: accent }}
+                        className="font-display text-5xl leading-none"
+                        style={{ color: matched ? "var(--gold)" : accent }}
                     >
                         {matched ? "♠" : (game?.suits.trim()[0] ?? "♥")}
                     </span>
                 </div>
 
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1.5">
                     <h2
-                        className="text-2xl font-black"
-                        style={{ color: "#faf2e2" }}
+                        className="font-display text-2xl leading-tight"
+                        style={{ color: "var(--cream)" }}
                     >
                         {matched ? t("match_found") : t("searching_title")}
                     </h2>
                     <p
                         className="text-sm font-semibold"
-                        style={{ color: "#9a8870" }}
+                        style={{ color: "var(--muted)" }}
                     >
                         {matched
                             ? t("entering")
                             : (game?.name ?? t("searching_title"))}
                     </p>
+                </div>
+
+                {/* Queue avatar row: flat discs ringed with a thick ink border. */}
+                <div className="flex items-center gap-2">
+                    {seatIds.map((id, i) => (
+                        <span
+                            key={id}
+                            className="h-9 w-9 rounded-full"
+                            style={{
+                                background:
+                                    i === 0 ? accent : "var(--panel-d2)",
+                                border: "2.5px solid var(--ink)",
+                            }}
+                        />
+                    ))}
                 </div>
 
                 {!matched && (
@@ -100,40 +115,36 @@ export function MatchmakingOverlay({
                             <Stat
                                 value={`${elapsed}s`}
                                 label={t("elapsed_label")}
-                                accent={accent}
+                                accent="var(--gold)"
                             />
                             <span
-                                className="h-8 w-px"
-                                style={{ background: "#3d2d18" }}
+                                className="h-8 w-0.5 rounded-full"
+                                style={{ background: "var(--ink)" }}
                             />
                             <Stat
                                 value={String(waiting)}
                                 label={t("in_queue_label")}
-                                accent={accent}
+                                accent="var(--gold)"
                             />
                         </div>
 
                         <div className="flex w-full flex-col gap-2">
-                            <button
-                                type="button"
+                            <GameButton
+                                variant="red"
+                                size="md"
                                 onClick={onPlayBots}
-                                className="rounded-xl py-3 font-black text-sm transition-transform active:scale-95"
-                                style={{
-                                    background: accent,
-                                    color: "#0d0a05",
-                                    boxShadow: `0 4px 0 0 ${game?.shadow ?? "#1a6038"}`,
-                                }}
+                                className="w-full"
                             >
                                 {t("play_bots")}
-                            </button>
-                            <button
-                                type="button"
+                            </GameButton>
+                            <GameButton
+                                variant="ghost"
+                                size="sm"
                                 onClick={onCancel}
-                                className="rounded-xl py-2.5 text-sm font-bold transition-colors"
-                                style={{ color: "#9a8870" }}
+                                className="w-full"
                             >
                                 {t("cancel")}
-                            </button>
+                            </GameButton>
                         </div>
                     </>
                 )}
@@ -152,13 +163,20 @@ function Stat({
     accent: string;
 }) {
     return (
-        <div className="flex flex-col items-center gap-0.5">
-            <span className="text-2xl font-black" style={{ color: accent }}>
+        <div className="flex flex-col items-center gap-1">
+            <span
+                className="font-display text-2xl leading-none"
+                style={{ color: accent }}
+            >
                 {value}
             </span>
             <span
-                className="text-[10px] font-bold uppercase tracking-wider"
-                style={{ color: "#7a6a50" }}
+                className="stamp"
+                style={{
+                    background: "var(--panel-d2)",
+                    color: "var(--muted)",
+                    borderColor: "var(--ink)",
+                }}
             >
                 {label}
             </span>

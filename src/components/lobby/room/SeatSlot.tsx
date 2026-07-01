@@ -21,20 +21,25 @@ export function SeatSlot({ slot, hostId }: Props) {
         <li
             className="flex items-center gap-3 rounded-xl px-4 py-3"
             style={{
-                background: filled ? "#1c1510" : "rgba(255,255,255,0.02)",
-                border: `2px solid ${filled ? "#3d2d18" : "rgba(61,45,24,0.5)"}`,
+                background: filled ? "var(--panel-d)" : "transparent",
+                border: filled
+                    ? "2.5px solid var(--ink)"
+                    : "2.5px dashed rgba(147,168,200,0.4)",
+                boxShadow: filled ? "0 4px 0 var(--ink)" : undefined,
             }}
         >
             <div
-                className="flex h-9 w-9 items-center justify-center rounded-full font-black"
+                className="flex h-9 w-9 items-center justify-center rounded-full font-display"
                 style={{
                     background: isBot
-                        ? "rgba(167,139,250,0.15)"
+                        ? "var(--purple)"
                         : filled
-                          ? "rgba(245,197,22,0.15)"
+                          ? "var(--gold)"
                           : "transparent",
-                    color: isBot ? "#26ccba" : filled ? "#f5c516" : "#4a3820",
-                    border: filled ? undefined : "1px dashed #4a3820",
+                    color: isBot ? "var(--accent-ink)" : "var(--ink)",
+                    border: filled
+                        ? "2.5px solid var(--ink)"
+                        : "2px dashed rgba(147,168,200,0.4)",
                 }}
             >
                 {isBot
@@ -45,15 +50,20 @@ export function SeatSlot({ slot, hostId }: Props) {
             </div>
             <div className="min-w-0 flex-1">
                 <div
-                    className="truncate font-bold text-sm"
-                    style={{ color: filled ? "#faf2e2" : "#4a3820" }}
+                    className="truncate font-display text-sm"
+                    style={{
+                        color: filled ? "var(--cream)" : "var(--muted)",
+                    }}
                 >
                     {label}
                 </div>
                 {slot?.kind === "human" && slot.userId === hostId && (
                     <span
-                        className="text-[10px] font-black uppercase tracking-wider"
-                        style={{ color: "#f5c516" }}
+                        className="font-pixel text-wc-micro uppercase"
+                        style={{
+                            fontFamily: "var(--pixel)",
+                            color: "var(--gold)",
+                        }}
                     >
                         {t("host_badge")}
                     </span>

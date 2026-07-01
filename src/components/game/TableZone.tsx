@@ -122,7 +122,7 @@ function ZoneCards({ instance, template, ctx }: TableZoneProps) {
             >
                 {instance.emptyHint && (
                     <span
-                        className="px-1 text-center text-[10px] font-semibold xl:text-xs"
+                        className="px-1 text-center text-wc-label font-semibold xl:text-xs"
                         style={{
                             color: ctx.boardTheme.badge.textColor,
                             opacity: 0.5,

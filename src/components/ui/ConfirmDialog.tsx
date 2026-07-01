@@ -56,7 +56,7 @@ export function ConfirmDialog({
         <div
             className="wc-fade-in fixed inset-0 z-[1000] flex items-center justify-center p-4"
             style={{
-                background: "rgba(13,10,5,0.72)",
+                background: "rgba(10,26,46,0.72)",
                 backdropFilter: "blur(2px)",
             }}
         >
@@ -75,10 +75,11 @@ export function ConfirmDialog({
                 aria-modal="true"
                 aria-label={title ?? message}
                 tabIndex={-1}
-                className="wc-pop-in relative flex w-full max-w-sm flex-col gap-4 rounded-wc-panel border-2 border-wc-border bg-wc-panel p-6 text-center outline-none"
+                className="wc-pop-in relative flex w-full max-w-sm flex-col gap-4 rounded-2xl border-nb border-wc-ink bg-wc-panel-d p-6 text-center outline-none"
+                style={{ boxShadow: "0 8px 0 var(--ink)" }}
             >
                 {title && (
-                    <h2 className="text-lg font-black text-wc-heading">
+                    <h2 className="font-display text-xl text-wc-cream">
                         {title}
                     </h2>
                 )}

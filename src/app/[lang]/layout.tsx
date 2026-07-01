@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Nunito } from "next/font/google";
+import { Hanken_Grotesk, Lilita_One, Silkscreen } from "next/font/google";
 import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
@@ -13,18 +13,27 @@ import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 import { routing } from "@/i18n/routing";
 import { createClient } from "@/lib/supabase/server";
 
-const nunito = Nunito({
-    variable: "--font-nunito",
+// Body face — Hanken Grotesk: readable, slightly geometric, holds up at small
+// sizes against the chunky display face.
+const body = Hanken_Grotesk({
+    variable: "--font-body",
     subsets: ["latin"],
-    weight: ["400", "600", "700", "800", "900"],
+    weight: ["400", "500", "600", "700", "800"],
 });
 
-// Display face for headings & brand — a quirky variable grotesque that gives
-// the UI a recognizable personality instead of a generic all-sans look.
-const bricolage = Bricolage_Grotesque({
+// Display face — Lilita One: fat, rounded arcade poster type. Headings, brand,
+// buttons, scores. The signature of the neobrutalism system.
+const display = Lilita_One({
     variable: "--font-display",
     subsets: ["latin"],
-    weight: ["600", "700", "800"],
+    weight: ["400"],
+});
+
+// Pixel face — Silkscreen: tiny uppercase "stamp" labels (levels, meta chips).
+const pixel = Silkscreen({
+    variable: "--font-pixel",
+    subsets: ["latin"],
+    weight: ["400", "700"],
 });
 
 export const metadata: Metadata = {
@@ -59,9 +68,9 @@ export default async function RootLayout({
     return (
         <html
             lang={lang}
-            className={`${nunito.variable} ${bricolage.variable} h-full antialiased`}
+            className={`${body.variable} ${display.variable} ${pixel.variable} h-full antialiased`}
         >
-            <body className="min-h-screen bg-wc-surface text-wc-text">
+            <body className="min-h-screen bg-wc-bg text-wc-cream">
                 <PublicEnvScript />
                 <UmamiAnalytics />
                 <NextIntlClientProvider locale={lang} messages={messages}>

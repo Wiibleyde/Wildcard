@@ -13,11 +13,11 @@ import { gameCatalog } from "./index";
 
 /** Buckets the picker groups games into. Order here is the display order. */
 export const GAME_CATEGORIES = [
-    { id: "duel", accent: "#e04040" },
-    { id: "shedding", accent: "#f5c516" },
-    { id: "trick", accent: "#26ccba" },
-    { id: "solo", accent: "#48c97a" },
-    { id: "party", accent: "#38bdf8" },
+    { id: "duel", accent: "#ff4b3b" },
+    { id: "shedding", accent: "#ffc23d" },
+    { id: "trick", accent: "#9b6cf2" },
+    { id: "solo", accent: "#38cf78" },
+    { id: "party", accent: "#3b8cff" },
 ] as const;
 
 export type GameCategoryId = (typeof GAME_CATEGORIES)[number]["id"];
@@ -43,40 +43,40 @@ interface GameDisplayMeta {
 const DISPLAY: Record<string, GameDisplayMeta> = {
     bataille: {
         category: "duel",
-        accent: "#e04040",
-        shadow: "#8a1010",
+        accent: "#ff4b3b",
+        shadow: "#0b1220",
         suits: "♠ ♥",
         difficulty: 1,
         durationMin: 3,
     },
     president: {
         category: "shedding",
-        accent: "#f5c516",
-        shadow: "#8a6800",
+        accent: "#ffc23d",
+        shadow: "#0b1220",
         suits: "♦ ♣",
         difficulty: 2,
         durationMin: 12,
     },
     tarot: {
         category: "trick",
-        accent: "#26ccba",
-        shadow: "#0c5f56",
+        accent: "#9b6cf2",
+        shadow: "#0b1220",
         suits: "♠ ♥ ♦ ♣",
         difficulty: 3,
         durationMin: 20,
     },
     solitaire: {
         category: "solo",
-        accent: "#48c97a",
-        shadow: "#1a6038",
+        accent: "#38cf78",
+        shadow: "#0b1220",
         suits: "♦ ♣",
         difficulty: 2,
         durationMin: 6,
     },
     belote: {
         category: "trick",
-        accent: "#ff9d3c",
-        shadow: "#9a4a00",
+        accent: "#ff8a3d",
+        shadow: "#0b1220",
         suits: "♠ ♦",
         difficulty: 3,
         durationMin: 15,
@@ -84,8 +84,8 @@ const DISPLAY: Record<string, GameDisplayMeta> = {
     },
     kems: {
         category: "party",
-        accent: "#38bdf8",
-        shadow: "#0e5a7a",
+        accent: "#3b8cff",
+        shadow: "#0b1220",
         suits: "♥ ♣",
         difficulty: 1,
         durationMin: 8,

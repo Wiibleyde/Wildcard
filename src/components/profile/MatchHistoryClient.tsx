@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
+import { GameButton } from "@/components/ui/GameButton";
 import { useFilteredHistory } from "@/hooks/profile/useFilteredHistory";
 import { useGamePinning } from "@/hooks/profile/useGamePinning";
 import type { MatchHistoryEntry } from "@/lib/models/history";
@@ -12,9 +13,9 @@ interface Props {
 }
 
 const fieldStyle = {
-    background: "rgba(0,0,0,0.3)",
-    border: "2px solid #3d2d18",
-    color: "#faf2e2",
+    background: "var(--cream)",
+    border: "2.5px solid var(--ink)",
+    color: "var(--ink)",
 } as const;
 
 export function MatchHistoryClient({ entries }: Props) {
@@ -33,14 +34,11 @@ export function MatchHistoryClient({ entries }: Props) {
 
     return (
         <div className="flex flex-col gap-5">
-            <div
-                className="rounded-xl p-4 xl:p-5 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end"
-                style={{ background: "#1c1510", border: "2px solid #3d2d18" }}
-            >
+            <div className="panel-d p-4 xl:p-5 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
                 <label className="flex flex-col gap-1.5 flex-1 min-w-35">
                     <span
                         className="text-xs font-bold uppercase tracking-widest"
-                        style={{ color: "#7a6a50" }}
+                        style={{ color: "var(--muted)" }}
                     >
                         {t("filter_game")}
                     </span>
@@ -62,7 +60,7 @@ export function MatchHistoryClient({ entries }: Props) {
                 <label className="flex flex-col gap-1.5 flex-1 min-w-35">
                     <span
                         className="text-xs font-bold uppercase tracking-widest"
-                        style={{ color: "#7a6a50" }}
+                        style={{ color: "var(--muted)" }}
                     >
                         {t("filter_from")}
                     </span>
@@ -79,7 +77,7 @@ export function MatchHistoryClient({ entries }: Props) {
                 <label className="flex flex-col gap-1.5 flex-1 min-w-35">
                     <span
                         className="text-xs font-bold uppercase tracking-widest"
-                        style={{ color: "#7a6a50" }}
+                        style={{ color: "var(--muted)" }}
                     >
                         {t("filter_to")}
                     </span>
@@ -94,25 +92,24 @@ export function MatchHistoryClient({ entries }: Props) {
                 </label>
 
                 {filter.hasFilters && (
-                    <button
+                    <GameButton
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={filter.reset}
-                        className="rounded-lg px-4 py-2.5 font-bold text-sm transition-transform active:scale-95"
-                        style={{
-                            background: "rgba(255,255,255,0.04)",
-                            border: "2px solid #3d2d18",
-                            color: "#9a8870",
-                        }}
                     >
                         {t("reset_filters")}
-                    </button>
+                    </GameButton>
                 )}
             </div>
 
             <div className="flex items-center justify-between gap-3 px-1">
                 <span
-                    className="text-xs font-bold uppercase tracking-widest"
-                    style={{ color: "#7a6a50" }}
+                    className="stamp"
+                    style={{
+                        background: "var(--panel-d)",
+                        color: "var(--cream)",
+                    }}
                 >
                     📌{" "}
                     {t("pin_count", {
@@ -123,7 +120,7 @@ export function MatchHistoryClient({ entries }: Props) {
                 {pinning.error && (
                     <span
                         className="text-xs font-semibold"
-                        style={{ color: "#e04040" }}
+                        style={{ color: "var(--red)" }}
                     >
                         {pinning.error}
                     </span>
@@ -132,12 +129,8 @@ export function MatchHistoryClient({ entries }: Props) {
 
             {filter.filtered.length === 0 ? (
                 <p
-                    className="text-sm font-semibold rounded-xl px-4 py-10 text-center"
-                    style={{
-                        color: "#7a6a50",
-                        background: "#1c1510",
-                        border: "2px dashed #3d2d18",
-                    }}
+                    className="panel flat text-sm font-semibold px-4 py-10 text-center"
+                    style={{ color: "#5a5340" }}
                 >
                     {filter.hasFilters ? t("empty_filtered") : t("empty")}
                 </p>
