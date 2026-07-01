@@ -59,7 +59,7 @@ export function GameRow({ game: g, canEnd, now, endingId, onEnd }: Props) {
                         className="text-[11px] font-bold px-2 py-0.5 rounded-md"
                         style={{
                             background: "rgba(167,139,250,0.12)",
-                            color: "#a78bfa",
+                            color: "#26ccba",
                         }}
                     >
                         {t("phase")}: {g.phase}

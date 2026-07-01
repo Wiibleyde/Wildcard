@@ -114,7 +114,7 @@ export function SidebarDesktop({
                                 className="text-[10px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider"
                                 style={{
                                     background: "rgba(167,139,250,0.15)",
-                                    color: "#a78bfa",
+                                    color: "#26ccba",
                                     border: "1px solid rgba(167,139,250,0.25)",
                                 }}
                             >

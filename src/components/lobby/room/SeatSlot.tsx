@@ -33,7 +33,7 @@ export function SeatSlot({ slot, hostId }: Props) {
                         : filled
                           ? "rgba(245,197,22,0.15)"
                           : "transparent",
-                    color: isBot ? "#a78bfa" : filled ? "#f5c516" : "#4a3820",
+                    color: isBot ? "#26ccba" : filled ? "#f5c516" : "#4a3820",
                     border: filled ? undefined : "1px dashed #4a3820",
                 }}
             >

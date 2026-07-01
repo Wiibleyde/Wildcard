@@ -100,7 +100,7 @@ export function GameOverXp({ userId, won }: { userId: string; won: boolean }) {
                 tl.fromTo(
                     levelRef.current,
                     { scale: 1.6, color: "#f5c516" },
-                    { scale: 1, color: "#a78bfa", duration: 0.6 },
+                    { scale: 1, color: "#26ccba", duration: 0.6 },
                     "<",
                 );
             } else {
@@ -130,7 +130,7 @@ export function GameOverXp({ userId, won }: { userId: string; won: boolean }) {
                         className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-black"
                         style={{
                             background: "rgba(167,139,250,0.15)",
-                            color: "#a78bfa",
+                            color: "#26ccba",
                             border: "1px solid rgba(167,139,250,0.3)",
                         }}
                     >
@@ -164,7 +164,7 @@ export function GameOverXp({ userId, won }: { userId: string; won: boolean }) {
                     className="relative h-full overflow-hidden rounded-full"
                     style={{
                         background:
-                            "linear-gradient(90deg, #7c5ce8, #a78bfa, #c4b5fd)",
+                            "linear-gradient(90deg, #0e9e8e, #26ccba, #7af0e2)",
                         width: "0%",
                     }}
                 >

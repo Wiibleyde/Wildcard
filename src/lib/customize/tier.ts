@@ -25,7 +25,7 @@ export function tierTextColor(tier: TierKey): string {
         common: "#9ca3af",
         uncommon: "#4ade80",
         rare: "#60a5fa",
-        epic: "#a78bfa",
+        epic: "#26ccba",
         legendary: "#fbbf24",
         mystical: "#fb7185",
         ethereal: "#e8c468",

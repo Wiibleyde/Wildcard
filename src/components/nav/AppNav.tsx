@@ -78,7 +78,7 @@ export async function AppNav({ user }: { user: User }) {
                             className="text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-wider"
                             style={{
                                 background: "rgba(167,139,250,0.15)",
-                                color: "#a78bfa",
+                                color: "#26ccba",
                                 border: "1px solid rgba(167,139,250,0.25)",
                             }}
                         >

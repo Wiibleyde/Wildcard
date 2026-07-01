@@ -45,8 +45,9 @@ export default async function Home({
                     style={{
                         background:
                             "linear-gradient(160deg, #1e1408 0%, #0d0a05 60%)",
-                        border: "2px solid #3d2d18",
-                        boxShadow: "0 8px 40px rgba(0,0,0,0.5)",
+                        border: "2px solid #4a3822",
+                        boxShadow:
+                            "0 6px 0 0 rgba(0,0,0,0.45), 0 14px 30px rgba(0,0,0,0.5)",
                     }}
                 >
                     <DecoSuit
@@ -77,7 +78,7 @@ export default async function Home({
 
                         <div>
                             <h1
-                                className="text-5xl font-black tracking-tight xl:text-6xl"
+                                className="font-display text-5xl font-extrabold tracking-tight xl:text-6xl"
                                 style={{ color: "#faf2e2" }}
                             >
                                 Wildcard
@@ -111,64 +112,71 @@ export default async function Home({
                     </div>
                 </div>
 
-                {/* How it works */}
-                <div className="flex flex-col gap-5">
+                {/* How it works — a connected "play the hand" flow rather than
+                    three identical numbered feature cards. Suit pips are the
+                    nodes; a thin line threads them like a trick being played. */}
+                <div className="flex flex-col gap-7">
                     <h2
-                        className="text-xs font-bold uppercase tracking-widest"
-                        style={{ color: "#7a6a50" }}
+                        className="font-display text-2xl font-extrabold xl:text-3xl"
+                        style={{ color: "#faf2e2" }}
                     >
                         {tHome("how_title")}
                     </h2>
-                    <div className="grid gap-4 sm:grid-cols-3">
+                    <ol className="flex flex-col gap-9 sm:flex-row sm:gap-0">
                         {STEPS.map((step, i) => (
-                            <div
+                            <li
                                 key={step.suit}
-                                className="relative flex flex-col gap-2 overflow-hidden rounded-2xl p-5"
-                                style={{
-                                    background: "#1c1510",
-                                    border: "2px solid #3d2d18",
-                                }}
+                                className="relative flex flex-1 gap-4 sm:flex-col sm:gap-4 sm:pr-8"
                             >
-                                <div className="flex items-center gap-3">
+                                {/* thread to the next node (desktop only) */}
+                                {i < STEPS.length - 1 && (
                                     <span
-                                        className="flex h-9 w-9 items-center justify-center rounded-lg text-lg font-black"
+                                        aria-hidden
+                                        className="absolute top-6 left-12 hidden h-px w-[calc(100%-3rem)] sm:block"
                                         style={{
-                                            background: `${step.accent}1a`,
-                                            color: step.accent,
+                                            background:
+                                                "linear-gradient(90deg, #4a3a22, transparent)",
                                         }}
+                                    />
+                                )}
+                                <span
+                                    className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl"
+                                    style={{
+                                        background: "#1c1510",
+                                        color: step.accent,
+                                        border: `1.5px solid ${step.accent}66`,
+                                        boxShadow: `0 0 18px ${step.accent}1f`,
+                                    }}
+                                >
+                                    {step.suit}
+                                </span>
+                                <div className="flex flex-col gap-1.5">
+                                    <h3
+                                        className="font-display text-lg font-extrabold leading-tight"
+                                        style={{ color: "#faf2e2" }}
                                     >
-                                        {step.suit}
-                                    </span>
-                                    <span
-                                        className="text-xs font-black uppercase tracking-widest"
-                                        style={{ color: step.accent }}
+                                        {tHome(
+                                            `step${i + 1}_title` as "step1_title",
+                                        )}
+                                    </h3>
+                                    <p
+                                        className="text-sm font-semibold leading-snug"
+                                        style={{ color: "#9a8870" }}
                                     >
-                                        {tHome("step")} {i + 1}
-                                    </span>
+                                        {tHome(
+                                            `step${i + 1}_desc` as "step1_desc",
+                                        )}
+                                    </p>
                                 </div>
-                                <h3
-                                    className="text-base font-black leading-tight"
-                                    style={{ color: "#faf2e2" }}
-                                >
-                                    {tHome(
-                                        `step${i + 1}_title` as "step1_title",
-                                    )}
-                                </h3>
-                                <p
-                                    className="text-sm font-semibold leading-snug"
-                                    style={{ color: "#9a8870" }}
-                                >
-                                    {tHome(`step${i + 1}_desc` as "step1_desc")}
-                                </p>
-                            </div>
+                            </li>
                         ))}
-                    </div>
+                    </ol>
                 </div>
 
                 {/* Games by category */}
                 <div className="flex flex-col gap-8">
                     <h2
-                        className="text-2xl font-black xl:text-3xl"
+                        className="font-display text-2xl font-extrabold xl:text-3xl"
                         style={{ color: "#faf2e2" }}
                     >
                         {tHome("games_title")}

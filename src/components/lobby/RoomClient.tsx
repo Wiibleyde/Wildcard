@@ -292,7 +292,7 @@ export function RoomClient({
                     background: isSpectator
                         ? "rgba(245,197,22,0.12)"
                         : "rgba(167,139,250,0.12)",
-                    color: isSpectator ? "#f5c516" : "#a78bfa",
+                    color: isSpectator ? "#f5c516" : "#26ccba",
                     border: `1px solid ${
                         isSpectator
                             ? "rgba(245,197,22,0.4)"

@@ -54,7 +54,7 @@ export default async function AdminPage({
                                 background: isAdmin
                                     ? "rgba(245,197,22,0.15)"
                                     : "rgba(167,139,250,0.15)",
-                                color: isAdmin ? "#f5c516" : "#a78bfa",
+                                color: isAdmin ? "#f5c516" : "#26ccba",
                                 border: `1px solid ${isAdmin ? "rgba(245,197,22,0.3)" : "rgba(167,139,250,0.3)"}`,
                             }}
                         >

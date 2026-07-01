@@ -84,7 +84,7 @@ export function GameBoard({
 
             <div className="flex flex-1 items-center justify-center px-3 py-3 sm:px-8 sm:py-4">
                 <div
-                    className="flex min-h-36 w-full max-w-xl items-center justify-center rounded-xl backdrop-blur-sm sm:min-h-44 lg:max-w-2xl xl:min-h-52 xl:max-w-3xl 2xl:min-h-60 2xl:max-w-5xl"
+                    className="flex min-h-36 w-full max-w-xl items-center justify-center rounded-xl sm:min-h-44 lg:max-w-2xl xl:min-h-52 xl:max-w-3xl 2xl:min-h-60 2xl:max-w-5xl"
                     style={zoneStyle}
                 >
                     {playArea ??
@@ -104,7 +104,7 @@ export function GameBoard({
                     </BoardPill>
                 )}
                 <div
-                    className="flex min-h-24 max-w-full items-end justify-center gap-1 rounded-xl px-2 py-2 backdrop-blur-sm sm:px-4 xl:min-h-28"
+                    className="flex min-h-24 max-w-full items-end justify-center gap-1 rounded-xl px-2 py-2 sm:px-4 xl:min-h-28"
                     style={zoneStyle}
                 >
                     {handArea ??

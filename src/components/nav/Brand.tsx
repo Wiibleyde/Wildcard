@@ -37,7 +37,7 @@ export function Brand({ size }: { size: Size }) {
             </div>
             <div className="min-w-0">
                 <p
-                    className={`font-black ${s.word} leading-none tracking-tight`}
+                    className={`font-display font-extrabold ${s.word} leading-none tracking-tight`}
                     style={{ color: "#faf2e2" }}
                 >
                     Wildcard

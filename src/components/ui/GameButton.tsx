@@ -1,6 +1,6 @@
 import { Link } from "@/i18n/navigation";
 
-export type GameButtonVariant = "gold" | "green" | "red" | "purple" | "ghost";
+export type GameButtonVariant = "gold" | "green" | "red" | "teal" | "ghost";
 export type GameButtonSize = "sm" | "md" | "lg";
 
 type VariantConfig = {
@@ -14,7 +14,7 @@ const VARIANTS: Record<GameButtonVariant, VariantConfig> = {
     gold: { bg: "#f5c516", text: "#0d0a05", shadow: "#7a5a00" },
     green: { bg: "#48c97a", text: "#0d1f12", shadow: "#1a6038" },
     red: { bg: "#e04040", text: "#faf2e2", shadow: "#8a1010" },
-    purple: { bg: "#a78bfa", text: "#0d0a05", shadow: "#4a2a90" },
+    teal: { bg: "#26ccba", text: "#0d0a05", shadow: "#0c5f56" },
     ghost: {
         bg: "rgba(255,255,255,0.04)",
         text: "#f5c516",

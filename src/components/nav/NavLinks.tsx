@@ -64,7 +64,7 @@ export function NavLinks({
             href: "/shop",
             label: t("shop"),
             icon: <ShopIcon />,
-            color: "#a78bfa",
+            color: "#26ccba",
             glow: "rgba(167,139,250,0.1)",
             suit: "♦",
         },

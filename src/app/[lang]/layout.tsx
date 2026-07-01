@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Nunito } from "next/font/google";
+import { Bricolage_Grotesque, Nunito } from "next/font/google";
 import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
@@ -17,6 +17,14 @@ const nunito = Nunito({
     variable: "--font-nunito",
     subsets: ["latin"],
     weight: ["400", "600", "700", "800", "900"],
+});
+
+// Display face for headings & brand — a quirky variable grotesque that gives
+// the UI a recognizable personality instead of a generic all-sans look.
+const bricolage = Bricolage_Grotesque({
+    variable: "--font-display",
+    subsets: ["latin"],
+    weight: ["600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -49,7 +57,10 @@ export default async function RootLayout({
     } = await supabase.auth.getUser();
 
     return (
-        <html lang={lang} className={`${nunito.variable} h-full antialiased`}>
+        <html
+            lang={lang}
+            className={`${nunito.variable} ${bricolage.variable} h-full antialiased`}
+        >
             <body className="min-h-screen bg-wc-surface text-wc-text">
                 <PublicEnvScript />
                 <UmamiAnalytics />

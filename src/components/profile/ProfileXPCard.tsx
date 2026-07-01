@@ -29,7 +29,7 @@ export function ProfileXPCard({ xp }: Props) {
                         className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-black"
                         style={{
                             background: "rgba(167,139,250,0.15)",
-                            color: "#a78bfa",
+                            color: "#26ccba",
                             border: "1px solid rgba(167,139,250,0.3)",
                         }}
                     >
@@ -65,7 +65,7 @@ export function ProfileXPCard({ xp }: Props) {
                     className="h-full rounded-full relative overflow-hidden"
                     style={{
                         background:
-                            "linear-gradient(90deg, #7c5ce8, #a78bfa, #c4b5fd)",
+                            "linear-gradient(90deg, #0e9e8e, #26ccba, #7af0e2)",
                         width: "0%",
                     }}
                 >

@@ -34,11 +34,10 @@ export function GameCard({
 
     return (
         <div
-            className="group relative flex flex-col overflow-hidden rounded-2xl transition-transform duration-150 hover:-translate-y-1"
+            className="group wc-block relative flex flex-col overflow-hidden rounded-2xl transition-transform duration-150 hover:-translate-y-1"
             style={{
                 background: "#1c1510",
-                border: `2px solid ${available ? `${accent}44` : "#3d2d18"}`,
-                boxShadow: available ? `0 0 24px ${accent}14` : undefined,
+                border: `2px solid ${available ? `${accent}66` : "#4a3822"}`,
                 opacity: available ? 1 : 0.72,
             }}
         >

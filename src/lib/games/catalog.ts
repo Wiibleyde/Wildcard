@@ -15,7 +15,7 @@ import { gameCatalog } from "./index";
 export const GAME_CATEGORIES = [
     { id: "duel", accent: "#e04040" },
     { id: "shedding", accent: "#f5c516" },
-    { id: "trick", accent: "#a78bfa" },
+    { id: "trick", accent: "#26ccba" },
     { id: "solo", accent: "#48c97a" },
     { id: "party", accent: "#38bdf8" },
 ] as const;
@@ -59,8 +59,8 @@ const DISPLAY: Record<string, GameDisplayMeta> = {
     },
     tarot: {
         category: "trick",
-        accent: "#a78bfa",
-        shadow: "#4a2a90",
+        accent: "#26ccba",
+        shadow: "#0c5f56",
         suits: "♠ ♥ ♦ ♣",
         difficulty: 3,
         durationMin: 20,

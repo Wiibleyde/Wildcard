@@ -74,8 +74,9 @@ export async function ProfilePage({ lang }: { lang: string }) {
                     style={{
                         background:
                             "linear-gradient(150deg, #231808 0%, #0d0a05 65%)",
-                        border: "2px solid rgba(245,197,22,0.2)",
-                        boxShadow: "0 8px 40px rgba(0,0,0,0.4)",
+                        border: "2px solid rgba(245,197,22,0.28)",
+                        boxShadow:
+                            "0 6px 0 0 rgba(0,0,0,0.4), 0 14px 30px rgba(0,0,0,0.45)",
                     }}
                 >
                     <DecoSuit
