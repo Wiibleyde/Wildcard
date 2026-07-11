@@ -522,6 +522,46 @@ export type Database = {
                     },
                 ];
             };
+            eca_games: {
+                Row: {
+                    id: string;
+                    owner_id: string;
+                    name: string;
+                    description: string | null;
+                    definition: Record<string, unknown>;
+                    status: "draft" | "published";
+                    created_at: string;
+                    updated_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    owner_id: string;
+                    name: string;
+                    description?: string | null;
+                    definition: Record<string, unknown>;
+                    status?: "draft" | "published";
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    owner_id?: string;
+                    name?: string;
+                    description?: string | null;
+                    definition?: Record<string, unknown>;
+                    status?: "draft" | "published";
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Relationships: [
+                    {
+                        foreignKeyName: "eca_games_owner_id_fkey";
+                        columns: ["owner_id"];
+                        referencedRelation: "profiles";
+                        referencedColumns: ["id"];
+                    },
+                ];
+            };
             matchmaking_tickets: {
                 Row: {
                     user_id: string;
