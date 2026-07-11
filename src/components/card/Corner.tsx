@@ -21,16 +21,16 @@ export function Corner({
             className={`absolute flex flex-col items-center${flipped ? " rotate-180" : ""}`}
             style={{
                 ...(flipped
-                    ? { bottom: "4%", right: "6%" }
-                    : { top: "4%", left: "6%" }),
+                    ? { bottom: "3%", right: "5%" }
+                    : { top: "3%", left: "5%" }),
                 color,
-                lineHeight: 1.1,
+                lineHeight: 1.05,
             }}
         >
             <span
                 style={{
-                    fontSize: "13cqi",
-                    fontWeight: font?.rankWeight ?? 700,
+                    fontSize: "18cqi",
+                    fontWeight: font?.rankWeight ?? 800,
                     fontStyle: font?.rankItalic ? "italic" : undefined,
                     ...font?.rankStyle,
                 }}
@@ -38,7 +38,7 @@ export function Corner({
                 {label}
             </span>
             {sub !== undefined && (
-                <span style={{ fontSize: "11cqi" }}>{sub}</span>
+                <span style={{ fontSize: "14cqi" }}>{sub}</span>
             )}
         </div>
     );

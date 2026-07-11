@@ -5,18 +5,21 @@ export const darkWoodTheme: BoardTheme = {
     name: "Bois sombre",
     tier: "rare",
     surface: {
-        background:
-            "repeating-linear-gradient(90deg,#292524 0px,#292524 4px,#1c1917 4px,#1c1917 20px)",
-        overlay: "rgba(0,0,0,0.15)",
+        // Cartoon planks: two flat browns separated by hard ink seams
+        background: [
+            "radial-gradient(rgba(0,0,0,0.14) 1.4px, transparent 1.5px) 0 0 / 22px 22px",
+            "repeating-linear-gradient(90deg, #7a4a26 0px, #7a4a26 34px, #6b3d1e 34px, #6b3d1e 68px, #0b1220 68px, #0b1220 70.5px)",
+        ].join(", "),
     },
     zone: {
-        background: "rgba(120,53,15,0.20)",
-        borderColor: "rgba(217,119,6,0.15)",
-        boxShadow: "inset 0 1px 0 rgba(217,119,6,0.08)",
+        background: "rgba(11,18,32,0.38)",
+        borderColor: "#0b1220",
+        boxShadow: "inset 0 3px 0 rgba(0,0,0,0.25)",
+        textColor: "#f7edd4",
     },
     badge: {
-        background: "rgba(120,53,15,0.40)",
-        textColor: "rgba(253,230,138,0.85)",
+        background: "#ffc23d",
+        textColor: "#0b1220",
     },
-    accentColor: "#d97706",
+    accentColor: "#ffc23d",
 };

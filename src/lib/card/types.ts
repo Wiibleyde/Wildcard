@@ -97,6 +97,8 @@ export interface SuitStyle {
 export interface CardBorder {
     color: string;
     effect: "solid" | "glow";
+    /** Outline width in pixels — defaults to the neobrutalism 2.5px ink stroke */
+    width?: number;
     glowColor?: string;
     /** Glow spread in pixels (default 8) */
     glowSize?: number;

@@ -5,23 +5,23 @@ export const creatorBoardTheme: BoardTheme = {
     name: "Fondateur",
     tier: "ethereal",
     surface: {
-        // Deep obsidian with gold and violet aurora halos
+        // Ink table with a hard-edged gold lattice — matches the Fondateur deck back
         background: [
-            "radial-gradient(ellipse at 25% 25%, rgba(232,196,104,0.10) 0%, transparent 55%)",
-            "radial-gradient(ellipse at 75% 75%, rgba(139,92,246,0.08) 0%, transparent 55%)",
-            "radial-gradient(ellipse at 60% 10%, rgba(248,113,113,0.05) 0%, transparent 40%)",
-            "linear-gradient(160deg, #07060f 0%, #0d0b18 45%, #07060f 100%)",
+            "repeating-linear-gradient(45deg, rgba(255,194,61,0.10) 0px, rgba(255,194,61,0.10) 2px, transparent 2px, transparent 20px)",
+            "repeating-linear-gradient(-45deg, rgba(255,194,61,0.10) 0px, rgba(255,194,61,0.10) 2px, transparent 2px, transparent 20px)",
+            "linear-gradient(#0b1220, #0b1220)",
         ].join(", "),
     },
     zone: {
-        background: "rgba(232,196,104,0.06)",
-        borderColor: "rgba(232,196,104,0.25)",
-        boxShadow:
-            "inset 0 1px 0 rgba(232,196,104,0.12), 0 0 16px rgba(232,196,104,0.06)",
+        background: "rgba(255,194,61,0.07)",
+        // Gold frame — the ethereal tier gets the premium outline
+        borderColor: "#ffc23d",
+        boxShadow: "inset 0 3px 0 rgba(0,0,0,0.30)",
+        textColor: "#ffc23d",
     },
     badge: {
-        background: "rgba(15,12,30,0.70)",
-        textColor: "#e8c468",
+        background: "#ffc23d",
+        textColor: "#0b1220",
     },
-    accentColor: "#e8c468",
+    accentColor: "#ffc23d",
 };

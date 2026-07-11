@@ -5,17 +5,22 @@ export const midnightTheme: BoardTheme = {
     name: "Minuit",
     tier: "legendary",
     surface: {
-        background:
-            "radial-gradient(ellipse at top, #1e1b4b 0%, #0f0f23 60%, #000000 100%)",
+        background: [
+            "radial-gradient(rgba(155,108,242,0.10) 1.4px, transparent 1.5px) 0 0 / 22px 22px",
+            "radial-gradient(rgba(0,0,0,0.20) 1.4px, transparent 1.5px) 11px 11px / 22px 22px",
+            "linear-gradient(#101f35, #101f35)",
+        ].join(", "),
     },
     zone: {
-        background: "rgba(49,46,129,0.20)",
-        borderColor: "rgba(129,140,248,0.15)",
-        boxShadow: "inset 0 1px 0 rgba(129,140,248,0.08)",
+        background: "rgba(5,10,20,0.55)",
+        // Purple frame — an ink outline would vanish on the near-ink surface
+        borderColor: "#9b6cf2",
+        boxShadow: "inset 0 3px 0 rgba(0,0,0,0.30)",
+        textColor: "#f7edd4",
     },
     badge: {
-        background: "rgba(30,27,75,0.60)",
-        textColor: "rgba(199,210,254,0.90)",
+        background: "#9b6cf2",
+        textColor: "#0b1220",
     },
-    accentColor: "#818cf8",
+    accentColor: "#9b6cf2",
 };

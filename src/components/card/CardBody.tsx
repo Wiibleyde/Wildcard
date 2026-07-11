@@ -70,7 +70,7 @@ export function CenteredArtwork({
     return (
         <div className="w-full h-full flex items-center justify-center overflow-hidden">
             {typeof artwork === "string" ? (
-                <span style={{ fontSize: "46cqi", color, lineHeight: 1 }}>
+                <span style={{ fontSize: "50cqi", color, lineHeight: 1 }}>
                     {artwork}
                 </span>
             ) : (

@@ -9,20 +9,19 @@ import { SuitedContent } from "./SuitedCard";
 import { TrumpContent } from "./TrumpCard";
 
 function buildBorderStyle(theme: CardTheme): CSSProperties {
+    const width = theme.border.width ?? 2.5;
+    const border = `${width}px solid ${theme.border.color}`;
     if (theme.border.boxShadow) {
-        return {
-            border: `2px solid ${theme.border.color}`,
-            boxShadow: theme.border.boxShadow,
-        };
+        return { border, boxShadow: theme.border.boxShadow };
     }
     if (theme.border.effect === "glow" && theme.border.glowColor) {
         const spread = theme.border.glowSize ?? 8;
         return {
-            border: `2px solid ${theme.border.color}`,
+            border,
             boxShadow: `0 0 ${spread}px ${Math.round(spread / 3)}px ${theme.border.glowColor}`,
         };
     }
-    return { border: `2px solid ${theme.border.color}` };
+    return { border };
 }
 
 function cardEffectsAttr(theme: CardTheme): string | undefined {
