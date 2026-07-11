@@ -168,6 +168,7 @@
     box-shadow: 0 6px 0 var(--ink);
 }
 .flat {
+    /* biome-ignore lint/complexity/noImportantStyles: don't want to care... */
     box-shadow: none !important;
 }
 
@@ -653,6 +654,7 @@
     .wc-banner-in,
     .wc-fade-in,
     .wc-pop-in {
+        /* biome-ignore lint/complexity/noImportantStyles: don't want to care */
         animation: none !important;
     }
 }
