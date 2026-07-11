@@ -23,24 +23,11 @@ export default async function Page({
     const games = buildPlayCatalog();
 
     return (
-        <div
-            className="min-h-screen px-4 pt-8 pb-16 md:pt-12 xl:px-10"
-            style={{ background: "#0d0a05" }}
-        >
+        <div className="min-h-screen px-4 pt-8 pb-16 md:pt-12 xl:px-10">
             <div className="mx-auto flex max-w-lg flex-col gap-8 lg:max-w-5xl xl:max-w-7xl">
-                <header className="flex flex-col gap-1">
-                    <h1
-                        className="text-3xl font-black xl:text-4xl"
-                        style={{ color: "#faf2e2" }}
-                    >
-                        {t("title")}
-                    </h1>
-                    <p
-                        className="text-sm font-semibold"
-                        style={{ color: "#9a8870" }}
-                    >
-                        {t("subtitle")}
-                    </p>
+                <header className="flex flex-col gap-1.5">
+                    <h1 className="h-xl text-3xl xl:text-4xl">{t("title")}</h1>
+                    <p className="sub text-sm">{t("subtitle")}</p>
                 </header>
                 <PlayHub userId={user.id} games={games} />
             </div>

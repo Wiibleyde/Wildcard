@@ -1,9 +1,9 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { TierBadge } from "@/components/ui/TierBadge";
 import type { BoardTheme } from "@/lib/board/types";
 import { TIER_KEYS } from "@/lib/card/tiers";
+import { type TierKey, tierColor, tierTextColor } from "@/lib/customize/tier";
 import { TileShell } from "./TileShell";
 
 type Props = {
@@ -28,12 +28,26 @@ export function BoardTile({ theme, selected, onClick, previewHref }: Props) {
         >
             <div
                 className="w-16 h-10 rounded-md overflow-hidden shrink-0"
-                style={{ background: theme.surface.background }}
+                style={{
+                    background: theme.surface.background,
+                    border: "2.5px solid var(--ink)",
+                }}
             />
-            <span className="text-xs font-semibold text-wc-text truncate w-full text-center">
+            <span
+                className="text-xs font-display truncate w-full text-center"
+                style={{ color: "var(--ink)" }}
+            >
                 {theme.name}
             </span>
-            <TierBadge tier={theme.tier} name={tierName} />
+            <span
+                className="stamp"
+                style={{
+                    background: tierColor(theme.tier as TierKey),
+                    color: tierTextColor(theme.tier as TierKey),
+                }}
+            >
+                {tierName}
+            </span>
         </TileShell>
     );
 }

@@ -32,10 +32,7 @@ export default async function Page({
         .maybeSingle();
 
     return (
-        <div
-            className="min-h-screen px-4 xl:px-10 pt-6 pb-16"
-            style={{ background: "#0d0a05" }}
-        >
+        <div className="min-h-screen px-4 xl:px-10 pt-6 pb-16">
             <ReplayClient
                 payload={result.payload}
                 currentUserId={user.id}

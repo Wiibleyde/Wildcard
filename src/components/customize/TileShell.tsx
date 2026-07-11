@@ -29,8 +29,8 @@ function CheckIcon() {
         >
             <path
                 d="M2 6l3 3 5-5"
-                stroke="#0d0a05"
-                strokeWidth="1.8"
+                stroke="var(--accent-ink)"
+                strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
             />
@@ -49,40 +49,40 @@ export function TileShell({ selected, onClick, previewHref, children }: Props) {
     const t = useTranslations("customize");
     return (
         <div
-            className="relative rounded-xl overflow-hidden transition-all"
+            className="panel lift relative overflow-hidden"
             style={{
-                background: selected ? "rgba(245,197,22,0.07)" : "#1c1510",
-                border: `2px solid ${selected ? "rgba(245,197,22,0.55)" : "#3d2d18"}`,
-                boxShadow: selected
-                    ? "0 0 16px rgba(245,197,22,0.15), 0 4px 0 0 rgba(245,197,22,0.2)"
-                    : "0 3px 0 0 rgba(0,0,0,0.4)",
+                borderColor: selected ? "var(--red)" : "var(--ink)",
+                borderWidth: selected ? "3.5px" : "2.5px",
             }}
         >
             <button
                 type="button"
                 onClick={onClick}
-                className="w-full flex flex-col items-center gap-2 p-3 pb-7 cursor-pointer"
+                className="w-full flex flex-col items-center gap-2 p-3 pb-8 cursor-pointer"
             >
                 {children}
                 {selected && (
-                    <div
-                        className="absolute top-1.5 right-1.5 w-4.5 h-4.5 rounded-full flex items-center justify-center"
+                    <span
+                        role="img"
+                        aria-label={t("selected")}
+                        title={t("selected")}
+                        className="stamp absolute top-1.5 left-1.5"
                         style={{
-                            background: "#f5c516",
-                            boxShadow: "0 0 8px rgba(245,197,22,0.4)",
+                            background: "var(--red)",
+                            color: "var(--accent-ink)",
+                            padding: "5px",
                         }}
                     >
                         <CheckIcon />
-                    </div>
+                    </span>
                 )}
             </button>
             <Link
                 href={previewHref}
-                className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors"
+                className="stamp absolute bottom-1.5 left-1/2 -translate-x-1/2"
                 style={{
-                    background: "rgba(0,0,0,0.4)",
-                    color: "#7a6a50",
-                    borderTop: "1px solid #3d2d18",
+                    background: "var(--cream2)",
+                    color: "var(--ink)",
                 }}
             >
                 <EyeIcon />

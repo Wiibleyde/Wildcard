@@ -5,7 +5,6 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { GameButton } from "@/components/ui/GameButton";
-import { ADMIN } from "./adminTheme";
 
 type Props = {
     initialEnabled: boolean;
@@ -64,58 +63,86 @@ export function MaintenanceControl({ initialEnabled, initialMessage }: Props) {
 
     return (
         <section
-            className="rounded-2xl p-5 xl:p-6 flex flex-col gap-4"
-            style={{
-                background: "rgba(255,255,255,0.03)",
-                border: `1px solid ${enabled ? "rgba(224,64,64,0.4)" : ADMIN.border}`,
-            }}
+            className="panel-d p-5 xl:p-6 flex flex-col gap-4"
+            style={
+                enabled
+                    ? {
+                          borderColor: "var(--red)",
+                          boxShadow: "0 6px 0 var(--red)",
+                      }
+                    : undefined
+            }
         >
             <div className="flex items-center gap-2.5">
-                <h2
-                    className="text-lg xl:text-xl font-black"
-                    style={{ color: ADMIN.text }}
-                >
+                <h2 className="font-display text-xl xl:text-2xl leading-none">
                     {t("maintenance_title")}
                 </h2>
             </div>
 
-            <div
-                className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl"
-                style={{
-                    background: enabled
-                        ? "rgba(224,64,64,0.1)"
-                        : "rgba(72,201,122,0.08)",
-                    border: `1px solid ${enabled ? "rgba(224,64,64,0.25)" : "rgba(72,201,122,0.2)"}`,
-                }}
-            >
+            <div className="flex items-center justify-between gap-3">
                 <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    className="stamp"
                     style={{
-                        background: enabled ? ADMIN.danger : ADMIN.success,
-                        boxShadow: `0 0 8px ${enabled ? ADMIN.danger : ADMIN.success}`,
+                        background: enabled ? "var(--red)" : "var(--green)",
+                        color: enabled ? "var(--accent-ink)" : "var(--ink)",
                     }}
-                />
-                <span
-                    className="text-sm font-black"
-                    style={{ color: enabled ? ADMIN.danger : ADMIN.success }}
                 >
                     {enabled
                         ? t("maintenance_active")
                         : t("maintenance_inactive")}
                 </span>
+
+                <button
+                    type="button"
+                    role="switch"
+                    aria-checked={enabled}
+                    aria-label={t("maintenance_title")}
+                    onClick={() => apply(!enabled)}
+                    disabled={saving}
+                    className="relative shrink-0 disabled:opacity-50 disabled:cursor-default"
+                    style={{
+                        width: 62,
+                        height: 34,
+                        borderRadius: 10,
+                        border: "2.5px solid var(--ink)",
+                        background: enabled ? "var(--red)" : "var(--panel-d2)",
+                        transition: "background 0.12s",
+                        cursor: saving ? "default" : "pointer",
+                    }}
+                >
+                    <span
+                        className="absolute top-1/2"
+                        style={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: 6,
+                            background: "var(--gold)",
+                            border: "2.5px solid var(--ink)",
+                            boxShadow: "0 3px 0 var(--ink)",
+                            transform: `translateY(-50%) translateX(${enabled ? 30 : 3}px)`,
+                            transition:
+                                "transform 0.14s cubic-bezier(0.3,0.8,0.3,1)",
+                        }}
+                    />
+                </button>
             </div>
 
             <p
                 className="text-xs font-semibold"
-                style={{ color: ADMIN.textSubtle }}
+                style={{ color: "var(--muted)" }}
             >
                 {t("maintenance_desc")}
             </p>
 
             <label className="flex flex-col gap-1.5">
                 <span
-                    className="text-xs font-bold uppercase tracking-wider"
-                    style={{ color: ADMIN.textMuted }}
+                    className="uppercase"
+                    style={{
+                        fontFamily: "var(--pixel)",
+                        fontSize: 10,
+                        letterSpacing: "0.02em",
+                        color: "var(--muted)",
+                    }}
                 >
                     {t("maintenance_message_label")}
                 </span>
@@ -127,9 +154,9 @@ export function MaintenanceControl({ initialEnabled, initialMessage }: Props) {
                     placeholder={t("maintenance_message_placeholder")}
                     className="w-full rounded-xl px-3 py-2.5 text-sm font-semibold resize-none outline-none"
                     style={{
-                        background: "rgba(0,0,0,0.3)",
-                        border: `1px solid ${ADMIN.border}`,
-                        color: ADMIN.text,
+                        background: "var(--panel-d2)",
+                        border: "2.5px solid var(--ink)",
+                        color: "var(--cream)",
                     }}
                 />
             </label>
@@ -137,31 +164,20 @@ export function MaintenanceControl({ initialEnabled, initialMessage }: Props) {
             {error && (
                 <p
                     className="text-xs font-bold"
-                    style={{ color: ADMIN.danger }}
+                    style={{ color: "var(--red)" }}
                 >
                     {error}
                 </p>
             )}
 
-            {enabled ? (
-                <GameButton
-                    variant="green"
-                    size="md"
-                    onClick={() => apply(false)}
-                    disabled={saving}
-                >
-                    {saving ? tCommon("saving") : t("disable")}
-                </GameButton>
-            ) : (
-                <GameButton
-                    variant="red"
-                    size="md"
-                    onClick={() => apply(true)}
-                    disabled={saving}
-                >
-                    {saving ? tCommon("saving") : t("enable")}
-                </GameButton>
-            )}
+            <GameButton
+                variant="gold"
+                size="md"
+                onClick={() => apply(enabled)}
+                disabled={saving}
+            >
+                {saving ? tCommon("saving") : tCommon("save")}
+            </GameButton>
         </section>
     );
 }

@@ -1,4 +1,5 @@
 import { useTranslations } from "next-intl";
+import { GameButton } from "@/components/ui/GameButton";
 
 type Props = {
     isHost: boolean;
@@ -19,50 +20,36 @@ export function RoomActions({
 }: Props) {
     const t = useTranslations("room");
     return (
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
             {isHost ? (
-                <button
-                    type="button"
+                <GameButton
+                    variant="green"
                     onClick={onStart}
                     disabled={busy || !canStart}
-                    className="flex-1 rounded-xl py-3 font-black text-sm disabled:opacity-50"
-                    style={{
-                        background: "#48c97a",
-                        color: "#0d1f12",
-                        boxShadow: "0 4px 0 0 #1a6038",
-                    }}
+                    className="flex-1"
                 >
                     {busy
                         ? t("starting")
                         : canStart
                           ? t("start")
                           : t("need_more_players", { min: minPlayers })}
-                </button>
+                </GameButton>
             ) : (
                 <div
-                    className="flex-1 rounded-xl py-3 text-center font-bold text-sm"
+                    className="flex flex-1 items-center justify-center rounded-wc-btn border-nb py-3 text-center font-display text-sm"
                     style={{
-                        background: "rgba(255,255,255,0.03)",
-                        color: "#9a8870",
-                        border: "1px solid #3d2d18",
+                        background: "var(--panel-d)",
+                        color: "var(--muted)",
+                        borderColor: "var(--ink)",
+                        boxShadow: "0 4px 0 var(--ink)",
                     }}
                 >
                     {t("waiting_host")}
                 </div>
             )}
-            <button
-                type="button"
-                onClick={onLeave}
-                disabled={busy}
-                className="rounded-xl px-6 py-3 font-bold text-sm disabled:opacity-50"
-                style={{
-                    background: "rgba(224,64,64,0.12)",
-                    color: "#e04040",
-                    border: "1px solid rgba(224,64,64,0.4)",
-                }}
-            >
+            <GameButton variant="red" onClick={onLeave} disabled={busy}>
                 {t("leave")}
-            </button>
+            </GameButton>
         </div>
     );
 }

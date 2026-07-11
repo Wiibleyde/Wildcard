@@ -40,10 +40,7 @@ export default async function Page({
     ]);
 
     return (
-        <div
-            className="min-h-screen px-4 xl:px-10 pt-6 pb-6"
-            style={{ background: "#0d0a05" }}
-        >
+        <div className="min-h-screen px-4 xl:px-10 pt-6 pb-6">
             <GamePlayClient
                 initial={result.payload}
                 currentUserId={user.id}

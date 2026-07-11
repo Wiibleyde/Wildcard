@@ -1,5 +1,4 @@
 import Image from "next/image";
-import { GOLD_GRADIENT, GOLD_RED_GRADIENT } from "@/lib/ui/brand";
 
 type Props = {
     avatarUrl: string | null;
@@ -9,6 +8,7 @@ type Props = {
     initialClassName: string;
 };
 
+// Neobrutalism avatar — flat disc, thick ink ring, chunky display initial.
 export function NavAvatar({
     avatarUrl,
     initial,
@@ -18,36 +18,31 @@ export function NavAvatar({
 }: Props) {
     return (
         <div
-            className="relative rounded-full shrink-0 p-0.5"
+            className="relative shrink-0 overflow-hidden rounded-full"
             style={{
                 width: sizePx,
                 height: sizePx,
-                background: GOLD_RED_GRADIENT,
+                border: "2.5px solid var(--ink)",
             }}
         >
-            <div className="relative w-full h-full rounded-full overflow-hidden">
-                {avatarUrl ? (
-                    <Image
-                        src={avatarUrl}
-                        alt={username ?? ""}
-                        fill
-                        sizes={`${sizePx}px`}
-                        className="object-cover"
-                        loading="eager"
-                        unoptimized
-                    />
-                ) : (
-                    <div
-                        className={`w-full h-full flex items-center justify-center font-black ${initialClassName}`}
-                        style={{
-                            background: GOLD_GRADIENT,
-                            color: "#0d0a05",
-                        }}
-                    >
-                        {initial}
-                    </div>
-                )}
-            </div>
+            {avatarUrl ? (
+                <Image
+                    src={avatarUrl}
+                    alt={username ?? ""}
+                    fill
+                    sizes={`${sizePx}px`}
+                    className="object-cover"
+                    loading="eager"
+                    unoptimized
+                />
+            ) : (
+                <div
+                    className={`flex h-full w-full items-center justify-center font-display ${initialClassName}`}
+                    style={{ background: "var(--gold)", color: "var(--ink)" }}
+                >
+                    {initial}
+                </div>
+            )}
         </div>
     );
 }

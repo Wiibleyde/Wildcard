@@ -180,7 +180,7 @@ export function GamePlayClient({
 
     if (!table) {
         return (
-            <div className="p-8 text-center" style={{ color: "#9a8870" }}>
+            <div className="p-8 text-center" style={{ color: "var(--muted)" }}>
                 {payload.moduleId}
             </div>
         );

@@ -26,16 +26,16 @@ export function SeatPanel({
         <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-3">
                 <h3
-                    className="text-xs font-bold uppercase tracking-widest"
-                    style={{ color: "#7a6a50" }}
+                    className="font-display text-base"
+                    style={{ color: "var(--cream)" }}
                 >
                     {t("seats")} · {total}/{maxPlayers}
                 </h3>
                 {isHost && (
                     <div className="flex items-center gap-2">
                         <span
-                            className="text-xs font-bold"
-                            style={{ color: "#9a8870" }}
+                            className="font-display text-xs"
+                            style={{ color: "var(--muted)" }}
                         >
                             {t("bots")}
                         </span>
@@ -43,18 +43,19 @@ export function SeatPanel({
                             type="button"
                             onClick={() => onSetBots(botCount - 1)}
                             disabled={botCount <= 0}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg font-black disabled:opacity-30"
+                            className="flex h-7 w-7 items-center justify-center rounded-lg border-nb font-display disabled:opacity-30"
                             style={{
-                                background: "rgba(255,255,255,0.05)",
-                                color: "#f5c516",
-                                border: "1px solid #3d2d18",
+                                background: "var(--cream)",
+                                color: "var(--ink)",
+                                borderColor: "var(--ink)",
+                                boxShadow: "0 3px 0 var(--ink)",
                             }}
                         >
                             −
                         </button>
                         <span
-                            className="w-5 text-center font-black"
-                            style={{ color: "#faf2e2" }}
+                            className="w-5 text-center font-display"
+                            style={{ color: "var(--cream)" }}
                         >
                             {botCount}
                         </span>
@@ -62,11 +63,12 @@ export function SeatPanel({
                             type="button"
                             onClick={() => onSetBots(botCount + 1)}
                             disabled={total >= maxPlayers}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg font-black disabled:opacity-30"
+                            className="flex h-7 w-7 items-center justify-center rounded-lg border-nb font-display disabled:opacity-30"
                             style={{
-                                background: "rgba(255,255,255,0.05)",
-                                color: "#f5c516",
-                                border: "1px solid #3d2d18",
+                                background: "var(--cream)",
+                                color: "var(--ink)",
+                                borderColor: "var(--ink)",
+                                boxShadow: "0 3px 0 var(--ink)",
                             }}
                         >
                             +

@@ -22,18 +22,22 @@ export function RuleToggle({
     const t = useTranslations("room");
     return (
         <li
-            className="flex items-center justify-between gap-3 rounded-xl px-4 py-3"
+            className="flex items-center justify-between gap-3 rounded-xl border-nb px-4 py-3"
             style={{
-                background: "#1c1510",
-                border: "2px solid #3d2d18",
+                background: "var(--panel-d)",
+                borderColor: "var(--ink)",
+                boxShadow: "0 4px 0 var(--ink)",
                 opacity: locked ? 0.5 : 1,
             }}
         >
             <div className="min-w-0 flex-1">
-                <div className="font-bold text-sm" style={{ color: "#faf2e2" }}>
+                <div
+                    className="font-display text-sm"
+                    style={{ color: "var(--cream)" }}
+                >
                     {label}
                 </div>
-                <div className="text-xs" style={{ color: "#9a8870" }}>
+                <div className="text-xs" style={{ color: "var(--muted)" }}>
                     {description}
                 </div>
             </div>
@@ -45,26 +49,30 @@ export function RuleToggle({
                     aria-label={label}
                     disabled={busy || locked}
                     onClick={() => onToggle(!on)}
-                    className="inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full p-1 transition-colors duration-200 disabled:cursor-default disabled:opacity-40"
+                    className="inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-nb p-0.5 transition-colors duration-200 disabled:cursor-default disabled:opacity-40"
                     style={{
-                        background: on ? "#48c97a" : "rgba(255,255,255,0.08)",
+                        background: on ? "var(--green)" : "var(--panel-d2)",
+                        borderColor: "var(--ink)",
                     }}
                 >
                     <span
-                        className="h-4 w-4 rounded-full transition-transform duration-200"
+                        className="h-4 w-4 rounded-sm border-2 transition-transform duration-200"
                         style={{
-                            background: "#faf2e2",
-                            boxShadow: "0 1px 2px rgba(0,0,0,0.4)",
+                            background: "var(--cream)",
+                            borderColor: "var(--ink)",
                             transform: on
-                                ? "translateX(20px)"
+                                ? "translateX(18px)"
                                 : "translateX(0)",
                         }}
                     />
                 </button>
             ) : (
                 <span
-                    className="shrink-0 text-xs font-black uppercase tracking-wider"
-                    style={{ color: on ? "#48c97a" : "#7a6a50" }}
+                    className="shrink-0 font-pixel text-wc-micro uppercase"
+                    style={{
+                        fontFamily: "var(--pixel)",
+                        color: on ? "var(--green)" : "var(--muted)",
+                    }}
                 >
                     {on ? t("rule_on") : t("rule_off")}
                 </span>

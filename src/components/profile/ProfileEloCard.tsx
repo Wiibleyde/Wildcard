@@ -21,13 +21,10 @@ export async function ProfileEloCard({
     const t = await getTranslations("profile");
 
     return (
-        <div
-            className="rounded-xl p-6 border"
-            style={{ background: "#1c1510", borderColor: "#3d2d18" }}
-        >
+        <div className="panel-d p-6">
             <h2
-                className="text-xs font-bold uppercase tracking-widest mb-5"
-                style={{ color: "#7a6a50" }}
+                className="stamp mb-5"
+                style={{ background: "var(--gold)", color: "var(--ink)" }}
             >
                 {t("ratings_title")}
             </h2>
@@ -35,7 +32,7 @@ export async function ProfileEloCard({
             {ratings.length === 0 ? (
                 <p
                     className="text-sm font-semibold"
-                    style={{ color: "#9a8870" }}
+                    style={{ color: "var(--muted)" }}
                 >
                     {t("ratings_empty")}
                 </p>
@@ -44,30 +41,26 @@ export async function ProfileEloCard({
                     {ratings.map((r) => (
                         <li
                             key={r.moduleId}
-                            className="flex items-center justify-between gap-3 rounded-lg px-4 py-3 border"
-                            style={{
-                                background: "#231808",
-                                borderColor: "#3d2d18",
-                            }}
+                            className="panel flat flex items-center justify-between gap-3 px-4 py-3"
                         >
                             <div className="min-w-0">
                                 <p
-                                    className="text-sm font-black truncate"
-                                    style={{ color: "#faf2e2" }}
+                                    className="text-sm font-bold truncate"
+                                    style={{ color: "var(--ink)" }}
                                 >
                                     {r.moduleName}
                                 </p>
                                 <p
                                     className="text-xs font-semibold"
-                                    style={{ color: "#7a6a50" }}
+                                    style={{ color: "#5a5340" }}
                                 >
                                     {r.gamesPlayed} {t("ratings_played")} ·{" "}
                                     {r.wins} {t("ratings_wins")}
                                 </p>
                             </div>
                             <span
-                                className="text-2xl xl:text-3xl font-black shrink-0 tabular-nums"
-                                style={{ color: "#f5c516" }}
+                                className="font-display text-2xl xl:text-3xl shrink-0 tabular-nums"
+                                style={{ color: "var(--ink)" }}
                             >
                                 {r.rating}
                             </span>

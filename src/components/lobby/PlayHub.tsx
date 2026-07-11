@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { GameButton } from "@/components/ui/GameButton";
 import { useMatchmaking } from "@/hooks/lobby/useMatchmaking";
 import { useRoomAction } from "@/hooks/lobby/useRoomAction";
 import type { PlayGame } from "@/lib/games/catalog";
@@ -44,23 +45,36 @@ export function PlayHub({ userId, games }: Props) {
     return (
         <div className="flex flex-col gap-8">
             {/* Join a private game by code. */}
-            <section
-                className="flex flex-col gap-4 rounded-2xl p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between"
-                style={{ background: "#1c1510", border: "2px solid #3d2d18" }}
-            >
-                <div className="flex flex-col gap-0.5">
-                    <h2
-                        className="text-lg font-black"
-                        style={{ color: "#faf2e2" }}
+            <section className="panel flex flex-col gap-4 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-center gap-3">
+                    {/* Search glyph tile. */}
+                    <span
+                        aria-hidden
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl"
+                        style={{
+                            background: "var(--red)",
+                            color: "var(--accent-ink)",
+                            border: "2.5px solid var(--ink)",
+                            boxShadow: "0 4px 0 var(--ink)",
+                            transform: "rotate(-4deg)",
+                        }}
                     >
-                        {t("join_title")}
-                    </h2>
-                    <p
-                        className="text-sm font-semibold"
-                        style={{ color: "#9a8870" }}
-                    >
-                        {t("join_subtitle")}
-                    </p>
+                        🔎
+                    </span>
+                    <div className="flex flex-col gap-0.5">
+                        <h2
+                            className="font-display text-xl leading-tight"
+                            style={{ color: "var(--ink)" }}
+                        >
+                            {t("join_title")}
+                        </h2>
+                        <p
+                            className="text-sm font-semibold"
+                            style={{ color: "#5a5340" }}
+                        >
+                            {t("join_subtitle")}
+                        </p>
+                    </div>
                 </div>
                 <div className="flex gap-3">
                     <input
@@ -68,36 +82,37 @@ export function PlayHub({ userId, games }: Props) {
                         onChange={(e) => setCode(e.target.value.toUpperCase())}
                         placeholder={t("code_placeholder")}
                         maxLength={5}
-                        className="min-w-0 flex-1 rounded-xl px-4 py-3 text-center font-black tracking-[0.3em] outline-none lg:w-44"
+                        className="min-w-0 flex-1 rounded-xl px-4 py-3 text-center outline-none lg:w-44"
                         style={{
-                            background: "rgba(0,0,0,0.3)",
-                            border: "2px solid #3d2d18",
-                            color: "#faf2e2",
+                            background: "var(--cream2)",
+                            border: "2.5px solid var(--ink)",
+                            color: "var(--ink)",
+                            fontFamily: "var(--pixel)",
+                            letterSpacing: "0.3em",
+                            fontSize: "15px",
+                            boxShadow: "inset 0 2px 0 rgba(11,18,32,0.12)",
                         }}
                     />
-                    <button
-                        type="button"
+                    <GameButton
+                        variant="red"
+                        size="sm"
                         onClick={() => joinRoom(code)}
                         disabled={busy !== null || code.length < 3}
-                        className="shrink-0 rounded-xl px-6 py-3 font-black text-sm transition-transform active:scale-95 disabled:opacity-50"
-                        style={{
-                            background: "#f5c516",
-                            color: "#0d0a05",
-                            boxShadow: "0 4px 0 0 #8a6800",
-                        }}
+                        className="shrink-0"
                     >
                         {busy === "join" ? t("joining") : t("join_room")}
-                    </button>
+                    </GameButton>
                 </div>
             </section>
 
             {errorText && (
                 <p
-                    className="rounded-xl px-4 py-3 text-sm font-semibold"
+                    className="rounded-xl px-4 py-3 text-sm font-bold"
                     style={{
-                        background: "rgba(224,64,64,0.1)",
-                        border: "1px solid rgba(224,64,64,0.3)",
-                        color: "#e04040",
+                        background: "var(--red)",
+                        border: "2.5px solid var(--ink)",
+                        boxShadow: "0 4px 0 var(--ink)",
+                        color: "var(--accent-ink)",
                     }}
                 >
                     {errorText}
@@ -109,14 +124,22 @@ export function PlayHub({ userId, games }: Props) {
                 <section key={section.id} className="flex flex-col gap-4">
                     <div className="flex items-center gap-3">
                         <h2
-                            className="text-xs font-bold uppercase tracking-widest"
-                            style={{ color: section.accent }}
+                            className="wc-chip font-display"
+                            style={{
+                                padding: "8px 14px",
+                                borderRadius: 11,
+                                border: "2.5px solid var(--ink)",
+                                boxShadow: "0 3px 0 var(--ink)",
+                                background: section.accent,
+                                color: "var(--ink)",
+                                fontSize: "14px",
+                            }}
                         >
                             {section.label}
                         </h2>
                         <span
-                            className="h-px flex-1"
-                            style={{ background: "#2a2012" }}
+                            className="h-0.5 flex-1 rounded-full"
+                            style={{ background: "var(--bg-line)" }}
                         />
                     </div>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
@@ -133,23 +156,20 @@ export function PlayHub({ userId, games }: Props) {
                                     footer={
                                         g.matchmaking ? (
                                             <>
-                                                <button
-                                                    type="button"
+                                                <GameButton
+                                                    variant="red"
+                                                    size="sm"
                                                     onClick={() =>
                                                         quickMatch(g.id)
                                                     }
                                                     disabled={busy !== null}
-                                                    className="rounded-xl py-2.5 font-black text-sm transition-transform active:scale-95 disabled:opacity-50"
-                                                    style={{
-                                                        background: g.accent,
-                                                        color: "#0d0a05",
-                                                        boxShadow: `0 3px 0 0 ${g.shadow}`,
-                                                    }}
+                                                    className="w-full"
                                                 >
                                                     {t("quick_match")}
-                                                </button>
-                                                <button
-                                                    type="button"
+                                                </GameButton>
+                                                <GameButton
+                                                    variant="gold"
+                                                    size="sm"
                                                     onClick={() =>
                                                         createRoom(
                                                             g.id,
@@ -157,37 +177,27 @@ export function PlayHub({ userId, games }: Props) {
                                                         )
                                                     }
                                                     disabled={busy !== null}
-                                                    className="rounded-xl py-2.5 font-bold text-sm transition-transform active:scale-95 disabled:opacity-50"
-                                                    style={{
-                                                        background:
-                                                            "rgba(255,255,255,0.04)",
-                                                        color: "#faf2e2",
-                                                        border: `2px solid ${g.accent}40`,
-                                                    }}
+                                                    className="w-full"
                                                 >
                                                     {busy === "create"
                                                         ? t("creating")
                                                         : t("create_private")}
-                                                </button>
+                                                </GameButton>
                                             </>
                                         ) : (
-                                            <button
-                                                type="button"
+                                            <GameButton
+                                                variant="red"
+                                                size="sm"
                                                 onClick={() =>
                                                     createRoom(g.id, "private")
                                                 }
                                                 disabled={busy !== null}
-                                                className="rounded-xl py-2.5 font-black text-sm transition-transform active:scale-95 disabled:opacity-50"
-                                                style={{
-                                                    background: g.accent,
-                                                    color: "#0d0a05",
-                                                    boxShadow: `0 3px 0 0 ${g.shadow}`,
-                                                }}
+                                                className="w-full"
                                             >
                                                 {busy === "create"
                                                     ? t("creating")
                                                     : t("play_solo")}
-                                            </button>
+                                            </GameButton>
                                         )
                                     }
                                 />

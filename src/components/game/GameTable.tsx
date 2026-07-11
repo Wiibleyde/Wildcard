@@ -201,11 +201,30 @@ export function GameTable({
             <div className="flex flex-col gap-3 lg:flex-row">
                 <div
                     ref={rootRef}
-                    className="relative flex min-h-[60vh] flex-1 flex-col gap-3 overflow-hidden rounded-2xl p-3 sm:gap-4 sm:p-4 lg:h-[78vh] lg:min-h-0 xl:p-6"
-                    style={buildSurfaceStyle(boardTheme)}
+                    className="relative flex min-h-[60vh] flex-1 flex-col gap-3 overflow-hidden p-3 sm:gap-4 sm:p-4 lg:h-[78vh] lg:min-h-0 xl:p-6"
+                    style={{
+                        ...buildSurfaceStyle(boardTheme),
+                        borderRadius: "clamp(1.125rem, 3vw, 2rem)",
+                        border: "3px solid var(--ink)",
+                        boxShadow:
+                            "inset 0 0 0 3px rgba(0,0,0,0.35), inset 0 0 90px rgba(0,0,0,0.4), 0 10px 0 var(--ink)",
+                    }}
                 >
+                    {/* felt monogram watermark */}
+                    <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center font-display"
+                        style={{
+                            fontSize: "clamp(80px,17vw,200px)",
+                            color: "rgba(255,255,255,0.045)",
+                            lineHeight: 1,
+                        }}
+                    >
+                        W
+                    </span>
+
                     {data.seats && (
-                        <div className="shrink-0">
+                        <div className="relative z-10 shrink-0">
                             <TableSeats
                                 seats={data.seats}
                                 boardTheme={boardTheme}
@@ -217,14 +236,14 @@ export function GameTable({
                     )}
 
                     {top.length > 0 && (
-                        <div className="flex shrink-0 flex-wrap items-start justify-center gap-3 sm:gap-4 xl:gap-6">
+                        <div className="relative z-10 flex shrink-0 flex-wrap items-start justify-center gap-3 sm:gap-4 xl:gap-6">
                             {top}
                         </div>
                     )}
 
                     <div
                         data-center-region
-                        className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 lg:flex-4"
+                        className="relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center gap-3 lg:flex-4"
                     >
                         <div className={centerClass}>{center}</div>
                         {data.status && (
@@ -239,7 +258,7 @@ export function GameTable({
 
                     {(hasHand || controls.length > 0) && (
                         <div
-                            className={`flex w-full shrink-0 flex-col items-center gap-2 sm:gap-3 ${
+                            className={`relative z-10 flex w-full shrink-0 flex-col items-center gap-2 sm:gap-3 ${
                                 hasHand ? "lg:min-h-0 lg:flex-5" : ""
                             }`}
                         >

@@ -8,7 +8,6 @@ import { GameButton } from "@/components/ui/GameButton";
 import { useAvatarUpload } from "@/hooks/profile/useAvatarUpload";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import type { ProfilePatch, ProfilePatchErrorCode } from "@/lib/models/profile";
-import { GOLD_GRADIENT, GOLD_RED_GRADIENT } from "@/lib/ui/brand";
 
 type Props = {
     userId: string;
@@ -69,32 +68,30 @@ export function ProfileForm({
             <div className="flex items-center gap-4">
                 <div className="relative group shrink-0">
                     <div
-                        className="relative w-16 h-16 rounded-full p-0.5"
-                        style={{ background: GOLD_RED_GRADIENT }}
+                        className="relative w-16 h-16 rounded-full overflow-hidden"
+                        style={{ border: "2.5px solid var(--ink)" }}
                     >
-                        <div className="relative w-full h-full rounded-full overflow-hidden">
-                            {avatar.displayUrl ? (
-                                <Image
-                                    src={avatar.displayUrl}
-                                    alt="Avatar"
-                                    fill
-                                    sizes="64px"
-                                    className="object-cover"
-                                    loading="eager"
-                                    unoptimized
-                                />
-                            ) : (
-                                <div
-                                    className="w-full h-full flex items-center justify-center text-xl font-black"
-                                    style={{
-                                        background: GOLD_GRADIENT,
-                                        color: "#0d0a05",
-                                    }}
-                                >
-                                    {username?.[0]?.toUpperCase() ?? "?"}
-                                </div>
-                            )}
-                        </div>
+                        {avatar.displayUrl ? (
+                            <Image
+                                src={avatar.displayUrl}
+                                alt="Avatar"
+                                fill
+                                sizes="64px"
+                                className="object-cover"
+                                loading="eager"
+                                unoptimized
+                            />
+                        ) : (
+                            <div
+                                className="w-full h-full flex items-center justify-center font-display text-xl"
+                                style={{
+                                    background: "var(--gold)",
+                                    color: "var(--ink)",
+                                }}
+                            >
+                                {username?.[0]?.toUpperCase() ?? "?"}
+                            </div>
+                        )}
                     </div>
 
                     <button
@@ -104,7 +101,7 @@ export function ProfileForm({
                         className="absolute inset-0 rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
                     >
                         {avatar.busy ? (
-                            <span className="text-[10px] text-white font-semibold text-center px-1 leading-tight">
+                            <span className="text-wc-label text-white font-semibold text-center px-1 leading-tight">
                                 {t("avatar_uploading")}
                             </span>
                         ) : avatar.status === "saved" ? (
@@ -118,14 +115,14 @@ export function ProfileForm({
                 <div className="flex flex-col gap-1">
                     <p
                         className="text-xs font-semibold"
-                        style={{ color: "#7a6a50" }}
+                        style={{ color: "var(--muted)" }}
                     >
                         {t("avatar_upload")}
                     </p>
                     {avatar.status === "error" && avatar.error && (
                         <p
                             className="text-xs font-medium"
-                            style={{ color: "#e04040" }}
+                            style={{ color: "var(--red)" }}
                         >
                             {avatar.error}
                         </p>
@@ -145,7 +142,7 @@ export function ProfileForm({
                 <label
                     htmlFor="username"
                     className="block text-xs font-bold mb-2 uppercase tracking-widest"
-                    style={{ color: "#7a6a50" }}
+                    style={{ color: "var(--muted)" }}
                 >
                     {t("username_label")}
                 </label>
@@ -161,22 +158,18 @@ export function ProfileForm({
                     maxLength={30}
                     className="w-full rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none transition-all"
                     style={{
-                        background: "rgba(255,255,255,0.04)",
-                        border: "2px solid #3d2d18",
-                        color: "#faf2e2",
-                    }}
-                    onFocus={(e) => {
-                        e.currentTarget.style.borderColor =
-                            "rgba(245,197,22,0.5)";
-                    }}
-                    onBlur={(e) => {
-                        e.currentTarget.style.borderColor = "#3d2d18";
+                        background: "var(--cream)",
+                        border: "2.5px solid var(--ink)",
+                        color: "var(--ink)",
                     }}
                 />
             </div>
 
             {formErrorMessage && (
-                <p className="text-xs font-bold" style={{ color: "#e04040" }}>
+                <p
+                    className="text-xs font-bold"
+                    style={{ color: "var(--red)" }}
+                >
                     {formErrorMessage}
                 </p>
             )}
