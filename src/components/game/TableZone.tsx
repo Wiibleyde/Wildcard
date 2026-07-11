@@ -102,7 +102,7 @@ export function TableZone({ instance, template, ctx }: TableZoneProps) {
             {instance.caption && (
                 <span
                     className="text-xs font-bold xl:text-sm"
-                    style={{ color: ctx.boardTheme.badge.textColor }}
+                    style={{ color: ctx.boardTheme.zone.textColor }}
                 >
                     {instance.caption}
                 </span>
@@ -124,8 +124,8 @@ function ZoneCards({ instance, template, ctx }: TableZoneProps) {
                     <span
                         className="px-1 text-center text-wc-label font-semibold xl:text-xs"
                         style={{
-                            color: ctx.boardTheme.badge.textColor,
-                            opacity: 0.5,
+                            color: ctx.boardTheme.zone.textColor,
+                            opacity: 0.6,
                         }}
                     >
                         {instance.emptyHint}

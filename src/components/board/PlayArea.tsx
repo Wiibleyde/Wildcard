@@ -53,7 +53,9 @@ export function PlayArea({
             className="flex flex-wrap items-center justify-center gap-3 px-2 py-3"
         >
             {cards.length === 0 && emptyHint && (
-                <span className="text-sm text-white/40">{emptyHint}</span>
+                <span className="font-display text-sm text-wc-cream/50">
+                    {emptyHint}
+                </span>
             )}
             {cards.map((tableCard) => {
                 const owner = players.find(
@@ -80,7 +82,10 @@ export function PlayArea({
                             />
                         </div>
                         {owner && (
-                            <p className="mt-1 truncate text-center text-wc-label font-semibold text-white/60">
+                            <p
+                                className="mt-1 truncate text-center text-wc-label uppercase text-wc-cream/70"
+                                style={{ fontFamily: "var(--pixel)" }}
+                            >
                                 {owner.username}
                             </p>
                         )}

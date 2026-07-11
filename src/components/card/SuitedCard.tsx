@@ -93,7 +93,7 @@ function SuitedBody({
         return (
             <CenterBox
                 style={{
-                    fontSize: "46cqi",
+                    fontSize: "54cqi",
                     color: suitStyle.color,
                     lineHeight: 1,
                     ...suitStyle.symbolStyle,
@@ -109,7 +109,7 @@ function SuitedBody({
             <CenterBox col style={{ color: suitStyle.color, gap: "5%" }}>
                 <span
                     style={{
-                        fontSize: "33cqi",
+                        fontSize: "38cqi",
                         fontWeight: 700,
                         lineHeight: 1,
                     }}
@@ -118,7 +118,7 @@ function SuitedBody({
                 </span>
                 <span
                     style={{
-                        fontSize: "24cqi",
+                        fontSize: "28cqi",
                         lineHeight: 1,
                         ...suitStyle.symbolStyle,
                     }}
@@ -130,6 +130,9 @@ function SuitedBody({
     }
 
     if (pipLayout) {
+        // Denser layouts (8–10 pips) get smaller symbols so rows don't collide
+        const pipSize =
+            pipLayout.length <= 6 ? 20 : pipLayout.length <= 8 ? 18 : 16;
         return (
             <div className="relative w-full h-full">
                 {pipLayout.map((pip, i) => (
@@ -140,7 +143,7 @@ function SuitedBody({
                         style={{
                             left: `${pip.x}%`,
                             top: `${pip.y}%`,
-                            fontSize: "15cqi",
+                            fontSize: `${pipSize}cqi`,
                             color: suitStyle.color,
                             lineHeight: 1,
                             transform: `translate(-50%, -50%)${pip.flip ? " rotate(180deg)" : ""}`,

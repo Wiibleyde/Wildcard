@@ -55,7 +55,7 @@ export function TrumpContent({
                         <CenterBox col style={{ color, gap: "4%" }}>
                             <span
                                 style={{
-                                    fontSize: "38cqi",
+                                    fontSize: "44cqi",
                                     fontWeight: 700,
                                     lineHeight: 1,
                                 }}
@@ -64,9 +64,9 @@ export function TrumpContent({
                             </span>
                             <span
                                 style={{
-                                    fontSize: "11cqi",
+                                    fontSize: "13cqi",
                                     lineHeight: 1,
-                                    opacity: 0.5,
+                                    opacity: 0.65,
                                 }}
                             >
                                 {ROMAN[index]}

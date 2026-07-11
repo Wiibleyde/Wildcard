@@ -19,12 +19,12 @@ export function buildSurfaceStyle(theme: BoardTheme): CSSProperties {
     return { background: surface.background, ...surface.style };
 }
 
-/** Framed zone panel (play area, hand area). */
+/** Framed zone panel (play area, hand area) — thick neobrutalism outline. */
 export function buildZoneStyle(theme: BoardTheme): CSSProperties {
     const { zone } = theme;
     return {
         background: zone.background,
-        border: `1px solid ${zone.borderColor}`,
+        border: `2.5px solid ${zone.borderColor}`,
         boxShadow: zone.boxShadow,
     };
 }

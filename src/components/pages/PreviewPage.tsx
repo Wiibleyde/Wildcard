@@ -137,7 +137,7 @@ export function PreviewPage({ deckId, boardId, backHref }: Props) {
             <Hand cards={hand} theme={cardTheme} onPlay={playCard} />
             <span
                 className="text-xs font-semibold"
-                style={{ color: boardTheme.badge.textColor, opacity: 0.5 }}
+                style={{ color: boardTheme.zone.textColor, opacity: 0.6 }}
             >
                 {t("play_hint")}
             </span>

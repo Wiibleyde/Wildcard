@@ -46,8 +46,8 @@ function OpponentSeat({
 function ZonePlaceholder({ text, theme }: { text: string; theme: BoardTheme }) {
     return (
         <span
-            className="text-sm xl:text-base"
-            style={{ color: theme.badge.textColor, opacity: 0.4 }}
+            className="font-display text-sm xl:text-base"
+            style={{ color: theme.zone.textColor, opacity: 0.55 }}
         >
             {text}
         </span>
@@ -69,7 +69,7 @@ export function GameBoard({
 
     return (
         <div
-            className="relative flex h-full w-full flex-col overflow-hidden rounded-2xl"
+            className="relative flex h-full w-full flex-col overflow-hidden rounded-2xl border-nb border-wc-ink"
             style={buildSurfaceStyle(theme)}
         >
             <div className="flex flex-wrap items-start justify-around gap-x-4 gap-y-2 px-3 pt-3 sm:px-6 sm:pt-4">

@@ -1,54 +1,46 @@
 import type { CardTheme } from "@/lib/card/types";
 
+/**
+ * Fondateur deck, neobrutalism edition: ink-black face with gold + vermilion
+ * suits, thick gold outline and a hard offset shadow — no glows, the premium
+ * feel comes from the foil/holographic overlays instead.
+ */
 export const creatorTheme: CardTheme = {
     id: "creator",
     name: "Fondateur",
     tier: "ethereal",
     suits: {
-        spades: {
-            symbol: "♠",
-            color: "#e8c468",
-            symbolStyle: { textShadow: "0 0 10px rgba(232,196,104,0.70)" },
-        },
-        hearts: {
-            symbol: "♥",
-            color: "#f87171",
-            symbolStyle: { textShadow: "0 0 10px rgba(248,113,113,0.70)" },
-        },
-        diamonds: {
-            symbol: "♦",
-            color: "#f87171",
-            symbolStyle: { textShadow: "0 0 10px rgba(248,113,113,0.70)" },
-        },
-        clubs: {
-            symbol: "♣",
-            color: "#e8c468",
-            symbolStyle: { textShadow: "0 0 10px rgba(232,196,104,0.70)" },
-        },
+        spades: { symbol: "♠", color: "#ffc23d" },
+        hearts: { symbol: "♥", color: "#ff4b3b" },
+        diamonds: { symbol: "♦", color: "#ff4b3b" },
+        clubs: { symbol: "♣", color: "#ffc23d" },
     },
-    backgroundColor: "#05050a",
-    textColor: "#e8c468",
+    backgroundColor: "#0b1220",
+    textColor: "#ffc23d",
     border: {
-        color: "#e8c468",
-        effect: "glow",
-        glowColor: "rgba(232,196,104,0.50)",
-        glowSize: 14,
+        color: "#ffc23d",
+        effect: "solid",
+        boxShadow: "0 3px 0 #05070d",
     },
     back: {
-        color: "#05050a",
-        // Geometric gold grid over deep obsidian
+        color: "#0b1220",
+        // Hard-edged gold lattice over ink — thick strokes, zero gradient haze
         pattern: [
-            "repeating-linear-gradient(45deg, rgba(232,196,104,0.06) 0px, rgba(232,196,104,0.06) 1px, transparent 1px, transparent 18px)",
-            "repeating-linear-gradient(-45deg, rgba(232,196,104,0.06) 0px, rgba(232,196,104,0.06) 1px, transparent 1px, transparent 18px)",
-            "radial-gradient(ellipse at 50% 50%, #130f1f 0%, #05050a 100%)",
+            "repeating-linear-gradient(45deg, rgba(255,194,61,0.18) 0px, rgba(255,194,61,0.18) 2px, transparent 2px, transparent 16px)",
+            "repeating-linear-gradient(-45deg, rgba(255,194,61,0.18) 0px, rgba(255,194,61,0.18) 2px, transparent 2px, transparent 16px)",
+            "linear-gradient(#0b1220, #0b1220)",
         ].join(", "),
         effects: [
-            { type: "foil", color: "#e8c468", speed: 0.6 },
+            { type: "foil", color: "#ffc23d", speed: 0.6 },
             { type: "holographic" },
         ],
     },
-    effects: [{ type: "shimmer", color: "#e8c468", speed: 0.8 }],
+    effects: [{ type: "shimmer", color: "#ffc23d", speed: 0.8 }],
     // Signature throw — this deck's cards land on the table in an arc
     playAnimation: { template: "arc" },
-    trumpColor: "#e8c468",
+    font: {
+        family: 'var(--disp, "Lilita One", system-ui, sans-serif)',
+        rankWeight: 400,
+    },
+    trumpColor: "#ffc23d",
 };

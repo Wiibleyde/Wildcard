@@ -13,8 +13,11 @@ export type BoardThemeTier =
 export interface BoardZone {
     /** CSS background for zone containers (play area, hand area) */
     background: string;
+    /** Zone frame color — rendered as the neobrutalism 2.5px outline */
     borderColor: string;
     boxShadow?: string;
+    /** Labels rendered on the table surface (placeholders, captions, hints) */
+    textColor: string;
 }
 
 export interface BoardBadge {

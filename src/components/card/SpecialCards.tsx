@@ -23,7 +23,7 @@ export function FoolContent({ theme }: { theme: CardTheme }) {
                         />
                     ) : (
                         <CenterBox
-                            style={{ fontSize: "46cqi", color, lineHeight: 1 }}
+                            style={{ fontSize: "54cqi", color, lineHeight: 1 }}
                         >
                             ★
                         </CenterBox>
@@ -65,7 +65,7 @@ export function JokerContent({
                         />
                     ) : (
                         <CenterBox
-                            style={{ fontSize: "46cqi", color, lineHeight: 1 }}
+                            style={{ fontSize: "54cqi", color, lineHeight: 1 }}
                         >
                             ★
                         </CenterBox>
