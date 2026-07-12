@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type ChangeEvent, useRef, useState } from "react";
+import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -40,6 +40,20 @@ export function useGameImageUpload(
     const [error, setError] = useState("");
     const fileRef = useRef<HTMLInputElement>(null);
     const supabase = createClient();
+
+    // The "saved" badge resets to "idle" on a timer; clear it on unmount so the
+    // callback never sets state on an unmounted component.
+    const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(
+        () => () => {
+            if (resetTimer.current) clearTimeout(resetTimer.current);
+        },
+        [],
+    );
+    function scheduleIdle() {
+        if (resetTimer.current) clearTimeout(resetTimer.current);
+        resetTimer.current = setTimeout(() => setStatus("idle"), 2000);
+    }
 
     const mutation = useApiMutation<{ image_url: string | null }>(
         `/api/studio/games/${gameId}`,
@@ -81,7 +95,7 @@ export function useGameImageUpload(
             setImagePath(path);
             setImageBust(Date.now());
             setStatus("saved");
-            setTimeout(() => setStatus("idle"), 2000);
+            scheduleIdle();
         } else {
             setError(t("image_error"));
             setStatus("error");
@@ -97,7 +111,7 @@ export function useGameImageUpload(
             setImagePath(null);
             setImageBust(undefined);
             setStatus("saved");
-            setTimeout(() => setStatus("idle"), 2000);
+            scheduleIdle();
         } else {
             setError(t("image_error"));
             setStatus("error");

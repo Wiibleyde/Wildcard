@@ -35,7 +35,7 @@ export async function GET(
 
 /**
  * Partial update of an owned game — any subset of name / description /
- * definition / status. Name and description are mirrored into the stored
+ * definition / status / image_url. Name and description are mirrored into the stored
  * `definition.meta` so the columns stay authoritative. Invalid definitions
  * come back as a 422 with field-level `details`; a game the caller does not
  * own is a 404 (never a 403).

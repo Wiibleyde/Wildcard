@@ -32,10 +32,12 @@ interface Props {
  */
 export function EcaGamesAdminPanel({ games, canManage }: Props) {
     const t = useTranslations("admin");
+    const tCommon = useTranslations("common");
     const locale = useLocale();
     const router = useRouter();
     const confirm = useConfirm();
     const [busyId, setBusyId] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     function formatDate(iso: string): string {
         return new Date(iso).toLocaleDateString(
@@ -53,13 +55,20 @@ export function EcaGamesAdminPanel({ games, canManage }: Props) {
         if (busyId) return;
         const next = game.status === "published" ? "draft" : "published";
         setBusyId(game.id);
+        setError(null);
         try {
-            await fetch(`/api/admin/eca/${game.id}`, {
+            const res = await fetch(`/api/admin/eca/${game.id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ status: next }),
             });
+            if (!res.ok) {
+                setError(tCommon("error"));
+                return;
+            }
             router.refresh();
+        } catch {
+            setError(tCommon("error"));
         } finally {
             setBusyId(null);
         }
@@ -74,9 +83,18 @@ export function EcaGamesAdminPanel({ games, canManage }: Props) {
         });
         if (!ok) return;
         setBusyId(game.id);
+        setError(null);
         try {
-            await fetch(`/api/admin/eca/${game.id}`, { method: "DELETE" });
+            const res = await fetch(`/api/admin/eca/${game.id}`, {
+                method: "DELETE",
+            });
+            if (!res.ok) {
+                setError(tCommon("error"));
+                return;
+            }
             router.refresh();
+        } catch {
+            setError(tCommon("error"));
         } finally {
             setBusyId(null);
         }
@@ -107,6 +125,19 @@ export function EcaGamesAdminPanel({ games, canManage }: Props) {
                     {t("refresh")}
                 </GameButton>
             </div>
+
+            {error && (
+                <p
+                    className="rounded-xl px-3 py-2 text-sm font-semibold"
+                    style={{
+                        background: "var(--red)",
+                        color: "var(--cream)",
+                        border: "2.5px solid var(--ink)",
+                    }}
+                >
+                    {error}
+                </p>
+            )}
 
             {games.length === 0 ? (
                 <p
