@@ -5,14 +5,14 @@ import { useMemo, useState } from "react";
 import { GameButton } from "@/components/ui/GameButton";
 import type { CardDescriptor, Suit } from "@/lib/card/types";
 import { cardKey } from "@/lib/card/utils";
-import {
-    createEcaModule,
-    type EcaAction,
-    type EcaDefinition,
-    type EcaState,
-    type EcaView,
-    validateEcaDefinition,
-} from "@/lib/eca";
+import { createEcaModule } from "@/lib/eca/module";
+import type {
+    EcaAction,
+    EcaDefinition,
+    EcaState,
+    EcaView,
+} from "@/lib/eca/types";
+import { validateEcaDefinition } from "@/lib/eca/validate";
 import { clientState, createGame, dispatch } from "@/lib/engine/runner";
 import type { GameEvent, GameModule, Player } from "@/lib/engine/types";
 

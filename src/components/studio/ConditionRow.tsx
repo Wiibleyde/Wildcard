@@ -9,7 +9,7 @@ import type {
     EcaDeckId,
     EcaEventType,
     EcaOperand,
-} from "@/lib/eca";
+} from "@/lib/eca/types";
 import { dangerButtonStyle, fieldClass, fieldStyle } from "./fields";
 import { literalModeFor, OperandField, SUITS } from "./OperandField";
 

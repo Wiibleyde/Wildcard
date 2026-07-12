@@ -6,6 +6,7 @@ import {
     StudioHub,
 } from "@/components/studio/StudioHub";
 import { createClient } from "@/lib/supabase/server";
+import { publicStorageUrl } from "@/lib/supabase/storage";
 
 export default async function Page({
     params,
@@ -26,7 +27,9 @@ export default async function Page({
     // database-level defense-in-depth under the API's ownership checks.
     const { data } = await supabase
         .from("eca_games")
-        .select("id, name, description, status, definition, updated_at")
+        .select(
+            "id, name, description, status, image_url, definition, updated_at",
+        )
         .eq("owner_id", user.id)
         .order("updated_at", { ascending: false });
 
@@ -38,6 +41,9 @@ export default async function Page({
         ruleCount: Array.isArray(row.definition.rules)
             ? row.definition.rules.length
             : 0,
+        imageUrl: row.image_url
+            ? publicStorageUrl("eca-images", row.image_url)
+            : null,
         updatedAt: row.updated_at,
     }));
 

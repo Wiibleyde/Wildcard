@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { DECKS } from "@/lib/card/decks";
 import type { Suit } from "@/lib/card/types";
-import type { EcaDeckId, EcaEventType, EcaOperand } from "@/lib/eca";
+import type { EcaDeckId, EcaEventType, EcaOperand } from "@/lib/eca/types";
 import type { Translate } from "@/lib/games/catalogView";
 import { fieldClass, fieldStyle } from "./fields";
 

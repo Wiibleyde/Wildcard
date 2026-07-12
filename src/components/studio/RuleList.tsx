@@ -2,8 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import { GameButton } from "@/components/ui/GameButton";
-import type { EcaDeckId } from "@/lib/eca";
-import { ECA_RULES_MAX } from "@/lib/eca";
+import type { EcaDeckId } from "@/lib/eca/types";
+import { ECA_RULES_MAX } from "@/lib/eca/validate";
 import { type DraftRule, newDraftRule } from "./draft";
 import { RuleCard } from "./RuleCard";
 

@@ -530,6 +530,7 @@ export type Database = {
                     description: string | null;
                     definition: Record<string, unknown>;
                     status: "draft" | "published";
+                    image_url: string | null;
                     created_at: string;
                     updated_at: string;
                 };
@@ -540,6 +541,7 @@ export type Database = {
                     description?: string | null;
                     definition: Record<string, unknown>;
                     status?: "draft" | "published";
+                    image_url?: string | null;
                     created_at?: string;
                     updated_at?: string;
                 };
@@ -550,6 +552,7 @@ export type Database = {
                     description?: string | null;
                     definition?: Record<string, unknown>;
                     status?: "draft" | "published";
+                    image_url?: string | null;
                     created_at?: string;
                     updated_at?: string;
                 };

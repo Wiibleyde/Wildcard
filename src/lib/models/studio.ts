@@ -1,12 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { EcaDefinition } from "@/lib/eca/types";
 import {
     ECA_DESCRIPTION_MAX,
     ECA_NAME_MAX,
     ECA_NAME_MIN,
-    type EcaDefinition,
     type EcaValidationError,
     validateEcaDefinition,
-} from "@/lib/eca";
+} from "@/lib/eca/validate";
 import type { Database } from "@/lib/supabase/types";
 
 type Admin = SupabaseClient<Database>;
@@ -47,6 +47,9 @@ export const STUDIO_ERROR_STATUS: Record<StudioErrorCode, number> = {
 /** Per-owner cap on studio games. Mirrors the DB trigger (`eca_games_cap`). */
 export const MAX_ECA_GAMES_PER_OWNER = 20;
 
+/** Max length of a stored cover-image storage path. Mirrors the DB CHECK. */
+export const ECA_IMAGE_PATH_MAX = 2048;
+
 export type EcaGameStatus = "draft" | "published";
 
 /** List projection — everything but the (potentially large) definition. */
@@ -56,6 +59,8 @@ export interface EcaGameSummary {
     readonly name: string;
     readonly description: string | null;
     readonly status: EcaGameStatus;
+    /** Cover-image storage path in the public `eca-images` bucket, or null. */
+    readonly imageUrl: string | null;
     readonly createdAt: string;
     readonly updatedAt: string;
 }
@@ -73,7 +78,7 @@ type Failure = {
 type Result<T> = ({ ok: true } & T) | Failure;
 
 const SUMMARY_COLUMNS =
-    "id, owner_id, name, description, status, created_at, updated_at";
+    "id, owner_id, name, description, status, image_url, created_at, updated_at";
 
 type SummaryRow = {
     id: string;
@@ -81,6 +86,7 @@ type SummaryRow = {
     name: string;
     description: string | null;
     status: EcaGameStatus;
+    image_url: string | null;
     created_at: string;
     updated_at: string;
 };
@@ -92,6 +98,7 @@ function toSummary(row: SummaryRow): EcaGameSummary {
         name: row.name,
         description: row.description,
         status: row.status,
+        imageUrl: row.image_url,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -109,6 +116,22 @@ function isValidDescription(description: unknown): description is string {
     return (
         typeof description === "string" &&
         description.length <= ECA_DESCRIPTION_MAX
+    );
+}
+
+/**
+ * A cover-image patch is either `null` (clear it) or a storage path the caller
+ * is entitled to: it must sit under the owner's own `${ownerId}/` folder — the
+ * exact prefix the storage RLS policy allows them to write. Rejecting foreign
+ * prefixes here stops a creator from pointing their game at an object outside
+ * their folder, even though the bucket itself is world-readable.
+ */
+function isValidImagePath(value: unknown, ownerId: string): value is string {
+    return (
+        typeof value === "string" &&
+        value.length > 0 &&
+        value.length <= ECA_IMAGE_PATH_MAX &&
+        value.startsWith(`${ownerId}/`)
     );
 }
 
@@ -274,12 +297,14 @@ export async function updateEcaGame(
         description?: unknown;
         definition?: unknown;
         status?: unknown;
+        image_url?: unknown;
     };
     if (
         body.name === undefined &&
         body.description === undefined &&
         body.definition === undefined &&
-        body.status === undefined
+        body.status === undefined &&
+        body.image_url === undefined
     ) {
         return { ok: false, error: "invalid_input" };
     }
@@ -307,6 +332,16 @@ export async function updateEcaGame(
             return { ok: false, error: "invalid_input" };
         }
         statusPatch = body.status;
+    }
+    let imagePatch: string | null | undefined;
+    if (body.image_url !== undefined) {
+        if (
+            body.image_url !== null &&
+            !isValidImagePath(body.image_url, ownerId)
+        ) {
+            return { ok: false, error: "invalid_input" };
+        }
+        imagePatch = body.image_url;
     }
 
     const name = namePatch ?? row.name;
@@ -343,6 +378,7 @@ export async function updateEcaGame(
     if (namePatch !== undefined) update.name = namePatch;
     if (descriptionPatch !== undefined) update.description = descriptionPatch;
     if (statusPatch !== undefined) update.status = statusPatch;
+    if (imagePatch !== undefined) update.image_url = imagePatch;
     if (definition !== null) {
         // definition.meta mirrors the row name/description columns (single
         // source of truth) so the stored copies can never drift.

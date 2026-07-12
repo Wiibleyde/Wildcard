@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import type { Locale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 import { EcaEditor } from "@/components/studio/EcaEditor";
-import { validateEcaDefinition } from "@/lib/eca";
+import { validateEcaDefinition } from "@/lib/eca/validate";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function Page({
@@ -24,7 +24,9 @@ export default async function Page({
     // the editor (they are readable, not editable).
     const { data } = await supabase
         .from("eca_games")
-        .select("id, owner_id, name, description, status, definition")
+        .select(
+            "id, owner_id, name, description, status, image_url, definition",
+        )
         .eq("id", id)
         .maybeSingle();
     if (!data || data.owner_id !== user.id) redirect(`/${lang}/studio`);
@@ -40,9 +42,11 @@ export default async function Page({
                 <EcaEditor
                     initialGame={{
                         id: data.id,
+                        ownerId: data.owner_id,
                         name: data.name,
                         description: data.description,
                         status: data.status,
+                        imageUrl: data.image_url,
                         definition: validated.definition,
                     }}
                 />

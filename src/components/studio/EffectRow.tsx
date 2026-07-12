@@ -1,8 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import type { EcaEffect, EcaEventType } from "@/lib/eca";
-import { ECA_DRAW_COUNT_MAX, ECA_DRAW_COUNT_MIN } from "@/lib/eca";
+import type { EcaEffect, EcaEventType } from "@/lib/eca/types";
+import { ECA_DRAW_COUNT_MAX, ECA_DRAW_COUNT_MIN } from "@/lib/eca/validate";
 import type { Translate } from "@/lib/games/catalogView";
 import { dangerButtonStyle, fieldClass, fieldStyle } from "./fields";
 

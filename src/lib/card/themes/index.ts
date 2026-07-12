@@ -15,5 +15,3 @@ export const THEMES: Record<string, CardTheme> = {
 export function getCardTheme(id: string | null | undefined): CardTheme {
     return (id && THEMES[id]) || freeTheme;
 }
-
-export { creatorTheme, freeTheme };

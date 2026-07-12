@@ -3,7 +3,7 @@ import type {
     EcaDefinition,
     EcaEffect,
     EcaEventType,
-} from "@/lib/eca";
+} from "@/lib/eca/types";
 
 /**
  * Editor-side mirror of an {@link EcaDefinition}: conditions and effects carry

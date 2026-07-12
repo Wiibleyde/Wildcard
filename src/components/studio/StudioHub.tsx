@@ -1,16 +1,14 @@
 "use client";
 
+import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { GameButton } from "@/components/ui/GameButton";
 import { useRouter } from "@/i18n/navigation";
-import {
-    CRAZY_EIGHTS_LIKE,
-    ECA_NAME_MAX,
-    type EcaDefinition,
-    MINIMAL_VALID,
-} from "@/lib/eca";
+import { CRAZY_EIGHTS_LIKE, MINIMAL_VALID } from "@/lib/eca/fixtures";
+import type { EcaDefinition } from "@/lib/eca/types";
+import { ECA_NAME_MAX } from "@/lib/eca/validate";
 import type { Translate } from "@/lib/games/catalogView";
 // Client-safe: models/studio only pulls @/lib/eca at runtime (supabase imports are type-only).
 import { MAX_ECA_GAMES_PER_OWNER } from "@/lib/models/studio";
@@ -28,6 +26,8 @@ export interface StudioGameSummary {
     readonly description: string | null;
     readonly status: "draft" | "published";
     readonly ruleCount: number;
+    /** Display-ready public cover URL (already resolved), or null. */
+    readonly imageUrl: string | null;
     readonly updatedAt: string;
 }
 
@@ -264,6 +264,23 @@ export function StudioHub({ games }: Props) {
                                 key={game.id}
                                 className="panel lift flex flex-col gap-3 p-4 sm:p-5"
                             >
+                                {game.imageUrl && (
+                                    <div
+                                        className="relative aspect-video w-full overflow-hidden rounded-xl"
+                                        style={{
+                                            border: "2.5px solid var(--ink)",
+                                        }}
+                                    >
+                                        <Image
+                                            src={game.imageUrl}
+                                            alt={game.name}
+                                            fill
+                                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                                            className="object-cover"
+                                            unoptimized
+                                        />
+                                    </div>
+                                )}
                                 <div className="flex items-start justify-between gap-2">
                                     <h3
                                         className="font-display text-lg leading-tight"

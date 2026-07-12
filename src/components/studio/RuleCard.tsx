@@ -8,8 +8,8 @@ import type {
     EcaEffect,
     EcaEventType,
     EcaOperand,
-} from "@/lib/eca";
-import { ECA_EFFECTS_MAX, ECA_RULE_NAME_MAX } from "@/lib/eca";
+} from "@/lib/eca/types";
+import { ECA_EFFECTS_MAX, ECA_RULE_NAME_MAX } from "@/lib/eca/validate";
 import { ConditionRow } from "./ConditionRow";
 import type { DraftCondition, DraftEffect, DraftRule } from "./draft";
 import { EffectRow } from "./EffectRow";

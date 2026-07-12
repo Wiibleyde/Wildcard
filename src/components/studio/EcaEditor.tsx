@@ -6,7 +6,7 @@ import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { GameButton } from "@/components/ui/GameButton";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import { useRouter } from "@/i18n/navigation";
-import type { EcaDefinition, EcaValidationError } from "@/lib/eca";
+import type { EcaDefinition } from "@/lib/eca/types";
 import {
     ECA_DESCRIPTION_MAX,
     ECA_HAND_SIZE_MAX,
@@ -14,12 +14,14 @@ import {
     ECA_NAME_MAX,
     ECA_PLAYERS_MAX,
     ECA_PLAYERS_MIN,
+    type EcaValidationError,
     validateEcaDefinition,
-} from "@/lib/eca";
+} from "@/lib/eca/validate";
 import type { Translate } from "@/lib/games/catalogView";
 import type { StudioErrorCode } from "@/lib/models/studio";
 import { type DraftDefinition, toDraftDefinition } from "./draft";
 import { fieldClass, fieldStyle, labelClass, labelStyle } from "./fields";
+import { GameImageField } from "./GameImageField";
 import { RuleList } from "./RuleList";
 import { TestPlay } from "./TestPlay";
 
@@ -79,9 +81,11 @@ const API_ERROR_KEYS: Record<StudioErrorCode, string> = {
 
 export interface StudioGameDetail {
     readonly id: string;
+    readonly ownerId: string;
     readonly name: string;
     readonly description: string | null;
     readonly status: "draft" | "published";
+    readonly imageUrl: string | null;
     readonly definition: EcaDefinition;
 }
 
@@ -386,6 +390,11 @@ export function EcaEditor({ initialGame }: Props) {
                                 style={fieldStyle}
                             />
                         </div>
+                        <GameImageField
+                            ownerId={initialGame.ownerId}
+                            gameId={initialGame.id}
+                            initialImagePath={initialGame.imageUrl}
+                        />
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label
