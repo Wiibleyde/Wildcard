@@ -299,7 +299,12 @@ Un seul serveur, un seul `docker compose up`.
 | RAM | 4 Go |
 | Disque | 20 Go SSD |
 | OS | Ubuntu 22.04+ |
-| Ports ouverts | 80, 443 |
+| Ports ouverts | 22 (SSH), 80, 443 |
+
+> **Seuls 80/443 (Caddy) et 22 (SSH) doivent être joignables de l'extérieur.**
+> Les ports internes publiés par compose — app `3000`, Kong `54321/54322`, et les
+> ports d'admin (`54323`, `54325-27`) — ne doivent **pas** être exposés : sinon on
+> contourne Caddy **et** le filtrage CrowdSec. Cf. « Durcissement réseau » ci-dessous.
 
 ```bash
 # Docker (si pas installé)
@@ -352,50 +357,163 @@ docker compose --env-file .env.docker ps
 # → tous les services : Up (healthy)
 ```
 
-### 3 — Nginx + SSL (reverse proxy)
+### 3 — Reverse proxy Caddy (profil `proxy`)
+
+Le reverse proxy est **conteneurisé** : le service `caddy` (profil `proxy` dans
+`docker-compose.yml`) est le point d'entrée HTTPS unique. Il termine TLS avec des
+certificats **Let's Encrypt émis et renouvelés automatiquement** — pas de certbot
+à piloter à la main — et route vers l'app et l'API Supabase par leur **nom de
+service** sur le réseau Docker. Caddy gère nativement l'upgrade WebSocket
+(Realtime) et pose les en-têtes `X-Forwarded-*`.
+
+Renseigner les domaines dans `.env.docker` (leurs DNS `A`/`AAAA` doivent pointer
+vers le serveur) :
 
 ```bash
-sudo apt install -y nginx certbot python3-certbot-nginx
+# Dans .env.docker :
+APP_DOMAIN=wildcard.example.com
+API_DOMAIN=api.wildcard.example.com
+ACME_EMAIL=admin@example.com      # notifications Let's Encrypt
 ```
 
-Créer `/etc/nginx/sites-available/wildcard` :
+La config vit dans [`caddy/Caddyfile`](caddy/Caddyfile) :
 
-```nginx
-# API Supabase (Kong + WebSocket Realtime)
-server {
-    server_name api.wildcard.example.com;
-    location / {
-        proxy_pass         http://localhost:54321;
-        proxy_http_version 1.1;
-        proxy_set_header   Upgrade    $http_upgrade;
-        proxy_set_header   Connection "upgrade";
-        proxy_set_header   Host       $host;
-        proxy_set_header   X-Real-IP  $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
-    }
+```caddyfile
+{
+    email {$ACME_EMAIL}
 }
 
-# Application Next.js
-server {
-    server_name wildcard.example.com;
-    location / {
-        proxy_pass       http://localhost:3000;
-        proxy_set_header Host             $host;
-        proxy_set_header X-Real-IP        $remote_addr;
-        proxy_set_header X-Forwarded-For  $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
+{$APP_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy app:3000
+}
+
+{$API_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy kong:8000    # WebSocket Realtime proxifié automatiquement
 }
 ```
+
+Lancer la stack **avec** le proxy (ouvre les ports 80/443 de l'hôte) :
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/wildcard /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
-
-# SSL automatique via Let's Encrypt
-sudo certbot --nginx -d wildcard.example.com -d api.wildcard.example.com
+docker compose --env-file .env.docker --profile proxy up -d
 ```
+
+> Les certificats sont persistés dans le volume `caddy-data` : ne pas le
+> supprimer (rate-limit Let's Encrypt = 5 certs / domaine / semaine).
+
+#### CrowdSec — protection du reverse proxy (IPS)
+
+Le proxy est protégé par **CrowdSec**, un IPS collaboratif. Deux moitiés qui
+forment une boucle fermée :
+
+- **Détection** — l'agent CrowdSec parse les access logs JSON de Caddy (volume
+  partagé `caddy-logs`) et applique les scénarios de la collection
+  `crowdsecurity/caddy` (scan, brute-force, CVE HTTP…). Une attaque crée une
+  **décision** de ban en base.
+- **Remédiation** — le binaire Caddy est **recompilé** (`caddy/Dockerfile`, via
+  `xcaddy`) avec le bouncer `hslatman/caddy-crowdsec-bouncer`. Le handler
+  `crowdsec` interroge la LAPI à chaque requête et **bloque** les IP sous
+  décision. L'image `caddy:2-alpine` stock ne suffit pas — d'où le `build:`.
+
+L'agent et le bouncer partagent une clé (`CROWDSEC_API_KEY`) : l'agent
+l'auto-enregistre au démarrage (`BOUNCER_KEY_CADDY`), le bouncer la présente en
+`X-Api-Key`. Aucune étape manuelle.
+
+```bash
+# Dans .env.docker — générer la clé :
+CROWDSEC_API_KEY=$(openssl rand -hex 32)
+```
+
+Le premier `up --profile proxy` **compile** le binaire Caddy (une minute, réseau
+requis). Vérifier après démarrage :
+
+```bash
+docker exec wildcard-crowdsec cscli metrics       # parsing + scénarios
+docker exec wildcard-crowdsec cscli decisions list # bans actifs
+docker exec wildcard-crowdsec cscli bouncers list  # le bouncer `caddy` = valid
+```
+
+**Web UI = Grafana**, pas de nouveau service. L'agent expose ses métriques
+Prometheus sur `:6060` (basculé sur `0.0.0.0` via `crowdsec/config.yaml.local`) ;
+le profil `monitoring` les scrape et provisionne le dashboard **« Sécurité
+(CrowdSec) »** (bans actifs, scénarios déclenchés, parsing). Le Metabase de
+`cscli dashboard` est déprécié (retiré en CrowdSec 1.7.0) — on réutilise la stack
+Grafana existante.
+
+```bash
+# Proxy + protection + UI :
+docker compose --env-file .env.docker --profile proxy --profile monitoring up -d
+# → Grafana sur http://localhost:54327, dashboard « Sécurité (CrowdSec) »
+```
+
+#### Durcissement réseau (pare-feu)
+
+Caddy est le **seul point d'entrée** : tout le trafic doit y passer pour être
+filtré par CrowdSec. Or `docker-compose.yml` publie les ports internes (app
+`3000`, Kong `54321`) sur l'hôte — pratique en dev local, **trou de sécurité en
+prod** : une IP bannie peut frapper `http://serveur:3000` en direct et contourner
+l'IPS.
+
+> ⚠️ **Piège Docker + ufw** : Docker insère ses règles iptables **avant** celles
+> d'ufw. Un `ufw deny 3000` ne bloque donc **pas** un port publié par Docker. Ne
+> pas se reposer sur ufw seul pour ces ports.
+
+**Correctif propre — republier les ports internes en loopback.** Le repo fournit
+`docker-compose.prod.yml`, un override qui rebinde app / Kong / dashboards sur
+`127.0.0.1`. Caddy joint toujours l'app et Kong par le réseau compose
+(`app:3000`, `kong:8000`), donc ces ports n'ont pas besoin d'être exposés :
+
+```yaml
+# docker-compose.prod.yml (extrait) — le tag !override REMPLACE la liste ports du
+# fichier de base ; sans lui, Compose FUSIONNE et le mapping 0.0.0.0 subsisterait.
+services:
+  app:
+    ports: !override
+      - "127.0.0.1:3000:3000"
+  kong:
+    ports: !override
+      - "127.0.0.1:${KONG_HTTP_PORT}:8000/tcp"
+      - "127.0.0.1:${KONG_HTTPS_PORT}:8443/tcp"
+```
+
+Lancer la prod avec l'override empilé sur le fichier de base :
+
+```bash
+docker compose --env-file .env.docker \
+  -f docker-compose.yml -f docker-compose.prod.yml \
+  --profile proxy --profile monitoring up -d
+```
+
+> **Recommandé en prod — rendre l'override + les profils implicites.** Ajouter ces
+> deux lignes à `.env.docker` sur le serveur : Compose les lit nativement, donc
+> **toutes** les commandes (y compris `scripts/deploy.sh`) chargent l'override et
+> les profils sans `-f`/`--profile`. Sans ça, un `deploy.sh` qui recrée `app`
+> republie le port sur `0.0.0.0` et **rouvre le trou**.
+>
+> ```bash
+> # .env.docker (serveur de prod uniquement — NE PAS mettre en dev local)
+> COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
+> COMPOSE_PROFILES=proxy,monitoring
+> ```
+>
+> Ensuite un simple `docker compose --env-file .env.docker up -d` suffit.
+
+**Pare-feu de base** (défense en profondeur, en plus du loopback) :
+
+```bash
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow 22/tcp    # SSH
+sudo ufw allow 80/tcp    # Caddy — redirige vers 443
+sudo ufw allow 443/tcp   # Caddy — HTTPS
+sudo ufw enable
+```
+
+Les dashboards d'admin (Studio, Grafana, Umami) restent en loopback : y accéder
+via un **tunnel SSH** (`ssh -L 54327:localhost:54327 serveur`) plutôt qu'en les
+exposant.
 
 ### 4 — OAuth en production
 

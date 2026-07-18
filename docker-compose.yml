@@ -260,6 +260,75 @@ services:
       - "3000:3000"
 
   # ──────────────────────────────────────────────────────────────────────────
+  # Profil "proxy" — reverse proxy Caddy (point d'entrée HTTPS de production)
+  # Termine TLS (certificats Let's Encrypt automatiques) et route l'app + l'API
+  # Supabase par leur nom de service sur le réseau compose — remplace le combo
+  # nginx + certbot documenté auparavant. Opt-in : le dev local attaque les
+  # ports hôte directement, seule la prod passe par Caddy.
+  # Lancer avec : docker compose --env-file .env.docker --profile proxy up -d
+  # ──────────────────────────────────────────────────────────────────────────
+  caddy:
+    profiles: [proxy]
+    container_name: wildcard-caddy
+    # Binaire Caddy rebâti avec le bouncer CrowdSec (module absent de l'image
+    # stock) — cf. caddy/Dockerfile.
+    build:
+      context: ./caddy
+    image: wildcard-caddy:local
+    restart: unless-stopped
+    # app & kong n'ont pas de profil → toujours démarrés ; la dépendance garantit
+    # juste que les upstreams existent avant que Caddy ne commence à router.
+    depends_on:
+      - app
+      - kong
+      - crowdsec
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3 (QUIC)
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+      # Clé du bouncer CrowdSec — même valeur que BOUNCER_KEY_CADDY côté agent.
+      CROWDSEC_API_KEY: ${CROWDSEC_API_KEY}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificats émis — À PERSISTER : les reperdre expose au rate-limit
+      # Let's Encrypt (5 certs / domaine / semaine).
+      - caddy-data:/data
+      - caddy-config:/config
+      # Access logs JSON écrits ici (rw), parsés par l'agent CrowdSec (ro).
+      - caddy-logs:/var/log/caddy
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Profil "proxy" — CrowdSec (IPS collaboratif)
+  # Agent + LAPI dans un seul conteneur : parse les access logs JSON de Caddy,
+  # détecte les scénarios d'attaque (collection `crowdsecurity/caddy`) et publie
+  # des décisions de ban que le bouncer Caddy applique. Métriques Prometheus sur
+  # :6060 (scrapées par le profil `monitoring` → dashboard Grafana « Sécurité »).
+  # ──────────────────────────────────────────────────────────────────────────
+  crowdsec:
+    profiles: [proxy]
+    container_name: wildcard-crowdsec
+    image: crowdsecurity/crowdsec:latest
+    restart: unless-stopped
+    environment:
+      # Collections hub installées au boot (idempotent) : parser Caddy + règles
+      # CVE HTTP + whitelist des bons acteurs (crawlers légitimes, CDN).
+      COLLECTIONS: "crowdsecurity/caddy crowdsecurity/http-cve crowdsecurity/whitelist-good-actors"
+      # Auto-enregistre un bouncer nommé `caddy` avec cette clé au démarrage :
+      # supprime le chicken-and-egg (pas de `cscli bouncers add` manuel).
+      BOUNCER_KEY_CADDY: ${CROWDSEC_API_KEY}
+    volumes:
+      # DB (décisions, machines, clés bouncer) — À PERSISTER.
+      - crowdsec-db:/var/lib/crowdsec/data
+      - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
+      - ./crowdsec/config.yaml.local:/etc/crowdsec/config.yaml.local:ro
+      # Les access logs de Caddy, en lecture seule.
+      - caddy-logs:/var/log/caddy:ro
+
+  # ──────────────────────────────────────────────────────────────────────────
   # Profil "studio" — optionnel, dashboard + storage
   # Lancer avec : docker compose --env-file .env.docker --profile studio up -d
   # ──────────────────────────────────────────────────────────────────────────
@@ -464,3 +533,7 @@ volumes:
   umami-db-data:
   prometheus-data:
   grafana-data:
+  caddy-data:
+  caddy-config:
+  caddy-logs:
+  crowdsec-db:

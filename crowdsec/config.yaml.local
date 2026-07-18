@@ -1,0 +1,10 @@
+# Overlay de config CrowdSec (fusionné par-dessus /etc/crowdsec/config.yaml).
+#
+# Par défaut l'endpoint Prometheus écoute sur 127.0.0.1:6060 → injoignable
+# depuis le conteneur Prometheus. On le bascule sur 0.0.0.0 pour que Prometheus
+# scrape `crowdsec:6060` sur le réseau compose (cf. monitoring/prometheus/*).
+prometheus:
+  enabled: true
+  level: full
+  listen_addr: 0.0.0.0
+  listen_port: 6060

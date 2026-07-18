@@ -25,6 +25,15 @@ scrape_configs:
           - app:3000
           - host.docker.internal:3000
 
+  # CrowdSec — métriques du moteur de détection (bans actifs, scénarios
+  # déclenchés, parsing). Endpoint NON authentifié sur :6060 (listen_addr basculé
+  # sur 0.0.0.0 via crowdsec/config.yaml.local). Cible active seulement quand la
+  # stack tourne sous `--profile proxy` ; sinon up=0, sans conséquence.
+  - job_name: crowdsec
+    static_configs:
+      - targets:
+          - crowdsec:6060
+
   # Prometheus s'auto-scrape (santé de la collecte elle-même).
   - job_name: prometheus
     static_configs:
