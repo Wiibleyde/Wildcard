@@ -2,7 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { after } from "next/server";
 import { createGame } from "@/lib/engine/runner";
 import { type Player, resolveRuleToggles } from "@/lib/engine/types";
-import { getGameModule } from "@/lib/games";
+import {
+    resolveGameModule,
+    resolveLaunchableModule,
+} from "@/lib/games/resolve";
 import { recordGameStarted } from "@/lib/metrics/registry";
 import type { Database } from "@/lib/supabase/types";
 import { advanceBots } from "./game";
@@ -109,7 +112,12 @@ export async function createRoom(
     moduleId: string,
     visibility: "public" | "private" = "private",
 ): Promise<Result<{ code: string; roomId: string }>> {
-    if (!getGameModule(moduleId)) return { ok: false, error: "unknown_game" };
+    // Gate new rooms: native always, studio games only when published or the
+    // host is the owner (playtest their own draft). Started rooms survive an
+    // unpublish — that leniency lives in resolveGameModule, not here.
+    if (!(await resolveLaunchableModule(admin, moduleId, hostId))) {
+        return { ok: false, error: "unknown_game" };
+    }
 
     const room = await insertRoom(admin, { moduleId, hostId, visibility });
     if (!room.ok) return room;
@@ -139,7 +147,7 @@ export async function joinRoom(
     if (!room) return { ok: false, error: "not_found" };
     if (room.status !== "lobby") return { ok: false, error: "already_started" };
 
-    const module = getGameModule(room.module_id);
+    const module = await resolveGameModule(admin, room.module_id);
     if (!module) return { ok: false, error: "unknown_game" };
 
     // Retry loop: losing a seat race (unique violation) re-reads the seats and
@@ -213,7 +221,7 @@ export async function setRoomRole(
     if (!room) return { ok: false, error: "not_found" };
     if (room.status !== "lobby") return { ok: false, error: "already_started" };
 
-    const module = getGameModule(room.module_id);
+    const module = await resolveGameModule(admin, room.module_id);
     if (!module) return { ok: false, error: "unknown_game" };
 
     if (role === "spectator") {
@@ -342,7 +350,7 @@ export async function setBotCount(
     if (room.host_id !== userId) return { ok: false, error: "not_host" };
     if (room.status !== "lobby") return { ok: false, error: "already_started" };
 
-    const module = getGameModule(room.module_id);
+    const module = await resolveGameModule(admin, room.module_id);
     if (!module) return { ok: false, error: "unknown_game" };
 
     const { count: humanCount } = await admin
@@ -385,7 +393,7 @@ export async function setRules(
     if (room.host_id !== userId) return { ok: false, error: "not_host" };
     if (room.status !== "lobby") return { ok: false, error: "already_started" };
 
-    const module = getGameModule(room.module_id);
+    const module = await resolveGameModule(admin, room.module_id);
     if (!module) return { ok: false, error: "unknown_game" };
 
     const resolved = resolveRuleToggles(module.ruleToggles, rules);
@@ -418,7 +426,7 @@ export async function startGame(
     if (room.host_id !== userId) return { ok: false, error: "not_host" };
     if (room.status !== "lobby") return { ok: false, error: "already_started" };
 
-    const module = getGameModule(room.module_id);
+    const module = await resolveGameModule(admin, room.module_id);
     if (!module) return { ok: false, error: "unknown_game" };
 
     // Bind the host's chosen rules into a fresh module instance; games with no

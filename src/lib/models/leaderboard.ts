@@ -1,4 +1,5 @@
 import { gameCatalog, getGameModule } from "@/lib/games";
+import { ecaNamesByModuleIds } from "@/lib/games/resolve";
 import type { createClient } from "@/lib/supabase/server";
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -72,10 +73,17 @@ export async function getLeaderboard(
     const rank = (id: string) =>
         catalogOrder.get(id) ?? Number.MAX_SAFE_INTEGER;
 
+    // Studio games appear on the ladder under their own module id; resolve their
+    // display names in one query (published rows are world-readable under RLS).
+    const ecaNames = await ecaNamesByModuleIds(supabase, byModule.keys());
+
     return [...byModule.entries()]
         .map(([moduleId, entries]) => ({
             moduleId,
-            moduleName: getGameModule(moduleId)?.name ?? moduleId,
+            moduleName:
+                getGameModule(moduleId)?.name ??
+                ecaNames.get(moduleId) ??
+                moduleId,
             entries,
         }))
         .sort(

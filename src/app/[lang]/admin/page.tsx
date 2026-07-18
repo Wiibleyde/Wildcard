@@ -3,6 +3,7 @@ import type { Locale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { MaintenanceControl } from "@/components/admin/MaintenanceControl";
 import { OngoingGamesPanel } from "@/components/admin/OngoingGamesPanel";
+import { GameButton } from "@/components/ui/GameButton";
 import { getUserRole, roleAtLeast } from "@/lib/auth/roles";
 import { listOngoingGames } from "@/lib/models/admin";
 import { getAppSettings } from "@/lib/models/settings";
@@ -57,6 +58,11 @@ export default async function AdminPage({
                         </span>
                     </div>
                     <p className="sub text-sm">{t("subtitle")}</p>
+                    <div className="mt-1">
+                        <GameButton variant="gold" size="sm" href="/admin/eca">
+                            {t("eca_manage")}
+                        </GameButton>
+                    </div>
                 </header>
 
                 <div className="grid grid-cols-1 lg:grid-cols-[1fr_22.5rem] xl:grid-cols-[1fr_25rem] gap-6 items-start">

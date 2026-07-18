@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Player } from "@/lib/engine/types";
 import { getGameModule } from "@/lib/games";
+import { ecaNamesByModuleIds } from "@/lib/games/resolve";
 import type { Database } from "@/lib/supabase/types";
 
 type Admin = SupabaseClient<Database>;
@@ -73,6 +74,13 @@ export async function getMatchHistory(
     });
     if (!data || data.length === 0) return [];
 
+    // Native names come from the registry; studio-game names are fetched once
+    // for the whole page in a single query keyed by the `eca:` module ids.
+    const ecaNames = await ecaNamesByModuleIds(
+        admin,
+        data.map((row) => row.module_id),
+    );
+
     return data.map((row) => {
         const winners = new Set(row.winner_ids);
         const bots = new Set(row.bot_ids);
@@ -90,7 +98,10 @@ export async function getMatchHistory(
         return {
             gameId: row.game_id,
             moduleId: row.module_id,
-            moduleName: getGameModule(row.module_id)?.name ?? row.module_id,
+            moduleName:
+                getGameModule(row.module_id)?.name ??
+                ecaNames.get(row.module_id) ??
+                row.module_id,
             playedAt: row.created_at,
             result,
             // Mirrors getReplay's rule: a finished game that bumped its version

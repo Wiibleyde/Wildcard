@@ -12,6 +12,7 @@ import { ProfileForm } from "@/components/profile/ProfileForm";
 import { ProfileXPCard } from "@/components/profile/ProfileXPCard";
 import { Link } from "@/i18n/navigation";
 import { getGameModule } from "@/lib/games";
+import { ecaNamesByModuleIds } from "@/lib/games/resolve";
 import { createClient } from "@/lib/supabase/server";
 import { publicStorageUrl } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
@@ -44,9 +45,16 @@ export async function ProfilePage({ lang }: { lang: string }) {
     const xp = playerXP?.xp ?? 0;
     const level = levelForXp(xp);
 
+    const ecaNames = await ecaNamesByModuleIds(
+        supabase,
+        (eloRes.data ?? []).map((row) => row.module_id),
+    );
     const ratings: EloRatingRow[] = (eloRes.data ?? []).map((row) => ({
         moduleId: row.module_id,
-        moduleName: getGameModule(row.module_id)?.name ?? row.module_id,
+        moduleName:
+            getGameModule(row.module_id)?.name ??
+            ecaNames.get(row.module_id) ??
+            row.module_id,
         rating: row.rating,
         gamesPlayed: row.games_played,
         wins: row.wins,

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { creatorTheme, freeTheme, getCardTheme, THEMES } from ".";
+import { getCardTheme, THEMES } from ".";
+import { creatorTheme } from "./creator";
+import { freeTheme } from "./free";
 
 describe("getCardTheme", () => {
     it("resolves a registered deck style id", () => {

@@ -1,6 +1,8 @@
+import { isEcaModuleId } from "@/lib/eca/id";
 import { type AnyGameModule, registerGame } from "@/lib/engine/types";
 import { bataille } from "./bataille/bataille";
 import { batailleTable } from "./bataille/table";
+import { ecaTable } from "./eca/table";
 import { president } from "./president/president";
 import { presidentTable } from "./president/table";
 import { solitaire } from "./solitaire/solitaire";
@@ -38,8 +40,13 @@ export function getGameModule(id: string): AnyGameModule | undefined {
     return GAMES[id];
 }
 
-/** Resolve a game's table config, or `undefined` when it has none yet. */
+/**
+ * Resolve a game's table config, or `undefined` when it has none yet. Every
+ * studio game (`eca:<uuid>`) shares the single generic ECA table — no per-game
+ * config is stored, so the id prefix is enough to route to it.
+ */
 export function getGameTable(id: string): AnyGameTableConfig | undefined {
+    if (isEcaModuleId(id)) return ecaTable;
     return GAME_TABLES[id];
 }
 

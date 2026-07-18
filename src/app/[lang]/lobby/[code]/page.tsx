@@ -7,8 +7,9 @@ import {
     type SpectatorRow,
 } from "@/components/lobby/RoomClient";
 import { resolveRuleToggles } from "@/lib/engine/types";
-import { GAMES } from "@/lib/games";
+import { resolveGameModule } from "@/lib/games/resolve";
 import { usernamesByIds } from "@/lib/models/usernames";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function Page({
@@ -41,7 +42,12 @@ export default async function Page({
     }
     if (room.status === "finished") redirect(`/${lang}/lobby`);
 
-    const module = GAMES[room.module_id];
+    // Service-role resolve: a studio game's definition lives in `eca_games`, and
+    // a member who was invited to the host's unpublished draft can't read that
+    // row under RLS — the admin client surfaces only its public meta (name,
+    // player range) for the lobby, never the secret game state.
+    const admin = createAdminClient();
+    const module = await resolveGameModule(admin, room.module_id);
     const ruleToggles = module?.ruleToggles ?? [];
     const initialRules = resolveRuleToggles(module?.ruleToggles, room.rules);
 

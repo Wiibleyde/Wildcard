@@ -1,5 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getGameModule } from "@/lib/games";
+import {
+    resolveGameModule,
+    resolveLaunchableModule,
+} from "@/lib/games/resolve";
 import type { Database } from "@/lib/supabase/types";
 import { insertRoom, startGame } from "./room";
 
@@ -132,7 +135,8 @@ async function tryForm(
 
 /** Form a game from `moduleId`'s waiting pool, if enough players are ready. */
 async function formFor(admin: Admin, moduleId: string): Promise<void> {
-    const module = getGameModule(moduleId);
+    // A pool already exists for this module id, so resolve status-agnostic.
+    const module = await resolveGameModule(admin, moduleId);
     if (!module || module.maxPlayers <= 1) return;
     await tryForm(admin, moduleId, module.minPlayers, module.maxPlayers);
 }
@@ -186,7 +190,7 @@ export async function enqueue(
     userId: string,
     moduleId: string,
 ): Promise<Result<MatchStatus>> {
-    const module = getGameModule(moduleId);
+    const module = await resolveLaunchableModule(admin, moduleId, userId);
     if (!module) return { ok: false, error: "unknown_game" };
     if (module.maxPlayers <= 1) return { ok: false, error: "not_matchmakable" };
 
@@ -218,7 +222,7 @@ export async function playWithBots(
     userId: string,
     moduleId: string,
 ): Promise<Result<{ gameId: string }>> {
-    const module = getGameModule(moduleId);
+    const module = await resolveLaunchableModule(admin, moduleId, userId);
     if (!module) return { ok: false, error: "unknown_game" };
 
     const roomId = crypto.randomUUID();

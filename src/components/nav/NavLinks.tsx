@@ -8,6 +8,7 @@ import {
     PlayIcon,
     ShieldIcon,
     ShopIcon,
+    StudioIcon,
     TrophyIcon,
 } from "./NavIcons";
 import { isActive } from "./navUtils";
@@ -34,6 +35,7 @@ export function NavLinks({ variant, canModerate = false }: Props) {
         { href: "/leaderboard", label: t("leaderboard"), icon: <TrophyIcon /> },
         { href: "/shop", label: t("shop"), icon: <ShopIcon /> },
         { href: "/customize", label: t("style"), icon: <PaletteIcon /> },
+        { href: "/studio", label: t("studio"), icon: <StudioIcon /> },
         ...(canModerate
             ? [{ href: "/admin", label: t("admin"), icon: <ShieldIcon /> }]
             : []),

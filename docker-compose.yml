@@ -333,8 +333,8 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - ./supabase/init/storage-avatars.sql:/storage-avatars.sql:ro
-    command: >
-      sh -c "psql -h db -U postgres -d ${POSTGRES_DB} -f /storage-avatars.sql"
+      - ./supabase/init/storage-eca-images.sql:/storage-eca-images.sql:ro
+    command: sh -c "psql -h db -U postgres -d ${POSTGRES_DB} -f /storage-avatars.sql && psql -h db -U postgres -d ${POSTGRES_DB} -f /storage-eca-images.sql"
 
   studio:
     profiles: [studio]

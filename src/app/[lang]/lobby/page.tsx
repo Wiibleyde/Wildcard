@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import type { Locale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { CommunityGames } from "@/components/lobby/CommunityGames";
 import { PlayHub } from "@/components/lobby/PlayHub";
 import { buildPlayCatalog } from "@/lib/games/catalog";
+import { listPublishedEcaGames } from "@/lib/models/studio";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function Page({
@@ -21,6 +23,8 @@ export default async function Page({
     if (!user) redirect(`/${lang}/login`);
 
     const games = buildPlayCatalog();
+    // Published creator games — RLS exposes published rows to any signed-in user.
+    const community = await listPublishedEcaGames(supabase);
 
     return (
         <div className="min-h-screen px-4 pt-8 pb-16 md:pt-12 xl:px-10">
@@ -30,6 +34,7 @@ export default async function Page({
                     <p className="sub text-sm">{t("subtitle")}</p>
                 </header>
                 <PlayHub userId={user.id} games={games} />
+                <CommunityGames games={community} />
             </div>
         </div>
     );

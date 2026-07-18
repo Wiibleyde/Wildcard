@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isEcaModuleId } from "@/lib/eca/id";
+import type { EcaState } from "@/lib/eca/types";
 import { createGame, dispatch } from "@/lib/engine/runner";
 import type {
     GameAction,
@@ -7,6 +9,7 @@ import type {
     GameState,
 } from "@/lib/engine/types";
 import { getGameModule } from "@/lib/games";
+import { ecaModuleFromState } from "@/lib/games/resolve";
 import { type GamePlayer, playersOf } from "@/lib/models/game";
 import type { Database } from "@/lib/supabase/types";
 
@@ -76,7 +79,11 @@ export async function getReplay(
     if (!secret) return { ok: false, error: "not_found" };
     const finalState = secret.state as unknown as GameState;
 
-    const module = getGameModule(meta.module_id);
+    // Studio games rebuild from the definition stamped into the final state, so
+    // a replay re-derives bit-identically without an `eca_games` read.
+    const module = isEcaModuleId(meta.module_id)
+        ? ecaModuleFromState(finalState as EcaState, meta.module_id)
+        : getGameModule(meta.module_id);
     if (!module) return { ok: false, error: "unknown_game" };
 
     // A replay is private to its participants: only someone who actually sat in

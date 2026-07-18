@@ -12,11 +12,3 @@ export const BOARD_THEMES: Record<string, BoardTheme> = {
     midnight: midnightTheme,
     creator: creatorBoardTheme,
 };
-
-export {
-    creatorBoardTheme,
-    darkWoodTheme,
-    greenFeltTheme,
-    midnightTheme,
-    oceanTheme,
-};
