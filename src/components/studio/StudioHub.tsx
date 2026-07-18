@@ -7,6 +7,7 @@ import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { GameButton } from "@/components/ui/GameButton";
 import { useRouter } from "@/i18n/navigation";
 import { CRAZY_EIGHTS_LIKE, MINIMAL_VALID } from "@/lib/eca/fixtures";
+import { ecaModuleIdFor } from "@/lib/eca/id";
 import type { EcaDefinition } from "@/lib/eca/types";
 import { ECA_NAME_MAX } from "@/lib/eca/validate";
 import type { Translate } from "@/lib/games/catalogView";
@@ -69,6 +70,7 @@ export function StudioHub({ games }: Props) {
     const [template, setTemplate] = useState<TemplateId>("blank");
     const [busy, setBusy] = useState(false);
     const [deleting, setDeleting] = useState<string | null>(null);
+    const [launching, setLaunching] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     // Mirrors the server-side per-owner cap — no doomed POST, instant hint.
@@ -129,6 +131,40 @@ export function StudioHub({ games }: Props) {
         } catch {
             setError(t("create_error"));
             setBusy(false);
+        }
+    }
+
+    /**
+     * Host a room for this game and jump into its lobby. Works for published
+     * games and — because the owner is the requester — for the creator's own
+     * unpublished drafts too (playtest with friends). The server re-validates
+     * the definition, so a broken draft surfaces as a play error here.
+     */
+    async function handlePlay(game: StudioGameSummary) {
+        if (launching) return;
+        setLaunching(game.id);
+        setError(null);
+        try {
+            const res = await fetch("/api/rooms", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    moduleId: ecaModuleIdFor(game.id),
+                    visibility: "private",
+                }),
+            });
+            const data = (await res.json().catch(() => ({}))) as {
+                code?: unknown;
+            };
+            if (!res.ok || typeof data.code !== "string") {
+                setError(t("play_error"));
+                setLaunching(null);
+                return;
+            }
+            router.push(`/lobby/${data.code}`);
+        } catch {
+            setError(t("play_error"));
+            setLaunching(null);
         }
     }
 
@@ -326,23 +362,36 @@ export function StudioHub({ games }: Props) {
                                         date: formatDate(game.updatedAt),
                                     })}
                                 </p>
-                                <div className="mt-auto flex gap-2">
+                                <div className="mt-auto flex flex-col gap-2">
                                     <GameButton
-                                        variant="gold"
+                                        variant="green"
                                         size="sm"
-                                        href={`/studio/${game.id}`}
-                                        className="flex-1"
+                                        onClick={() => handlePlay(game)}
+                                        disabled={launching !== null}
+                                        className="w-full"
                                     >
-                                        {t("edit")}
+                                        {launching === game.id
+                                            ? t("launching")
+                                            : t("play")}
                                     </GameButton>
-                                    <GameButton
-                                        variant="red"
-                                        size="sm"
-                                        onClick={() => handleDelete(game)}
-                                        disabled={deleting !== null}
-                                    >
-                                        {t("delete")}
-                                    </GameButton>
+                                    <div className="flex gap-2">
+                                        <GameButton
+                                            variant="gold"
+                                            size="sm"
+                                            href={`/studio/${game.id}`}
+                                            className="flex-1"
+                                        >
+                                            {t("edit")}
+                                        </GameButton>
+                                        <GameButton
+                                            variant="red"
+                                            size="sm"
+                                            onClick={() => handleDelete(game)}
+                                            disabled={deleting !== null}
+                                        >
+                                            {t("delete")}
+                                        </GameButton>
+                                    </div>
                                 </div>
                             </article>
                         ))}

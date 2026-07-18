@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { ecaModuleIdFor } from "@/lib/eca/id";
 import type { EcaDefinition } from "@/lib/eca/types";
 import {
     ECA_DESCRIPTION_MAX,
@@ -7,7 +8,9 @@ import {
     type EcaValidationError,
     validateEcaDefinition,
 } from "@/lib/eca/validate";
+import { publicStorageUrl } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
+import { usernamesByIds } from "./usernames";
 
 type Admin = SupabaseClient<Database>;
 
@@ -392,6 +395,72 @@ export async function updateEcaGame(
     const { error } = await admin.from("eca_games").update(update).eq("id", id);
     if (error) return { ok: false, error: "db_error" };
     return { ok: true };
+}
+
+/** One published creator game, as the community browse hub needs it. */
+export interface PublishedEcaGame {
+    readonly id: string;
+    /** `eca:<uuid>` — pass straight to room creation. */
+    readonly moduleId: string;
+    readonly name: string;
+    readonly description: string | null;
+    /** Display-ready public cover URL, or null. */
+    readonly imageUrl: string | null;
+    readonly ownerName: string;
+    readonly ruleCount: number;
+    readonly minPlayers: number;
+    readonly maxPlayers: number;
+}
+
+/** Cap on the community browse list — newest published first. */
+const COMMUNITY_LIMIT = 48;
+
+/**
+ * The public catalog of published creator games — what every player can host.
+ * Readable through the RLS client (the select policy exposes published rows to
+ * any authenticated user), so this needs no service role. Definitions were
+ * validated on publish; player range and rule count are read back from the
+ * stored `meta`/`rules` for the card, and owner names resolved in one lookup.
+ */
+export async function listPublishedEcaGames(
+    client: Admin,
+): Promise<PublishedEcaGame[]> {
+    const { data, error } = await client
+        .from("eca_games")
+        .select(
+            "id, name, description, image_url, definition, owner_id, updated_at",
+        )
+        .eq("status", "published")
+        .order("updated_at", { ascending: false })
+        .limit(COMMUNITY_LIMIT);
+    if (error || !data) return [];
+
+    const nameOf = await usernamesByIds(
+        client,
+        data.map((row) => row.owner_id),
+    );
+
+    return data.map((row) => {
+        // Published rows validate on write, but the column is jsonb — read the
+        // two card facts through a loose shape rather than trusting the type.
+        const def = row.definition as unknown as {
+            rules?: unknown;
+            meta?: { minPlayers?: number; maxPlayers?: number };
+        };
+        return {
+            id: row.id,
+            moduleId: ecaModuleIdFor(row.id),
+            name: row.name,
+            description: row.description,
+            imageUrl: row.image_url
+                ? publicStorageUrl("eca-images", row.image_url)
+                : null,
+            ownerName: nameOf.get(row.owner_id) ?? "?",
+            ruleCount: Array.isArray(def.rules) ? def.rules.length : 0,
+            minPlayers: def.meta?.minPlayers ?? 2,
+            maxPlayers: def.meta?.maxPlayers ?? 8,
+        };
+    });
 }
 
 /** Delete an owned game. */

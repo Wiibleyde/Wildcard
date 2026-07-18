@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { after } from "next/server";
+import { isEcaModuleId } from "@/lib/eca/id";
+import type { EcaState } from "@/lib/eca/types";
 import { clientState, dispatch } from "@/lib/engine/runner";
 import type {
     AnyGameModule,
@@ -11,6 +13,7 @@ import type {
     RuleViolation,
 } from "@/lib/engine/types";
 import { getGameModule } from "@/lib/games";
+import { ecaModuleFromState } from "@/lib/games/resolve";
 import { recordGameFinished, recordMove } from "@/lib/metrics/registry";
 import { recordEloForGame } from "@/lib/models/elo";
 import { recordXpForGame } from "@/lib/models/xp";
@@ -104,13 +107,16 @@ async function loadGame(
         .maybeSingle();
     if (!secret) return { ok: false, error: "not_found" };
 
-    const module = getGameModule(meta.module_id);
+    const state = secret.state as unknown as GameState;
+    // Studio games rebuild their module from the definition stamped into the
+    // state — no `eca_games` read on this hot path (page load + every poll), and
+    // a game stays loadable even if its row was later edited or removed.
+    const module = isEcaModuleId(meta.module_id)
+        ? ecaModuleFromState(state as EcaState, meta.module_id)
+        : getGameModule(meta.module_id);
     if (!module) return { ok: false, error: "unknown_game" };
 
-    return {
-        ok: true,
-        game: { meta, module, state: secret.state as unknown as GameState },
-    };
+    return { ok: true, game: { meta, module, state } };
 }
 
 export async function playersOf(
