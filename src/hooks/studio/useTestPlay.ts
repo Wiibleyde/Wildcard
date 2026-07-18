@@ -257,10 +257,9 @@ export function useTestPlay(definition: EcaDefinition) {
               .join(", ")
         : "";
 
-    const currentName =
-        sandbox && sandbox.state.currentPlayerId
-            ? playerName(sandbox.players, sandbox.state.currentPlayerId)
-            : null;
+    const currentName = sandbox?.state.currentPlayerId
+        ? playerName(sandbox.players, sandbox.state.currentPlayerId)
+        : null;
 
     const refusalText =
         refusal === null

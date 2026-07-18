@@ -28,7 +28,8 @@ const CRAZY_EIGHTS = {
     version: 1,
     meta: {
         name: "Huit américain (démo)",
-        description: "Même couleur ou même valeur. 8 joker, 7 saute, As inverse.",
+        description:
+            "Même couleur ou même valeur. 8 joker, 7 saute, As inverse.",
         minPlayers: 2,
         maxPlayers: 5,
     },
@@ -40,9 +41,45 @@ const CRAZY_EIGHTS = {
         reshuffleDiscard: true,
     },
     rules: [
-        { id: "wild-eight", name: "8 — carte folle", event: "cardPlayed", conditions: [{ lhs: { kind: "card", source: "playedCard", prop: "rank" }, op: "eq", rhs: { kind: "literal", value: "8" } }], effects: [{ type: "acceptCard" }] },
-        { id: "same-suit", name: "Même couleur", event: "cardPlayed", conditions: [{ lhs: { kind: "card", source: "playedCard", prop: "suit" }, op: "eq", rhs: { kind: "card", source: "topDiscard", prop: "suit" } }], effects: [{ type: "acceptCard" }] },
-        { id: "same-rank", name: "Même valeur", event: "cardPlayed", conditions: [{ lhs: { kind: "card", source: "playedCard", prop: "rank" }, op: "eq", rhs: { kind: "card", source: "topDiscard", prop: "rank" } }], effects: [{ type: "acceptCard" }] },
+        {
+            id: "wild-eight",
+            name: "8 — carte folle",
+            event: "cardPlayed",
+            conditions: [
+                {
+                    lhs: { kind: "card", source: "playedCard", prop: "rank" },
+                    op: "eq",
+                    rhs: { kind: "literal", value: "8" },
+                },
+            ],
+            effects: [{ type: "acceptCard" }],
+        },
+        {
+            id: "same-suit",
+            name: "Même couleur",
+            event: "cardPlayed",
+            conditions: [
+                {
+                    lhs: { kind: "card", source: "playedCard", prop: "suit" },
+                    op: "eq",
+                    rhs: { kind: "card", source: "topDiscard", prop: "suit" },
+                },
+            ],
+            effects: [{ type: "acceptCard" }],
+        },
+        {
+            id: "same-rank",
+            name: "Même valeur",
+            event: "cardPlayed",
+            conditions: [
+                {
+                    lhs: { kind: "card", source: "playedCard", prop: "rank" },
+                    op: "eq",
+                    rhs: { kind: "card", source: "topDiscard", prop: "rank" },
+                },
+            ],
+            effects: [{ type: "acceptCard" }],
+        },
     ],
     win: { condition: "emptyHand" },
 };
@@ -66,7 +103,10 @@ async function authCookiesAndUser() {
     });
     const res = await fetch(`${SB}/auth/v1/token?grant_type=password`, {
         method: "POST",
-        headers: { apikey: env.SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+        headers: {
+            apikey: env.SUPABASE_ANON_KEY,
+            "Content-Type": "application/json",
+        },
         body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
     });
     if (!res.ok) throw new Error(`login ${res.status}: ${await res.text()}`);
@@ -74,7 +114,12 @@ async function authCookiesAndUser() {
 
     let captured = [];
     const sb = createServerClient(SB, env.SUPABASE_ANON_KEY, {
-        cookies: { getAll: () => [], setAll: (cs) => { captured = cs; } },
+        cookies: {
+            getAll: () => [],
+            setAll: (cs) => {
+                captured = cs;
+            },
+        },
     });
     const { error } = await sb.auth.setSession({
         access_token: session.access_token,
@@ -82,7 +127,10 @@ async function authCookiesAndUser() {
     });
     if (error) throw new Error(`setSession: ${error.message}`);
     const cookies = captured.map((c) => ({
-        name: c.name, value: c.value, domain: "localhost", path: "/",
+        name: c.name,
+        value: c.value,
+        domain: "localhost",
+        path: "/",
     }));
     return { cookies, userId: session.user.id };
 }
@@ -125,14 +173,19 @@ await ctx.addCookies(cookies);
 async function post(path, data) {
     const res = await ctx.request.post(`${BASE}${path}`, data ? { data } : {});
     const body = await res.json().catch(() => ({}));
-    if (!res.ok()) throw new Error(`${path} -> ${res.status()} ${JSON.stringify(body)}`);
+    if (!res.ok())
+        throw new Error(`${path} -> ${res.status()} ${JSON.stringify(body)}`);
     return body;
 }
 
 const errors = [];
 function watch(page) {
-    page.on("console", (m) => { if (m.type() === "error") errors.push(m.text().slice(0, 200)); });
-    page.on("pageerror", (e) => errors.push(`PAGEERROR ${e.message.slice(0, 200)}`));
+    page.on("console", (m) => {
+        if (m.type() === "error") errors.push(m.text().slice(0, 200));
+    });
+    page.on("pageerror", (e) =>
+        errors.push(`PAGEERROR ${e.message.slice(0, 200)}`),
+    );
 }
 
 // ── Variant 1: player + 2 bots — hand fan + one action ──
@@ -143,13 +196,20 @@ const g1 = await post(`/api/rooms/${r1.code}/start`);
 const p1 = await ctx.newPage();
 watch(p1);
 await p1.setViewportSize({ width: 1280, height: 900 });
-await p1.goto(`${BASE}/fr/game/${g1.gameId}`, { waitUntil: "load", timeout: 45000 });
+await p1.goto(`${BASE}/fr/game/${g1.gameId}`, {
+    waitUntil: "load",
+    timeout: 45000,
+});
 await p1.waitForTimeout(1800);
 await p1.screenshot({ path: `${SHOTS}eca-player-before.png`, fullPage: true });
 
 let acted = "none";
 // Prefer laying a card from the hand; fall back to a control (Draw/Pass).
-const handCard = p1.locator('[data-zone-key="hand"] button:enabled, [data-zone-key="hand"] [role="button"]').first();
+const handCard = p1
+    .locator(
+        '[data-zone-key="hand"] button:enabled, [data-zone-key="hand"] [role="button"]',
+    )
+    .first();
 const control = p1.locator("button.btn-game:enabled").first();
 if (await handCard.count()) {
     await handCard.click().catch(() => {});
@@ -171,7 +231,10 @@ const g2 = await post(`/api/rooms/${r2.code}/start`);
 const p2 = await ctx.newPage();
 watch(p2);
 await p2.setViewportSize({ width: 1280, height: 900 });
-await p2.goto(`${BASE}/fr/game/${g2.gameId}`, { waitUntil: "load", timeout: 45000 });
+await p2.goto(`${BASE}/fr/game/${g2.gameId}`, {
+    waitUntil: "load",
+    timeout: 45000,
+});
 // Poll the full GET a few times: each read self-heals a stranded bot chain and
 // advances the all-bot game, so screenshots catch it progressing.
 const versions = [];
@@ -187,11 +250,27 @@ const final = await post(`/api/games/${g2.gameId}`).catch(() => ({}));
 await p2.close();
 
 await browser.close();
-console.log(JSON.stringify({
-    ecaGameId,
-    moduleId,
-    player: { room: r1.code, gameId: g1.gameId, acted },
-    spectator: { room: r2.code, gameId: g2.gameId, versions, finalVersion: final.version, isOver: final.isOver },
-    consoleErrors: [...new Set(errors)].slice(0, 10),
-    shots: ["eca-player-before", "eca-player-after", "eca-spectator"].map((s) => `${SHOTS}${s}.png`),
-}, null, 1));
+console.log(
+    JSON.stringify(
+        {
+            ecaGameId,
+            moduleId,
+            player: { room: r1.code, gameId: g1.gameId, acted },
+            spectator: {
+                room: r2.code,
+                gameId: g2.gameId,
+                versions,
+                finalVersion: final.version,
+                isOver: final.isOver,
+            },
+            consoleErrors: [...new Set(errors)].slice(0, 10),
+            shots: [
+                "eca-player-before",
+                "eca-player-after",
+                "eca-spectator",
+            ].map((s) => `${SHOTS}${s}.png`),
+        },
+        null,
+        1,
+    ),
+);
