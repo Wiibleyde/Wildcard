@@ -1,0 +1,172 @@
+{
+    "uid": "wildcard-crowdsec",
+    "title": "Wildcard — Sécurité (CrowdSec)",
+    "tags": ["wildcard", "crowdsec", "security"],
+    "timezone": "browser",
+    "schemaVersion": 39,
+    "version": 1,
+    "editable": true,
+    "refresh": "30s",
+    "time": { "from": "now-6h", "to": "now" },
+    "templating": { "list": [] },
+    "annotations": { "list": [] },
+    "panels": [
+        {
+            "id": 1,
+            "type": "stat",
+            "title": "Décisions actives (bans en cours)",
+            "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "reduceOptions": { "calcs": ["lastNotNull"] }
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "datasource": { "type": "prometheus", "uid": "prometheus" },
+                    "expr": "sum(cs_active_decisions)"
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "type": "stat",
+            "title": "Scénarios déclenchés (cumul)",
+            "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "reduceOptions": { "calcs": ["lastNotNull"] }
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "datasource": { "type": "prometheus", "uid": "prometheus" },
+                    "expr": "sum(cs_bucket_overflowed_total)"
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "type": "stat",
+            "title": "Lignes de log parsées (cumul)",
+            "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "reduceOptions": { "calcs": ["lastNotNull"] }
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "datasource": { "type": "prometheus", "uid": "prometheus" },
+                    "expr": "sum(cs_parser_hits_total)"
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "type": "timeseries",
+            "title": "Décisions actives par raison",
+            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "drawStyle": "line",
+                        "fillOpacity": 20,
+                        "stacking": { "mode": "normal" }
+                    }
+                },
+                "overrides": []
+            },
+            "options": {
+                "legend": { "displayMode": "list", "placement": "bottom" }
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "datasource": { "type": "prometheus", "uid": "prometheus" },
+                    "expr": "sum by (reason) (cs_active_decisions)",
+                    "legendFormat": "{{reason}}"
+                }
+            ]
+        },
+        {
+            "id": 5,
+            "type": "timeseries",
+            "title": "Alertes par scénario (taux /5m)",
+            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": { "drawStyle": "bars", "fillOpacity": 40 }
+                },
+                "overrides": []
+            },
+            "options": {
+                "legend": { "displayMode": "list", "placement": "bottom" }
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "datasource": { "type": "prometheus", "uid": "prometheus" },
+                    "expr": "sum by (name) (rate(cs_bucket_overflowed_total[5m]))",
+                    "legendFormat": "{{name}}"
+                }
+            ]
+        },
+        {
+            "id": 6,
+            "type": "timeseries",
+            "title": "Parsing des logs (lignes/s par source)",
+            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": { "drawStyle": "line", "fillOpacity": 10 }
+                },
+                "overrides": []
+            },
+            "options": {
+                "legend": { "displayMode": "list", "placement": "bottom" }
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "datasource": { "type": "prometheus", "uid": "prometheus" },
+                    "expr": "sum by (source) (rate(cs_parser_hits_total[5m]))",
+                    "legendFormat": "{{source}}"
+                }
+            ]
+        },
+        {
+            "id": 7,
+            "type": "timeseries",
+            "title": "Requêtes du bouncer Caddy → LAPI (taux /5m)",
+            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": { "drawStyle": "line", "fillOpacity": 10 }
+                },
+                "overrides": []
+            },
+            "options": {
+                "legend": { "displayMode": "list", "placement": "bottom" }
+            },
+            "targets": [
+                {
+                    "refId": "A",
+                    "datasource": { "type": "prometheus", "uid": "prometheus" },
+                    "expr": "sum by (bouncer) (rate(cs_lapi_bouncer_requests_total[5m]))",
+                    "legendFormat": "{{bouncer}}"
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,39 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Wildcard — fragment Caddy (site blocks)
+#
+# Ce fichier N'EST PAS un Caddyfile complet : c'est le fragment PROPRE À WILDCARD
+# à `import`er dans le Caddy CENTRAL (cf. deploy/README.md). Le central fournit
+# les blocs globaux (email ACME, app `crowdsec`, snippet `(access_log)`) ; ce
+# fragment n'ajoute QUE les deux sites de Wildcard.
+#
+# Réseau : Caddy et Wildcard partagent le réseau Docker externe `edge`. Sur ce
+# réseau, l'app et la gateway Supabase (Kong) sont accessibles par leurs ALIAS
+# `wildcard-app` / `wildcard-kong` (définis dans le docker-compose.yml de
+# Wildcard) — d'où le proxy par NOM, sans port hôte publié.
+#
+# Variables (env du conteneur Caddy central, ou valeurs en dur) :
+#   WILDCARD_APP_DOMAIN   ex. wildcard.example.com
+#   WILDCARD_API_DOMAIN   ex. api.wildcard.example.com
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Application Next.js
+{$WILDCARD_APP_DOMAIN} {
+	encode zstd gzip
+	# `route` fige l'ordre : filtrage CrowdSec AVANT le proxy.
+	route {
+		crowdsec
+		reverse_proxy wildcard-app:3000
+	}
+	import access_log
+}
+
+# API Supabase (Kong) — REST (PostgREST), Auth (GoTrue), Realtime.
+# L'upgrade WebSocket du Realtime est détecté et proxifié automatiquement.
+{$WILDCARD_API_DOMAIN} {
+	encode zstd gzip
+	route {
+		crowdsec
+		reverse_proxy wildcard-kong:8000
+	}
+	import access_log
+}
