@@ -1,46 +1,53 @@
 # Override PROD — à empiler sur docker-compose.yml.
 #
+#   docker network create edge   # une fois par serveur
 #   docker compose --env-file .env.docker \
-#     -f docker-compose.yml -f docker-compose.prod.yml \
-#     --profile proxy --profile monitoring up -d
+#     -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
-# Objectif : republier les ports internes en 127.0.0.1 UNIQUEMENT. En prod, tout
-# le trafic public entre par Caddy (80/443), qui joint l'app et Kong par le
-# réseau compose (app:3000, kong:8000). Exposer 3000/54321 sur 0.0.0.0
-# contournerait Caddy + le filtrage CrowdSec — cf. README « Durcissement réseau ».
+# Deux rôles :
+#  1. Republier les ports internes en 127.0.0.1 UNIQUEMENT. En prod, tout le
+#     trafic public entre par le Caddy CENTRAL (stack edge séparée, cf.
+#     deploy/README.md), qui joint l'app et Kong via le réseau `edge`. Exposer
+#     3000/54321 sur 0.0.0.0 contournerait Caddy + le filtrage CrowdSec.
+#  2. Attacher `app` et `kong` au réseau externe `edge` avec des alias stables
+#     (`wildcard-app` / `wildcard-kong`) pour que le proxy central les résolve
+#     sans port hôte publié. En listant `default` ET `edge`, l'app garde son
+#     accès au réseau interne (app → kong) ET devient joignable depuis `edge`.
 #
-# ⚠️ Le tag `!override` est OBLIGATOIRE : sans lui, Compose FUSIONNE (concatène)
-# les listes `ports` → le mapping 0.0.0.0 du fichier de base subsisterait à côté
-# du mapping loopback (trou non refermé + conflit de port au runtime). `!override`
-# remplace entièrement la liste. Requiert Docker Compose ≥ 2.24.
+# ⚠️ Le tag `!override` est OBLIGATOIRE sur `ports` : sans lui, Compose FUSIONNE
+# (concatène) les listes → le mapping 0.0.0.0 du fichier de base subsisterait à
+# côté du loopback (trou non refermé + conflit de port). `!override` remplace
+# entièrement la liste. Requiert Docker Compose ≥ 2.24.
+networks:
+  # Créé hors compose : `docker network create edge`. Partagé avec la stack
+  # edge/observabilité (Caddy, CrowdSec, Prometheus, Grafana, Umami).
+  edge:
+    external: true
+
 services:
   app:
     ports: !override
       - "127.0.0.1:3000:3000"
+    networks:
+      default: {}
+      edge:
+        aliases: [wildcard-app]
 
   kong:
     ports: !override
       - "127.0.0.1:${KONG_HTTP_PORT}:8000/tcp"
       - "127.0.0.1:${KONG_HTTPS_PORT}:8443/tcp"
+    networks:
+      default: {}
+      edge:
+        aliases: [wildcard-kong]
 
   # Interface de test mail (dev) — jamais exposée en prod.
   inbucket:
     ports: !override
       - "127.0.0.1:${INBUCKET_PORT}:9000"
 
-  # Dashboards d'admin : loopback only, accès par tunnel SSH.
+  # Dashboard d'admin Supabase : loopback only, accès par tunnel SSH.
   studio:
     ports: !override
       - "127.0.0.1:${STUDIO_PORT}:3000"
-
-  grafana:
-    ports: !override
-      - "127.0.0.1:${GRAFANA_PORT}:3000"
-
-  umami:
-    ports: !override
-      - "127.0.0.1:${UMAMI_PORT}:3000"
-
-  prometheus:
-    ports: !override
-      - "127.0.0.1:${PROMETHEUS_PORT}:9090"

@@ -221,19 +221,10 @@ Ajouter une clé de traduction :
 
 ## Monitoring & Analytics
 
-Stack 100 % open source, self-host, RGPD-compliant. Trois services, profil
-Docker `monitoring` :
-
-| Service        | Rôle                                            | URL locale              |
-| -------------- | ----------------------------------------------- | ----------------------- |
-| **Umami**      | Analytics web cookieless (pages vues, sessions) | http://localhost:54325  |
-| **Prometheus** | Métriques applicatives (scrape `/api/metrics`)  | http://localhost:54326  |
-| **Grafana**    | Visualisation unifiée des deux sources          | http://localhost:54327  |
-
-```bash
-# Renseigner d'abord la section monitoring de .env.docker
-docker compose --env-file .env.docker --profile monitoring up -d
-```
+L'observabilité (Umami + Prometheus + Grafana) est **mutualisée** : elle tourne
+dans la stack edge séparée — cf. **[`deploy/README.md`](deploy/README.md)** —, pas
+dans ce dépôt (ce sont des briques génériques réutilisables). L'app garde deux
+points d'intégration : l'endpoint `/api/metrics` (Prometheus) et le tag Umami.
 
 ### Métriques Prometheus exposées (`/api/metrics`)
 
@@ -246,32 +237,30 @@ docker compose --env-file .env.docker --profile monitoring up -d
 - `wildcard_game_duration_seconds{module}` — durée d'une partie (histogram) → **durée moyenne par jeu**
 - métriques Node/process (`wildcard_*` : CPU, heap, event-loop)
 
-> **Accès protégé** — le port de l'app est publié, donc `/api/metrics` est
-> joignable de l'extérieur. Définir `METRICS_TOKEN` (`.env.docker`) : la route
-> exige alors un `Authorization: Bearer <token>`, que Prometheus envoie
-> automatiquement. Laissé vide en dev local (pas de Prometheus), la route reste
-> ouverte.
+> **Accès protégé** — définir `METRICS_TOKEN` (`.env.docker`) : la route exige
+> alors un `Authorization: Bearer <token>`, que le Prometheus central présente
+> (même valeur des deux côtés — cf. [`deploy/README.md`](deploy/README.md)).
+> Laissé vide en dev local (pas de Prometheus), la route reste ouverte.
 
-### Grafana
+### Dashboards Grafana
 
-Datasources et dashboards **provisionnés** au démarrage (`monitoring/grafana/`) :
+Les JSON vivent dans `deploy/grafana/dashboards/` ; le Grafana central les charge
+(datasources d'`uid` `prometheus` + `umami-postgres`, cf.
+[`deploy/README.md`](deploy/README.md)) :
 
-- **Prometheus** + **Umami (PostgreSQL)** — les deux sources.
-- Dashboard *Wildcard — Métier (jeux)* : parties actives, durée moyenne par jeu,
-  taux d'abandon, latence des coups, débit/erreurs.
-- Dashboard *Wildcard — Analytics web (Umami)* : pages vues, sessions, top pages.
-
-Login admin : `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` (`.env.docker`).
+- *Wildcard — Métier (jeux)* : parties actives, durée moyenne par jeu, taux
+  d'abandon, latence des coups, débit/erreurs.
+- *Wildcard — Analytics web (Umami)* : pages vues, sessions, top pages.
+- *Sécurité (CrowdSec)* : bans actifs, scénarios déclenchés, parsing.
 
 ### Activer le tag Umami dans l'app
 
-1. Ouvrir Umami (http://localhost:54325), login par défaut `admin` / `umami`.
-2. Créer un site « Wildcard » → copier son **Website ID**.
-3. Coller dans `.env.docker` (ou `.env.local` pour `next dev`) → `UMAMI_WEBSITE_ID`,
-   redémarrer l'app.
+1. Ouvrir l'UI Umami central → créer un site « Wildcard » → copier son **Website ID**.
+2. Coller dans `.env.docker` (ou `.env.local` pour `next dev`) → `UMAMI_WEBSITE_ID`,
+   ajuster `UMAMI_URL` sur l'Umami central, redémarrer l'app.
 
 Sans `UMAMI_WEBSITE_ID`, le tag ne se charge pas — aucun impact sur les runs
-locaux sans monitoring.
+locaux.
 
 > **Config publique au runtime** — `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `UMAMI_URL`
 > et `UMAMI_WEBSITE_ID` ne sont **pas** des `NEXT_PUBLIC_*` : elles sont lues
@@ -301,10 +290,10 @@ Un seul serveur, un seul `docker compose up`.
 | OS | Ubuntu 22.04+ |
 | Ports ouverts | 22 (SSH), 80, 443 |
 
-> **Seuls 80/443 (Caddy) et 22 (SSH) doivent être joignables de l'extérieur.**
-> Les ports internes publiés par compose — app `3000`, Kong `54321/54322`, et les
-> ports d'admin (`54323`, `54325-27`) — ne doivent **pas** être exposés : sinon on
-> contourne Caddy **et** le filtrage CrowdSec. Cf. « Durcissement réseau » ci-dessous.
+> **Seuls 80/443 (Caddy central) et 22 (SSH) doivent être joignables de
+> l'extérieur.** Les ports internes publiés par compose — app `3000`, Kong
+> `54321/54322`, admin `54323` — ne doivent **pas** être exposés : le chemin
+> public passe par le réseau `edge` (cf. « Reverse proxy, TLS & durcissement »).
 
 ```bash
 # Docker (si pas installé)
@@ -357,163 +346,72 @@ docker compose --env-file .env.docker ps
 # → tous les services : Up (healthy)
 ```
 
-### 3 — Reverse proxy Caddy (profil `proxy`)
+### 3 — Reverse proxy, TLS & durcissement (stack edge)
 
-Le reverse proxy est **conteneurisé** : le service `caddy` (profil `proxy` dans
-`docker-compose.yml`) est le point d'entrée HTTPS unique. Il termine TLS avec des
-certificats **Let's Encrypt émis et renouvelés automatiquement** — pas de certbot
-à piloter à la main — et route vers l'app et l'API Supabase par leur **nom de
-service** sur le réseau Docker. Caddy gère nativement l'upgrade WebSocket
-(Realtime) et pose les en-têtes `X-Forwarded-*`.
+Le point d'entrée HTTPS (**Caddy** + certificats Let's Encrypt automatiques),
+l'IPS (**CrowdSec**) et l'observabilité tournent dans une **stack edge
+mutualisée, déployée séparément** — voir **[`deploy/README.md`](deploy/README.md)**
+pour son compose complet et sa config. Ce dépôt n'en embarque que les fragments
+propres à Wildcard (`deploy/caddy/`, `deploy/prometheus/`, `deploy/grafana/`).
 
-Renseigner les domaines dans `.env.docker` (leurs DNS `A`/`AAAA` doivent pointer
-vers le serveur) :
+Wildcard s'y branche via un **réseau Docker externe partagé**, `edge` :
 
 ```bash
-# Dans .env.docker :
-APP_DOMAIN=wildcard.example.com
-API_DOMAIN=api.wildcard.example.com
-ACME_EMAIL=admin@example.com      # notifications Let's Encrypt
+docker network create edge          # une fois par serveur
 ```
 
-La config vit dans [`caddy/Caddyfile`](caddy/Caddyfile) :
-
-```caddyfile
-{
-    email {$ACME_EMAIL}
-}
-
-{$APP_DOMAIN} {
-    encode zstd gzip
-    reverse_proxy app:3000
-}
-
-{$API_DOMAIN} {
-    encode zstd gzip
-    reverse_proxy kong:8000    # WebSocket Realtime proxifié automatiquement
-}
-```
-
-Lancer la stack **avec** le proxy (ouvre les ports 80/443 de l'hôte) :
-
-```bash
-docker compose --env-file .env.docker --profile proxy up -d
-```
-
-> Les certificats sont persistés dans le volume `caddy-data` : ne pas le
-> supprimer (rate-limit Let's Encrypt = 5 certs / domaine / semaine).
-
-#### CrowdSec — protection du reverse proxy (IPS)
-
-Le proxy est protégé par **CrowdSec**, un IPS collaboratif. Deux moitiés qui
-forment une boucle fermée :
-
-- **Détection** — l'agent CrowdSec parse les access logs JSON de Caddy (volume
-  partagé `caddy-logs`) et applique les scénarios de la collection
-  `crowdsecurity/caddy` (scan, brute-force, CVE HTTP…). Une attaque crée une
-  **décision** de ban en base.
-- **Remédiation** — le binaire Caddy est **recompilé** (`caddy/Dockerfile`, via
-  `xcaddy`) avec le bouncer `hslatman/caddy-crowdsec-bouncer`. Le handler
-  `crowdsec` interroge la LAPI à chaque requête et **bloque** les IP sous
-  décision. L'image `caddy:2-alpine` stock ne suffit pas — d'où le `build:`.
-
-L'agent et le bouncer partagent une clé (`CROWDSEC_API_KEY`) : l'agent
-l'auto-enregistre au démarrage (`BOUNCER_KEY_CADDY`), le bouncer la présente en
-`X-Api-Key`. Aucune étape manuelle.
-
-```bash
-# Dans .env.docker — générer la clé :
-CROWDSEC_API_KEY=$(openssl rand -hex 32)
-```
-
-Le premier `up --profile proxy` **compile** le binaire Caddy (une minute, réseau
-requis). Vérifier après démarrage :
-
-```bash
-docker exec wildcard-crowdsec cscli metrics       # parsing + scénarios
-docker exec wildcard-crowdsec cscli decisions list # bans actifs
-docker exec wildcard-crowdsec cscli bouncers list  # le bouncer `caddy` = valid
-```
-
-**Web UI = Grafana**, pas de nouveau service. L'agent expose ses métriques
-Prometheus sur `:6060` (basculé sur `0.0.0.0` via `crowdsec/config.yaml.local`) ;
-le profil `monitoring` les scrape et provisionne le dashboard **« Sécurité
-(CrowdSec) »** (bans actifs, scénarios déclenchés, parsing). Le Metabase de
-`cscli dashboard` est déprécié (retiré en CrowdSec 1.7.0) — on réutilise la stack
-Grafana existante.
-
-```bash
-# Proxy + protection + UI :
-docker compose --env-file .env.docker --profile proxy --profile monitoring up -d
-# → Grafana sur http://localhost:54327, dashboard « Sécurité (CrowdSec) »
-```
-
-#### Durcissement réseau (pare-feu)
-
-Caddy est le **seul point d'entrée** : tout le trafic doit y passer pour être
-filtré par CrowdSec. Or `docker-compose.yml` publie les ports internes (app
-`3000`, Kong `54321`) sur l'hôte — pratique en dev local, **trou de sécurité en
-prod** : une IP bannie peut frapper `http://serveur:3000` en direct et contourner
-l'IPS.
-
-> ⚠️ **Piège Docker + ufw** : Docker insère ses règles iptables **avant** celles
-> d'ufw. Un `ufw deny 3000` ne bloque donc **pas** un port publié par Docker. Ne
-> pas se reposer sur ufw seul pour ces ports.
-
-**Correctif propre — republier les ports internes en loopback.** Le repo fournit
-`docker-compose.prod.yml`, un override qui rebinde app / Kong / dashboards sur
-`127.0.0.1`. Caddy joint toujours l'app et Kong par le réseau compose
-(`app:3000`, `kong:8000`), donc ces ports n'ont pas besoin d'être exposés :
+`docker-compose.prod.yml` attache `app` et `kong` à `edge` avec les alias
+`wildcard-app` / `wildcard-kong`, que le Caddy central proxifie **sans publier de
+port hôte**. Le même override rebinde les ports internes en `127.0.0.1` :
 
 ```yaml
-# docker-compose.prod.yml (extrait) — le tag !override REMPLACE la liste ports du
-# fichier de base ; sans lui, Compose FUSIONNE et le mapping 0.0.0.0 subsisterait.
+# docker-compose.prod.yml (extrait) — !override REMPLACE la liste ports ; sans
+# lui, Compose FUSIONNE et le mapping 0.0.0.0 subsisterait (trou de sécu).
 services:
   app:
     ports: !override
       - "127.0.0.1:3000:3000"
-  kong:
-    ports: !override
-      - "127.0.0.1:${KONG_HTTP_PORT}:8000/tcp"
-      - "127.0.0.1:${KONG_HTTPS_PORT}:8443/tcp"
+    networks:
+      default: {}
+      edge: { aliases: [wildcard-app] }
 ```
 
-Lancer la prod avec l'override empilé sur le fichier de base :
+Lancer la prod (override empilé sur le fichier de base) :
 
 ```bash
+docker network create edge          # si pas déjà fait
 docker compose --env-file .env.docker \
-  -f docker-compose.yml -f docker-compose.prod.yml \
-  --profile proxy --profile monitoring up -d
+  -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-> **Recommandé en prod — rendre l'override + les profils implicites.** Ajouter ces
-> deux lignes à `.env.docker` sur le serveur : Compose les lit nativement, donc
-> **toutes** les commandes (y compris `scripts/deploy.sh`) chargent l'override et
-> les profils sans `-f`/`--profile`. Sans ça, un `deploy.sh` qui recrée `app`
-> republie le port sur `0.0.0.0` et **rouvre le trou**.
->
-> ```bash
-> # .env.docker (serveur de prod uniquement — NE PAS mettre en dev local)
-> COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
-> COMPOSE_PROFILES=proxy,monitoring
-> ```
->
-> Ensuite un simple `docker compose --env-file .env.docker up -d` suffit.
+> **Recommandé — override implicite.** Sur le serveur de prod, ajouter à
+> `.env.docker` la ligne `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml`.
+> Compose la lit nativement : **toutes** les commandes (dont `scripts/deploy.sh`)
+> chargent l'override + le réseau `edge` sans `-f`. Sans ça, un `deploy.sh` qui
+> recrée `app` republie le port sur `0.0.0.0` et **rouvre le trou**.
 
-**Pare-feu de base** (défense en profondeur, en plus du loopback) :
+#### Durcissement réseau (pare-feu)
+
+Seuls **80/443** (Caddy central) et **22** (SSH) sont ouverts sur l'extérieur.
+Les ports internes de Wildcard restent en loopback — le chemin public passe par
+`edge`, pas par l'hôte.
+
+> ⚠️ **Piège Docker + ufw** : Docker insère ses règles iptables **avant** celles
+> d'ufw. Un `ufw deny 3000` ne bloque donc **pas** un port publié par Docker →
+> toujours rebinder en `127.0.0.1` plutôt que compter sur le pare-feu seul.
 
 ```bash
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
 sudo ufw allow 22/tcp    # SSH
-sudo ufw allow 80/tcp    # Caddy — redirige vers 443
-sudo ufw allow 443/tcp   # Caddy — HTTPS
+sudo ufw allow 80/tcp    # Caddy central — redirige vers 443
+sudo ufw allow 443/tcp   # Caddy central — HTTPS
 sudo ufw enable
 ```
 
-Les dashboards d'admin (Studio, Grafana, Umami) restent en loopback : y accéder
-via un **tunnel SSH** (`ssh -L 54327:localhost:54327 serveur`) plutôt qu'en les
-exposant.
+Les UI d'admin (Studio `54323`, Grafana / Umami côté edge) restent en loopback :
+y accéder via un **tunnel SSH** (`ssh -L 54327:localhost:54327 serveur`) plutôt
+qu'en les exposant.
 
 ### 4 — OAuth en production
 
