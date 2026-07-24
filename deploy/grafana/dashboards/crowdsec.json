@@ -76,7 +76,11 @@
             "datasource": { "type": "prometheus", "uid": "prometheus" },
             "fieldConfig": {
                 "defaults": {
-                    "custom": { "drawStyle": "line", "fillOpacity": 20, "stacking": { "mode": "normal" } }
+                    "custom": {
+                        "drawStyle": "line",
+                        "fillOpacity": 20,
+                        "stacking": { "mode": "normal" }
+                    }
                 },
                 "overrides": []
             },
