@@ -39,7 +39,8 @@ services:
       SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:?SUPABASE_SECRET_KEY is required}
       METRICS_TOKEN: ${METRICS_TOKEN:?METRICS_TOKEN is required}
       # DSN supabase_admin : seul rôle autorisé à créer le schéma et le trigger
-      # sur auth.users. Lu par l'entrypoint (scripts/migrate.sh) uniquement.
+      # sur auth.users. Lu par l'entrypoint (scripts/migrate.sh) uniquement,
+      # puis `unset` avant le `exec` : le serveur Next ne le voit jamais.
       WILDCARD_DATABASE_URL: ${WILDCARD_DATABASE_URL:?WILDCARD_DATABASE_URL is required}
       WILDCARD_MIGRATE: ${WILDCARD_MIGRATE:-run}
     networks: [front, supabase, monitoring]

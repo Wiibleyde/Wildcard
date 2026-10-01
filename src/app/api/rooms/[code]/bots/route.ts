@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/api/auth";
+import { readJsonObject } from "@/lib/api/body";
+import { failureResponse } from "@/lib/api/respond";
 import { ROOM_ERROR_STATUS, setBotCount } from "@/lib/models/room";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -8,13 +10,13 @@ export async function POST(
     ctx: { params: Promise<{ code: string }> },
 ) {
     const { code } = await ctx.params;
-    const auth = await requireUser();
+    const auth = await requireUser(request);
     if (!auth.ok) return auth.response;
 
-    const body = (await request.json().catch(() => ({}))) as {
-        count?: unknown;
-    };
-    if (typeof body.count !== "number") {
+    const parsed = await readJsonObject(request);
+    if (!parsed.ok) return parsed.response;
+    const { count } = parsed.body;
+    if (typeof count !== "number") {
         return NextResponse.json(
             { error: "count (number) is required" },
             { status: 400 },
@@ -22,12 +24,9 @@ export async function POST(
     }
 
     const admin = createAdminClient();
-    const result = await setBotCount(admin, auth.user.id, code, body.count);
+    const result = await setBotCount(admin, auth.user.id, code, count);
     if (!result.ok) {
-        return NextResponse.json(
-            { error: result.error },
-            { status: ROOM_ERROR_STATUS[result.error] },
-        );
+        return failureResponse("rooms.bots", result, ROOM_ERROR_STATUS);
     }
 
     return NextResponse.json({ botCount: result.botCount });

@@ -1,37 +1,35 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/api/auth";
+import { readJsonObject } from "@/lib/api/body";
+import { rateLimit } from "@/lib/api/rateLimit";
+import { failureResponse } from "@/lib/api/respond";
 import { createRoom, ROOM_ERROR_STATUS } from "@/lib/models/room";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
-    const auth = await requireUser();
+    const auth = await requireUser(request);
     if (!auth.ok) return auth.response;
 
-    const body = (await request.json().catch(() => ({}))) as {
-        moduleId?: unknown;
-        visibility?: unknown;
-    };
-    if (typeof body.moduleId !== "string") {
+    const limited = rateLimit("roomCreate", auth.user.id);
+    if (limited) return limited;
+
+    const parsed = await readJsonObject(request);
+    if (!parsed.ok) return parsed.response;
+    const { moduleId } = parsed.body;
+    if (typeof moduleId !== "string") {
         return NextResponse.json(
             { error: "moduleId is required" },
             { status: 400 },
         );
     }
     // Hand-made rooms are private (code-only) unless explicitly public.
-    const visibility = body.visibility === "public" ? "public" : "private";
+    const visibility =
+        parsed.body.visibility === "public" ? "public" : "private";
 
     const admin = createAdminClient();
-    const result = await createRoom(
-        admin,
-        auth.user.id,
-        body.moduleId,
-        visibility,
-    );
+    const result = await createRoom(admin, auth.user.id, moduleId, visibility);
     if (!result.ok) {
-        return NextResponse.json(
-            { error: result.error },
-            { status: ROOM_ERROR_STATUS[result.error] },
-        );
+        return failureResponse("rooms.create", result, ROOM_ERROR_STATUS);
     }
 
     return NextResponse.json({ code: result.code, roomId: result.roomId });

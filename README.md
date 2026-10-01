@@ -231,10 +231,10 @@ dépôt. L'app garde deux points d'intégration : l'endpoint `/api/metrics`
 - `wildcard_game_duration_seconds{module}` — durée d'une partie (histogram) → **durée moyenne par jeu**
 - métriques Node/process (`wildcard_*` : CPU, heap, event-loop)
 
-> **Accès protégé** — définir `METRICS_TOKEN` : la route exige
-> alors un `Authorization: Bearer <token>`, que le Prometheus central présente
-> (même valeur des deux côtés — cf. [`deploy/README.md`](deploy/README.md)).
-> Laissé vide en dev local (pas de Prometheus), la route reste ouverte.
+> **Accès protégé** — la route exige un `Authorization: Bearer <token>` égal à
+> `METRICS_TOKEN`, que le Prometheus central présente (même valeur des deux
+> côtés — cf. [`deploy/README.md`](deploy/README.md)). Sans `METRICS_TOKEN`,
+> la route répond 404 (fermée par défaut).
 
 ### Dashboards Grafana
 

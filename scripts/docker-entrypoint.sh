@@ -11,5 +11,10 @@ else
 	/app/scripts/migrate.sh
 fi
 
+# The migration DSN is a superuser credential: it is needed by migrate.sh only
+# and must not leak into the long-running Next server (its env is readable from
+# any RCE / debug dump / child process). Drop it before handing over.
+unset WILDCARD_DATABASE_URL
+
 # exec: the server becomes PID 1 and receives SIGTERM from `docker stop`.
 exec "$@"

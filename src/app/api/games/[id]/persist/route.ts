@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/api/auth";
+import { readJsonObject } from "@/lib/api/body";
+import { failureResponse } from "@/lib/api/respond";
 import { type PersistErrorCode, setPersistent } from "@/lib/models/persistence";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -16,13 +18,13 @@ export async function PUT(
     ctx: { params: Promise<{ id: string }> },
 ) {
     const { id } = await ctx.params;
-    const auth = await requireUser();
+    const auth = await requireUser(request);
     if (!auth.ok) return auth.response;
 
-    const body = (await request.json().catch(() => ({}))) as {
-        persistent?: unknown;
-    };
-    if (typeof body.persistent !== "boolean") {
+    const parsed = await readJsonObject(request);
+    if (!parsed.ok) return parsed.response;
+    const { persistent } = parsed.body;
+    if (typeof persistent !== "boolean") {
         return NextResponse.json(
             { error: "persistent (boolean) is required" },
             { status: 400 },
@@ -30,21 +32,10 @@ export async function PUT(
     }
 
     const admin = createAdminClient();
-    const result = await setPersistent(
-        admin,
-        auth.user.id,
-        id,
-        body.persistent,
-    );
+    const result = await setPersistent(admin, auth.user.id, id, persistent);
     if (!result.ok) {
-        return NextResponse.json(
-            { error: result.error },
-            { status: HTTP_STATUS[result.error] },
-        );
+        return failureResponse("games.persist", result, HTTP_STATUS);
     }
 
-    return NextResponse.json({
-        persistent: body.persistent,
-        count: result.count,
-    });
+    return NextResponse.json({ persistent, count: result.count });
 }

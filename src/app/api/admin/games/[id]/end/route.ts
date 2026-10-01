@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/api/auth";
+import { failureResponse } from "@/lib/api/respond";
 import { APPLY_ERROR_STATUS, endGame } from "@/lib/models/game";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -14,12 +15,9 @@ export async function POST(
     if (!auth.ok) return auth.response;
 
     const admin = createAdminClient();
-    const result = await endGame(admin, id);
+    const result = await endGame(admin, id, { reason: "admin" });
     if (!result.ok) {
-        return NextResponse.json(
-            { error: result.error },
-            { status: APPLY_ERROR_STATUS[result.error] },
-        );
+        return failureResponse("admin.games.end", result, APPLY_ERROR_STATUS);
     }
 
     return NextResponse.json({ ok: true, version: result.version });

@@ -138,6 +138,23 @@ docker exec supabase-db psql -U supabase_admin -d postgres \
   -c "select * from wildcard.schema_migrations order by version desc limit 5;"
 ```
 
+### Ordre de déploiement — migrations et code ensemble
+
+Migrations et code se déploient **ensemble** : l'entrypoint du conteneur applique
+les migrations puis démarre la nouvelle version, et l'ancien conteneur est
+arrêté par `docker compose up -d` — on ne fait pas tourner deux versions en
+parallèle sur la même base. Ne pas appliquer les migrations à la main longtemps
+avant de basculer le code (ni l'inverse, `WILDCARD_MIGRATE=skip` avec un code
+plus récent que le schéma).
+
+Garde-fou si une ancienne instance termine quand même une partie après la
+migration (déploiement progressif) : le règlement ELO/XP rejoué au démarrage
+(`settlePendingGames`) ne reprend que les parties portant un `end_reason`
+(`20261001140000_game_end_reason.sql`), colonne écrite uniquement par le code
+actuel. Une partie terminée par l'ancien code — déjà réglée par l'ancien chemin,
+`settled_at` resté NULL — n'est donc jamais réglée une seconde fois (pas de
+double ELO).
+
 Sécurité réseau : seuls 22/80/443 sont exposés sur rivendell ; il n'y a pas de
 pare-feu hôte, donc la règle est de **ne jamais publier** de port dans un
 compose (Docker passe devant tout pare-feu de toute façon).
