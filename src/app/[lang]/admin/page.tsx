@@ -8,6 +8,7 @@ import { getUserRole, roleAtLeast } from "@/lib/auth/roles";
 import { requireAuthUser } from "@/lib/auth/session";
 import { listOngoingGames } from "@/lib/models/admin";
 import { getAppSettings } from "@/lib/models/settings";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AdminPage({
@@ -29,7 +30,10 @@ export default async function AdminPage({
     const t = await getTranslations("admin");
 
     const [games, settings] = await Promise.all([
-        listOngoingGames(supabase),
+        // Service role: members-only room RLS would hide private-room games
+        // from staff who are not seated in them, so they could never be
+        // force-ended. Safe — the role gate above ran server-side first.
+        listOngoingGames(createAdminClient()),
         isAdmin ? getAppSettings(supabase) : Promise.resolve(null),
     ]);
 

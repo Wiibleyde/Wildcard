@@ -88,10 +88,12 @@ export async function getMatchHistory(
             (a, b) => a.seat - b.seat,
         );
 
+        // A solo game that ends without a winner (e.g. a resigned Solitaire)
+        // is a loss; with several seats, "no winner" stays "none".
         const won = winners.has(userId);
         const result: MatchResult = won
             ? "win"
-            : winners.size > 0
+            : winners.size > 0 || seats.length === 1
               ? "loss"
               : "none";
 

@@ -49,9 +49,12 @@ describe.skipIf(!CONFIGURED)(
         let anon: SupabaseClient<any, any, any>;
         // biome-ignore lint/suspicious/noExplicitAny: same — signed-in as `player`.
         let player: SupabaseClient<any, any, any>;
+        // biome-ignore lint/suspicious/noExplicitAny: same — signed-in, NOT a member of the room.
+        let outsider: SupabaseClient<any, any, any>;
 
         let playerId = "";
         let opponentId = "";
+        let outsiderId = "";
         let roomId = "";
         let gameId = "";
 
@@ -86,6 +89,14 @@ describe.skipIf(!CONFIGURED)(
             if (p2.error) throw p2.error;
             opponentId = p2.data.user.id;
 
+            const p3 = await admin.auth.admin.createUser({
+                email: email(3),
+                password,
+                email_confirm: true,
+            });
+            if (p3.error) throw p3.error;
+            outsiderId = p3.data.user.id;
+
             // Seed a room → game → secret state, all via the service role.
             const room = await admin
                 .from("rooms")
@@ -99,10 +110,11 @@ describe.skipIf(!CONFIGURED)(
             if (room.error) throw room.error;
             roomId = room.data.id;
 
-            await admin.from("room_players").insert([
+            const seats = await admin.from("room_players").insert([
                 { room_id: roomId, user_id: playerId, seat: 0 },
                 { room_id: roomId, user_id: opponentId, seat: 1 },
             ]);
+            if (seats.error) throw seats.error;
 
             const game = await admin
                 .from("games")
@@ -133,6 +145,19 @@ describe.skipIf(!CONFIGURED)(
             });
             if (state.error) throw state.error;
 
+            // One logged move carrying hidden information (a Tarot-like écart).
+            const logged = await admin.from("game_actions").insert({
+                game_id: gameId,
+                seq: 1,
+                actor_id: opponentId,
+                action: {
+                    type: "discard",
+                    playerId: opponentId,
+                    cards: OPPONENT_SECRET_HAND,
+                },
+            });
+            if (logged.error) throw logged.error;
+
             // Sign the first player in with a real session (JWT `authenticated` role).
             player = createClient(SUPABASE_URL, ANON_KEY, clientOpts);
             const signIn = await player.auth.signInWithPassword({
@@ -140,6 +165,13 @@ describe.skipIf(!CONFIGURED)(
                 password,
             });
             if (signIn.error) throw signIn.error;
+
+            outsider = createClient(SUPABASE_URL, ANON_KEY, clientOpts);
+            const outsiderSignIn = await outsider.auth.signInWithPassword({
+                email: email(3),
+                password,
+            });
+            if (outsiderSignIn.error) throw outsiderSignIn.error;
         });
 
         afterAll(async () => {
@@ -148,6 +180,7 @@ describe.skipIf(!CONFIGURED)(
             if (roomId) await admin.from("rooms").delete().eq("id", roomId);
             if (playerId) await admin.auth.admin.deleteUser(playerId);
             if (opponentId) await admin.auth.admin.deleteUser(opponentId);
+            if (outsiderId) await admin.auth.admin.deleteUser(outsiderId);
         });
 
         it("lets the service role read the secret state (the server is authoritative)", async () => {
@@ -220,6 +253,119 @@ describe.skipIf(!CONFIGURED)(
                 state: { forged: true },
             });
             expect(error).not.toBeNull(); // RLS rejects the insert
+        });
+
+        it("denies every client the move log — even a member of the game", async () => {
+            for (const client of [player, anon]) {
+                const { data, error } = await client
+                    .from("game_actions")
+                    .select("*")
+                    .eq("game_id", gameId);
+                expect(error).toBeNull();
+                expect(data ?? []).toHaveLength(0);
+            }
+        });
+
+        it("hides a private room's games and seats from a non-member", async () => {
+            const games = await outsider
+                .from("games")
+                .select("id")
+                .eq("id", gameId);
+            expect(games.data ?? []).toHaveLength(0);
+            const seats = await outsider
+                .from("room_players")
+                .select("user_id")
+                .eq("room_id", roomId);
+            expect(seats.data ?? []).toHaveLength(0);
+        });
+
+        it("still shows a member their room's seats", async () => {
+            const { data, error } = await player
+                .from("room_players")
+                .select("user_id")
+                .eq("room_id", roomId);
+            expect(error).toBeNull();
+            expect(data ?? []).toHaveLength(2);
+        });
+
+        // Server-only functions: a client key must get "permission denied"
+        // (42501), never a result. Arguments are well-formed so the call
+        // reaches the privilege check instead of failing on resolution.
+        const SERVER_ONLY_RPCS: ReadonlyArray<
+            readonly [string, () => Record<string, unknown>]
+        > = [
+            [
+                "apply_elo_results",
+                () => ({
+                    p_module_id: "president",
+                    p_results: [{ user_id: playerId, delta: 500, won: true }],
+                }),
+            ],
+            [
+                "award_game_xp",
+                () => ({ p_awards: [{ user_id: playerId, amount: 100000 }] }),
+            ],
+            ["match_history", () => ({ p_user_id: opponentId, p_limit: 10 })],
+            [
+                "match_make",
+                () => ({ p_module_id: "president", p_min: 1, p_max: 4 }),
+            ],
+            ["prune_expired_game_actions", () => ({})],
+            ["settle_game", () => ({ p_game_id: gameId, p_elo: [], p_xp: [] })],
+            [
+                "commit_game_step",
+                () => ({
+                    p_game_id: gameId,
+                    p_expected_version: 0,
+                    p_phase: "done",
+                    p_current_player_id: null,
+                    p_is_over: true,
+                    p_winner_ids: [playerId],
+                    p_state: {},
+                    p_actor_id: playerId,
+                    p_action: {},
+                    p_events: [],
+                }),
+            ],
+        ];
+
+        for (const [fn, args] of SERVER_ONLY_RPCS) {
+            it(`refuses ${fn}() to the anon and authenticated keys`, async () => {
+                for (const client of [anon, player]) {
+                    const { data, error } = await client.rpc(fn, args());
+                    expect(data).toBeNull();
+                    expect(error?.code).toBe("42501");
+                }
+            });
+        }
+
+        it("keeps the leaderboard callable by guests", async () => {
+            const { error } = await anon.rpc("leaderboard", { p_top_n: 1 });
+            expect(error).toBeNull();
+        });
+
+        it("refuses a seat in a room that already left the lobby", async () => {
+            const room = await admin
+                .from("rooms")
+                .insert({
+                    code: `RLP${STAMP}`,
+                    module_id: "president",
+                    host_id: playerId,
+                    status: "playing",
+                })
+                .select("id")
+                .single();
+            if (room.error) throw room.error;
+            try {
+                const { error } = await admin.from("room_players").insert({
+                    room_id: room.data.id,
+                    user_id: outsiderId,
+                    seat: 0,
+                });
+                expect(error?.code).toBe("WCL01");
+            } finally {
+                await admin.from("rooms").delete().eq("id", room.data.id);
+            }
         });
     },
 );
