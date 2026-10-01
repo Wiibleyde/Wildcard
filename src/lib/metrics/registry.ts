@@ -51,10 +51,11 @@ async function collectActiveGames(gauge: Gauge<"module">): Promise<void> {
     gauge.reset();
     try {
         const admin = createAdminClient();
-        const { data } = await admin
+        const { data, error } = await admin
             .from("games")
             .select("module_id")
             .eq("is_over", false);
+        if (error) throw new Error(error.message);
         const perModule = new Map<string, number>();
         for (const row of data ?? []) {
             perModule.set(

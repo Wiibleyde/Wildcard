@@ -3,6 +3,10 @@
 // `bun run db:types` (local stack: `bun run dev:up`) after each migration.
 // The portal's schema, which Wildcard only reads through security-definer
 // functions, is not part of it.
+
+/** `games.end_reason` — how a finished game ended (see 20261001140000). */
+export type GameEndReason = "natural" | "forfeit" | "admin" | "abandoned";
+
 export type Database = {
     wildcard: {
         Tables: {
@@ -390,6 +394,14 @@ export type Database = {
                     bot_ids: string[];
                     created_at: string;
                     updated_at: string;
+                    /** End recorded (room finished, ELO/XP applied); null = owed. */
+                    settled_at: string | null;
+                    /** When the retention sweep deleted the move log. */
+                    actions_pruned_at: string | null;
+                    /** How the game ended; null while live (or ended by legacy code). */
+                    end_reason: GameEndReason | null;
+                    /** The player whose departure ended the game (end_reason 'forfeit'). */
+                    forfeited_by: string | null;
                 };
                 Insert: {
                     id?: string;
@@ -403,6 +415,10 @@ export type Database = {
                     bot_ids?: string[];
                     created_at?: string;
                     updated_at?: string;
+                    settled_at?: string | null;
+                    actions_pruned_at?: string | null;
+                    end_reason?: GameEndReason | null;
+                    forfeited_by?: string | null;
                 };
                 Update: {
                     id?: string;
@@ -416,6 +432,10 @@ export type Database = {
                     bot_ids?: string[];
                     created_at?: string;
                     updated_at?: string;
+                    settled_at?: string | null;
+                    actions_pruned_at?: string | null;
+                    end_reason?: GameEndReason | null;
+                    forfeited_by?: string | null;
                 };
                 Relationships: [
                     {
@@ -528,6 +548,7 @@ export type Database = {
                     definition: Record<string, unknown>;
                     status: "draft" | "published";
                     image_url: string | null;
+                    moderation_locked: boolean;
                     created_at: string;
                     updated_at: string;
                 };
@@ -539,6 +560,7 @@ export type Database = {
                     definition: Record<string, unknown>;
                     status?: "draft" | "published";
                     image_url?: string | null;
+                    moderation_locked?: boolean;
                     created_at?: string;
                     updated_at?: string;
                 };
@@ -550,6 +572,7 @@ export type Database = {
                     definition?: Record<string, unknown>;
                     status?: "draft" | "published";
                     image_url?: string | null;
+                    moderation_locked?: boolean;
                     created_at?: string;
                     updated_at?: string;
                 };
@@ -593,6 +616,38 @@ export type Database = {
         };
         Views: Record<string, never>;
         Functions: {
+            commit_game_step: {
+                Args: {
+                    p_game_id: string;
+                    p_expected_version: number;
+                    p_phase: string;
+                    p_current_player_id: string | null;
+                    p_is_over: boolean;
+                    p_winner_ids: string[];
+                    p_state: Record<string, unknown>;
+                    p_actor_id: string;
+                    p_action: Record<string, unknown>;
+                    p_events: Record<string, unknown>[];
+                };
+                /** New version, or null when the compare-and-set lost. */
+                Returns: number | null;
+            };
+            settle_game: {
+                Args: {
+                    p_game_id: string;
+                    p_elo: {
+                        user_id: string;
+                        delta: number;
+                        won: boolean;
+                    }[];
+                    p_xp: {
+                        user_id: string;
+                        amount: number;
+                    }[];
+                };
+                /** False when the game is not over or was already settled. */
+                Returns: boolean;
+            };
             apply_elo_results: {
                 Args: {
                     p_module_id: string;

@@ -1,18 +1,20 @@
-import { type TierKey, tierColor, tierTextColor } from "@/lib/customize/tier";
+import { useTranslations } from "next-intl";
+import type { ThemeTier } from "@/lib/card/types";
+import { TIER_LABEL_KEY, tierColor, tierTextColor } from "@/lib/customize/tier";
 
 type Props = {
-    tier: string;
-    name: string;
+    tier: ThemeTier;
 };
 
-export function TierBadge({ tier, name }: Props) {
-    const key = tier as TierKey;
+/** Pill showing a theme's localized tier name in its tier colours. */
+export function TierBadge({ tier }: Props) {
+    const t = useTranslations("customize");
     return (
         <span
             className="text-wc-label font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
-            style={{ background: tierColor(key), color: tierTextColor(key) }}
+            style={{ background: tierColor(tier), color: tierTextColor(tier) }}
         >
-            {name}
+            {t(TIER_LABEL_KEY[tier])}
         </span>
     );
 }

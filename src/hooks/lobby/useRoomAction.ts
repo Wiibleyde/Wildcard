@@ -2,7 +2,14 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 
-const ROOM_ERROR_KEYS = new Set(["not_found", "room_full", "already_started"]);
+const ROOM_ERROR_KEYS = new Set([
+    "not_found",
+    "room_full",
+    "already_started",
+    "rate_limited",
+    "maintenance",
+    "payload_too_large",
+]);
 
 type Action = "create" | "join";
 
@@ -26,14 +33,25 @@ export function useRoomAction() {
     ) {
         setBusy(action);
         setError(null);
-        const res = await request();
-        const data = await res.json();
-        if (!res.ok) {
+        try {
+            const res = await request();
+            // A 5xx/proxy page isn't JSON — don't let the parse throw.
+            const data = (await res.json().catch(() => ({}))) as {
+                code?: string;
+                error?: unknown;
+            };
+            const target = res.ok ? codeFromData(data) : "";
+            if (!target) {
+                setBusy(null);
+                setError(describeError(data.error));
+                return;
+            }
+            // Stay busy while navigating so the button can't double-submit.
+            router.push(`/lobby/${target}`);
+        } catch {
             setBusy(null);
-            setError(describeError(data.error));
-            return;
+            setError(describeError(null));
         }
-        router.push(`/lobby/${codeFromData(data)}`);
     }
 
     function createRoom(

@@ -1,14 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import type { CardDescriptor } from "@/lib/card/types";
-
-export type BoardThemeTier =
-    | "common"
-    | "uncommon"
-    | "rare"
-    | "epic"
-    | "legendary"
-    | "mystical"
-    | "ethereal";
+import type { CardDescriptor, ThemeTier } from "@/lib/card/types";
 
 export interface BoardZone {
     /** CSS background for zone containers (play area, hand area) */
@@ -29,7 +20,8 @@ export interface BoardBadge {
 export interface BoardTheme {
     id: string;
     name: string;
-    tier: BoardThemeTier;
+    /** Same tier scale as card themes — one shared `ThemeTier` union. */
+    tier: ThemeTier;
 
     surface: {
         /** CSS background shorthand — gradient, solid, or url(...) */

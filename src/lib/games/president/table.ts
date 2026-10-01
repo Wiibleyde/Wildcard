@@ -38,10 +38,10 @@ function rankLabel(ctx: TableContext, rank: unknown): string {
         : r;
 }
 
-/** Title for a clean finish, when one exists ("Président", "Vice-Trou"…). */
 /**
- * Canonical Président ladder, adjusted to the table size (`total` ranked
- * players): Président, Vice-Président, Neutre(s), Vice-Trou du cul, Trou du cul.
+ * Title for a clean finish. Canonical Président ladder, adjusted to the table
+ * size (`total` ranked players): Président, Vice-Président, Neutre(s),
+ * Vice-Trou du cul, Trou du cul.
  * Vice titles need a 4th seat; everyone between the vices is Neutre. With 6
  * players the two middle seats are both Neutre. `place` is 1-based.
  */
@@ -121,6 +121,8 @@ export const presidentTable = registerTable<PresidentView>({
         if (first?.type !== "suited") return null;
 
         const nextHand = hand.filter((c) => !playedKeys.has(cardKey(c)));
+        // Show the hand's own copies, mirroring the server (never the action's).
+        const played = hand.filter((c) => playedKeys.has(cardKey(c)));
         // A fresh lead clears the just-won trick still on display; otherwise the
         // play stacks onto the running pile.
         const showingLast = view.pile.length === 0 && view.lastTrick.length > 0;
@@ -129,7 +131,7 @@ export const presidentTable = registerTable<PresidentView>({
             ...view,
             currentPlayerId: "",
             combo: { rank: first.rank, count: a.cards.length },
-            pile: [...basePile, { playerId: viewerId, cards: a.cards }],
+            pile: [...basePile, { playerId: viewerId, cards: played }],
             lastTrick: showingLast ? [] : view.lastTrick,
             players: view.players.map((p) =>
                 p.playerId === viewerId

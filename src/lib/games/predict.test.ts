@@ -120,9 +120,12 @@ describe("solitaire — predict matches apply on the whole board", () => {
                     cases++;
                 }
 
-                // Advance: prefer a board move, fall back to drawing/recycling.
+                // Advance: prefer a board move, fall back to drawing/recycling
+                // (never resign — it would end the walk early).
                 const next =
-                    legal.find((a) => a.type !== "draw") ??
+                    legal.find(
+                        (a) => a.type !== "draw" && a.type !== "resign",
+                    ) ??
                     legal.find((a) => a.type === "draw") ??
                     legal[0];
                 const stepped = dispatch(solitaire, state, next, "solo");

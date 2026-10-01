@@ -15,9 +15,16 @@ import type {
 import { getGameModule } from "@/lib/games";
 import { ecaModuleFromState } from "@/lib/games/resolve";
 import { recordGameFinished, recordMove } from "@/lib/metrics/registry";
-import { recordEloForGame } from "@/lib/models/elo";
-import { recordXpForGame } from "@/lib/models/xp";
-import type { Database } from "@/lib/supabase/types";
+import { eloResultsForGame } from "@/lib/models/elo";
+import {
+    describeEnd,
+    type GameEndInfo,
+    outcomeFromWinners,
+    playedMoves,
+    resolveEndOutcome,
+} from "@/lib/models/gameEnd";
+import { xpAwardsForGame } from "@/lib/models/xp";
+import type { Database, GameEndReason } from "@/lib/supabase/types";
 
 type Admin = SupabaseClient<Database>;
 
@@ -56,13 +63,22 @@ const LOG_LIMIT = 80;
 export interface GameClientPayload {
     readonly gameId: string;
     readonly moduleId: string;
+    /** Invite code of the room hosting the game — the in-game "leave" posts to it. */
+    readonly roomCode: string | null;
     readonly version: number;
     readonly phase: string;
     readonly isOver: boolean;
     readonly currentPlayerId: string | null;
     readonly view: unknown;
     readonly legalActions: readonly GameAction[];
+    /**
+     * Standings to show. For a natural end, the module's outcome; for a forfeit
+     * (state never reached a terminal position), rebuilt from the persisted
+     * winners; `null` for an admin / reaper close.
+     */
     readonly outcome: GameOutcome | null;
+    /** How the game ended — `null` while it is live. */
+    readonly end: GameEndInfo | null;
     readonly players: readonly GamePlayer[];
     /** Recent history, oldest first — drives the in-game log feed. */
     readonly log: readonly GameLogEntry[];
@@ -80,34 +96,55 @@ interface LoadedGame {
         version: number;
         is_over: boolean;
         bot_ids: string[];
+        winner_ids: string[];
+        end_reason: GameEndReason | null;
+        forfeited_by: string | null;
         created_at: string | null;
         updated_at: string;
+        room_code: string | null;
     };
     module: AnyGameModule;
     state: GameState;
 }
 
-async function loadGame(
+/**
+ * Load a game's public meta AND its secret state in ONE statement (PostgREST
+ * embeds `game_states` into the `games` row), so both come from the same
+ * snapshot: every commit writes them in one transaction
+ * (`wildcard.commit_game_step`), and a read can never pair state N with
+ * version N+1.
+ */
+export async function loadGame(
     admin: Admin,
     gameId: string,
 ): Promise<{ ok: true; game: LoadedGame } | { ok: false; error: LoadError }> {
-    const { data: meta } = await admin
+    const { data, error } = await admin
         .from("games")
         .select(
-            "id, room_id, module_id, version, is_over, bot_ids, created_at, updated_at",
+            "id, room_id, module_id, version, is_over, bot_ids, winner_ids, end_reason, forfeited_by, created_at, updated_at, game_states(state), rooms!games_room_id_fkey(code)",
         )
         .eq("id", gameId)
         .maybeSingle();
-    if (!meta) return { ok: false, error: "not_found" };
+    if (error) {
+        console.error(`[game] load failed (${gameId}):`, error.message);
+    }
+    if (!data) return { ok: false, error: "not_found" };
 
-    const { data: secret } = await admin
-        .from("game_states")
-        .select("state")
-        .eq("game_id", gameId)
-        .maybeSingle();
+    const { game_states: embedded, rooms: roomEmbed, ...row } = data;
+    const room = (Array.isArray(roomEmbed) ? roomEmbed[0] : roomEmbed) as
+        | { code: string }
+        | null
+        | undefined;
+    const meta = { ...row, room_code: room?.code ?? null };
+    // One-to-one embed: an object, or a one-element array depending on how the
+    // relationship is detected — accept both.
+    const secret = (Array.isArray(embedded) ? embedded[0] : embedded) as
+        | { state: unknown }
+        | null
+        | undefined;
     if (!secret) return { ok: false, error: "not_found" };
 
-    const state = secret.state as unknown as GameState;
+    const state = secret.state as GameState;
     // Studio games rebuild their module from the definition stamped into the
     // state — no `eca_games` read on this hot path (page load + every poll), and
     // a game stays loadable even if its row was later edited or removed.
@@ -154,20 +191,45 @@ async function logOf(admin: Admin, gameId: string): Promise<GameLogEntry[]> {
     }));
 }
 
+/** The persisted facts a {@link GameClientPayload} is shaped from. */
+interface PayloadMeta {
+    readonly gameId: string;
+    readonly moduleId: string;
+    readonly roomCode: string | null;
+    readonly version: number;
+    /** DB `is_over` — an out-of-band end flips it without touching `state`. */
+    readonly isOver: boolean;
+    readonly endReason: GameEndReason | null;
+    readonly forfeitedBy: string | null;
+    readonly winnerIds: readonly string[];
+    readonly botIds: readonly string[];
+}
+
+function payloadMetaOf(meta: LoadedGame["meta"]): PayloadMeta {
+    return {
+        gameId: meta.id,
+        moduleId: meta.module_id,
+        roomCode: meta.room_code,
+        version: meta.version,
+        isOver: meta.is_over,
+        endReason: meta.end_reason,
+        forfeitedBy: meta.forfeited_by,
+        winnerIds: meta.winner_ids,
+        botIds: meta.bot_ids,
+    };
+}
+
 /**
  * Assemble one viewer's redacted payload from an already-loaded module + state.
  * The single place that shapes a {@link GameClientPayload}, shared by the full
  * read ({@link getGameClientState}) and the action commit ({@link applyAction},
  * which returns the actor's fresh payload in the POST response so the client
- * needs no follow-up GET). `isOverFlag` is the DB column: an admin force-end
- * flips it without touching `state`, so `module.isOver(state)` alone would miss
- * it.
+ * needs no follow-up GET). The end of the game (outcome + {@link GameEndInfo})
+ * comes from the persisted row, not only the state: a forfeit / admin end /
+ * reaper close flips `is_over` without touching `state`.
  */
 function buildClientPayload(
-    gameId: string,
-    moduleId: string,
-    version: number,
-    isOverFlag: boolean,
+    meta: PayloadMeta,
     module: AnyGameModule,
     state: GameState,
     viewerId: string | null,
@@ -175,16 +237,41 @@ function buildClientPayload(
     log: GameLogEntry[],
 ): GameClientPayload {
     const cs = clientState(module, state, viewerId);
+    const isOver = cs.isOver || meta.isOver;
+    let outcome: GameOutcome | null = null;
+    let end: GameEndInfo | null = null;
+    if (isOver) {
+        const facts = {
+            reason: meta.endReason,
+            terminal: cs.isOver,
+            stateOutcome: cs.isOver ? module.outcome(state) : null,
+            playerIds: state.players.map((p) => p.id),
+            winnerIds: meta.winnerIds,
+            forfeitedBy: meta.forfeitedBy,
+        };
+        outcome = resolveEndOutcome(facts);
+        end = describeEnd({
+            ...facts,
+            outcome,
+            botIds: meta.botIds,
+            version: meta.version,
+            viewerId,
+        });
+    }
     return {
-        gameId,
-        moduleId,
-        version,
+        gameId: meta.gameId,
+        moduleId: meta.moduleId,
+        roomCode: meta.roomCode,
+        version: meta.version,
         phase: state.phase,
-        isOver: cs.isOver || isOverFlag,
+        isOver,
         currentPlayerId: state.currentPlayerId,
         view: cs.view,
-        legalActions: cs.legalActions,
-        outcome: module.outcome(state),
+        // A force-ended (admin / forfeit / reaper) game keeps a non-terminal
+        // state: the module would still list moves the server refuses.
+        legalActions: isOver ? [] : cs.legalActions,
+        outcome,
+        end,
         players,
         log,
         viewerId,
@@ -224,10 +311,7 @@ export async function getGameClientState(
     return {
         ok: true,
         payload: buildClientPayload(
-            meta.id,
-            meta.module_id,
-            meta.version,
-            meta.is_over,
+            payloadMetaOf(meta),
             module,
             state,
             effectiveViewer,
@@ -294,7 +378,9 @@ export type ApplyErrorCode =
 /** HTTP status for each apply/load error — keeps the route handlers thin. */
 export const APPLY_ERROR_STATUS: Record<ApplyErrorCode, number> = {
     not_found: 404,
-    unknown_game: 400,
+    // The game exists but its module cannot be rebuilt (removed from the
+    // registry, corrupt stamped definition): a server fault, not a bad request.
+    unknown_game: 500,
     version_conflict: 409,
     rule_violation: 422,
     invalid_action: 400,
@@ -383,17 +469,24 @@ const STALL_RESUME_MS = 3000;
  */
 function maybeResumeBots(admin: Admin, game: LoadedGame): void {
     const { meta, module, state } = game;
-    if (meta.is_over || meta.bot_ids.length === 0 || module.isOver(state))
-        return;
-    // Nobody (or a human) owns the turn → nothing to resume.
-    if (nextBotMover(module, state, new Set(meta.bot_ids)) === null) return;
+    if (meta.is_over || meta.bot_ids.length === 0) return;
     const idleMs = Date.now() - new Date(meta.updated_at).getTime();
     if (idleMs < STALL_RESUME_MS) return; // a live chain is still pacing moves
+    try {
+        if (module.isOver(state)) return;
+        // Nobody (or a human) owns the turn → nothing to resume.
+        if (nextBotMover(module, state, new Set(meta.bot_ids)) === null) {
+            return;
+        }
+    } catch (err) {
+        // A module fault must not turn a viewer read into a 500.
+        console.error(`[bots] game ${meta.id}: resume check threw:`, err);
+        return;
+    }
     after(() =>
         advanceBots(
             admin,
             meta.id,
-            meta.room_id,
             module,
             state,
             meta.version,
@@ -404,23 +497,128 @@ function maybeResumeBots(admin: Admin, game: LoadedGame): void {
 }
 
 /**
+ * Largest serialized client action accepted, in bytes. Real actions are a few
+ * hundred bytes at most; the cap bounds what a client can make the server
+ * store in the permanent move log.
+ */
+export const MAX_ACTION_BYTES = 4096;
+
+type CommitResult =
+    | { ok: true; version: number }
+    | { ok: false; error: "version_conflict" | "db_error"; message?: string };
+
+/**
+ * Commit one applied action atomically through `wildcard.commit_game_step`:
+ * the compare-and-set on `games.version`, the secret state and the log row
+ * (`seq` = new version) land in ONE transaction — all or nothing. A torn game
+ * (version bumped, state or log missing) can no longer exist, so the replay
+ * always re-derives the live state.
+ */
+async function commitStep(
+    admin: Admin,
+    gameId: string,
+    expectedVersion: number,
+    state: GameState,
+    isOver: boolean,
+    outcome: GameOutcome | null,
+    actorId: string,
+    action: GameAction,
+    events: readonly GameEvent[],
+): Promise<CommitResult> {
+    const { data, error } = await admin.rpc("commit_game_step", {
+        p_game_id: gameId,
+        p_expected_version: expectedVersion,
+        p_phase: state.phase,
+        p_current_player_id: state.currentPlayerId,
+        p_is_over: isOver,
+        p_winner_ids: [...(outcome?.winners ?? [])],
+        p_state: state as unknown as Record<string, unknown>,
+        p_actor_id: actorId,
+        p_action: action as unknown as Record<string, unknown>,
+        p_events: events as unknown as Record<string, unknown>[],
+    });
+    if (error) return { ok: false, error: "db_error", message: error.message };
+    if (data === null) return { ok: false, error: "version_conflict" };
+    return { ok: true, version: data };
+}
+
+/** What {@link settleGame} needs to know about a finished game. */
+export interface SettleTarget {
+    readonly id: string;
+    readonly moduleId: string;
+    readonly botIds: readonly string[];
+    readonly createdAt: string | null;
+    /** Moves actually played (no XP for a game nobody played). */
+    readonly moveCount: number;
+}
+
+/**
+ * Record the end of a finished game — exactly once. `wildcard.settle_game`
+ * flips `games.settled_at` with a compare-and-set, finishes the room and applies
+ * the ELO / XP computed here, in one transaction: a retried or concurrent
+ * settlement is a no-op, so ratings and XP can never be granted twice.
+ *
+ * `forfeited` players (they left mid-game) are ranked last by the caller's
+ * outcome and earn no XP. Best-effort for the caller: failures are logged and
+ * the maintenance sweep ({@link settlePendingGames}) retries any game still
+ * unsettled. Returns whether this call settled the game.
+ */
+export async function settleGame(
+    admin: Admin,
+    game: SettleTarget,
+    outcome: GameOutcome | null,
+    forfeited: readonly string[] = [],
+): Promise<boolean> {
+    try {
+        const elo = await eloResultsForGame(
+            admin,
+            game.moduleId,
+            outcome,
+            game.botIds,
+        );
+        const xp = xpAwardsForGame(outcome, game.botIds, {
+            excluded: forfeited,
+            moveCount: game.moveCount,
+        });
+        const { data, error } = await admin.rpc("settle_game", {
+            p_game_id: game.id,
+            p_elo: elo,
+            p_xp: xp,
+        });
+        if (error) {
+            console.error(`[game] settle failed (${game.id}):`, error.message);
+            return false;
+        }
+        if (data === true) {
+            recordGameFinished(game.moduleId, durationSeconds(game.createdAt));
+        }
+        return data === true;
+    } catch (err) {
+        console.error(`[game] settle threw (${game.id}):`, err);
+        return false;
+    }
+}
+
+/**
  * Drive every bot whose turn it currently is, one paced move at a time, until
- * a human is on turn or the game ends. Each step bumps `version` (so Realtime
- * pushes the move to every client), rewrites the secret state, and logs the
- * action.
+ * a human is on turn or the game ends. Each step is one atomic commit
+ * ({@link commitStep}): it bumps `version` (so Realtime pushes the move to every
+ * client), rewrites the secret state, and logs the action.
  *
  * Runs *after the response* of each human action and once at deal time (the
  * opening leader may be a bot) — see the `after()` calls at the call sites.
- * Because the chain now overlaps the request window, each step claims its
- * version transition with a compare-and-set and stops if anything else won
- * the race.
+ * Because the chain overlaps the request window, each step claims its version
+ * transition with a compare-and-set and stops if anything else won the race.
+ *
+ * Never throws: a module fault or a failed write is logged and stops the chain
+ * (the stall self-heal in {@link maybeResumeBots} re-kicks it later) instead of
+ * killing the `after()` task chain.
  *
  * Returns the final version after all bot moves.
  */
 export async function advanceBots(
     admin: Admin,
     gameId: string,
-    roomId: string,
     module: AnyGameModule,
     fromState: GameState,
     fromVersion: number,
@@ -432,68 +630,73 @@ export async function advanceBots(
     const botSet = new Set(botIds);
     let steps = 0;
 
-    while (steps++ < MAX_BOT_STEPS && !module.isOver(state)) {
-        const botId = nextBotMover(module, state, botSet);
-        if (botId === null) break;
+    try {
+        while (steps++ < MAX_BOT_STEPS && !module.isOver(state)) {
+            const botId = nextBotMover(module, state, botSet);
+            if (botId === null) break;
 
-        const legal = module.legalActions(state, botId);
-        if (legal.length === 0) break;
+            const legal = module.legalActions(state, botId);
+            if (legal.length === 0) break;
 
-        // The bot "thinks" — gives every client time to animate the previous
-        // play before the next version bump arrives.
-        await sleep(BOT_TURN_DELAY_MS);
+            // The bot "thinks" — gives every client time to animate the
+            // previous play before the next version bump arrives.
+            await sleep(BOT_TURN_DELAY_MS);
 
-        const action = chooseBotAction(legal);
-        const result = dispatch(module, state, action, botId);
-        if (!result.ok) break;
+            const action = chooseBotAction(legal);
+            const result = dispatch(module, state, action, botId);
+            if (!result.ok) {
+                console.error(
+                    `[bots] game ${gameId}: legal bot move refused (${result.error.code})`,
+                );
+                break;
+            }
 
-        state = result.state;
-        version += 1;
-        const over = module.isOver(state);
-        const outcome = module.outcome(state);
-        const now = new Date().toISOString();
-
-        const { data: claimed } = await admin
-            .from("games")
-            .update({
+            const over = module.isOver(result.state);
+            const outcome = module.outcome(result.state);
+            const committed = await commitStep(
+                admin,
+                gameId,
                 version,
-                phase: state.phase,
-                current_player_id: state.currentPlayerId,
-                is_over: over,
-                winner_ids: [...(outcome?.winners ?? [])],
-                updated_at: now,
-            })
-            .eq("id", gameId)
-            .eq("version", version - 1)
-            .select("id")
-            .maybeSingle();
-        // Someone else advanced the game while we slept — stop, their chain
-        // (or the next human action) owns the state now.
-        if (!claimed) break;
-        await admin
-            .from("game_states")
-            .update({
-                state: state as unknown as Record<string, unknown>,
-                updated_at: now,
-            })
-            .eq("game_id", gameId);
-        await admin.from("game_actions").insert({
-            game_id: gameId,
-            seq: version,
-            actor_id: botId,
-            action: action as unknown as Record<string, unknown>,
-            events: result.events as unknown as Record<string, unknown>[],
-        });
+                result.state,
+                over,
+                outcome,
+                botId,
+                action,
+                result.events,
+            );
+            if (!committed.ok) {
+                // A conflict means someone else advanced the game while we
+                // slept — their chain (or the next human action) owns it now.
+                if (committed.error === "db_error") {
+                    console.error(
+                        `[bots] game ${gameId}: commit failed:`,
+                        committed.message,
+                    );
+                }
+                break;
+            }
+            state = result.state;
+            version = committed.version;
 
-        if (over) {
-            await admin
-                .from("rooms")
-                .update({ status: "finished" })
-                .eq("id", roomId);
-            recordGameFinished(module.id, durationSeconds(createdAt));
-            await recordEloForGame(admin, module.id, outcome, botIds);
-            await recordXpForGame(admin, outcome, botIds);
+            if (over) {
+                await settleGame(
+                    admin,
+                    {
+                        id: gameId,
+                        moduleId: module.id,
+                        botIds,
+                        createdAt,
+                        moveCount: committed.version,
+                    },
+                    outcome,
+                );
+            }
         }
+    } catch (err) {
+        console.error(
+            `[bots] game ${gameId}: module threw, chain stopped:`,
+            err,
+        );
     }
 
     return version;
@@ -525,10 +728,13 @@ export type ApplyActionResult =
  * 1. The actor is forced to the authenticated user — the client cannot spoof
  *    `playerId`.
  * 2. Optimistic concurrency: `expectedVersion` must match the stored version,
- *    and the meta row is claimed with a compare-and-set (`where version = …`)
- *    so two simultaneous actions can never both commit. A loser gets
+ *    and the commit is a compare-and-set (`where version = …`) so two
+ *    simultaneous actions can never both commit. A loser gets
  *    `version_conflict` and simply refetches.
  * 3. The module validates legality; illegal moves are refused, never trusted.
+ * 4. Meta, secret state and log row are written in one transaction
+ *    ({@link commitStep}); a finished game is then settled exactly once
+ *    ({@link settleGame}).
  */
 export async function applyAction(
     admin: Admin,
@@ -550,8 +756,8 @@ export async function applyAction(
     const record = (result: string) =>
         recordMove(meta.module_id, result, performance.now() - startedAt);
 
-    // An admin abort sets `is_over` on the row without mutating `state`, so the
-    // module would still accept moves — refuse them here, before dispatch.
+    // An admin abort / forfeit sets `is_over` on the row without mutating
+    // `state`, so the module would still accept moves — refuse them here.
     if (meta.is_over) {
         record("rule_violation");
         return {
@@ -574,10 +780,25 @@ export async function applyAction(
 
     // Force the actor — never trust a client-supplied playerId.
     const action = { ...rawAction, playerId: actorId } as GameAction;
+    // The action is stored verbatim in the move log: bound its size so a
+    // client cannot pad it with arbitrary keys.
+    const actionBytes = new TextEncoder().encode(JSON.stringify(action)).length;
+    if (actionBytes > MAX_ACTION_BYTES) {
+        record("invalid_action");
+        return {
+            ok: false,
+            error: "invalid_action",
+            message: `Action too large (${actionBytes} bytes, max ${MAX_ACTION_BYTES}).`,
+        };
+    }
 
     let result: ApplyResult<GameState>;
+    let isOver: boolean;
+    let outcome: GameOutcome | null;
     try {
         result = dispatch(module, state, action, actorId);
+        isOver = result.ok && module.isOver(result.state);
+        outcome = result.ok ? module.outcome(result.state) : null;
     } catch (err) {
         record("invalid_action");
         return {
@@ -592,75 +813,40 @@ export async function applyAction(
     }
 
     const newState = result.state;
-    const isOver = module.isOver(newState);
-    const outcome = module.outcome(newState);
-    const newVersion = meta.version + 1;
-
-    // Compare-and-set on the meta row: claims this version transition. If a
-    // concurrent action already advanced past `expectedVersion`, no row matches
-    // and we bail out without touching the secret state.
-    const { data: claimed, error: claimError } = await admin
-        .from("games")
-        .update({
-            version: newVersion,
-            phase: newState.phase,
-            current_player_id: newState.currentPlayerId,
-            is_over: isOver,
-            winner_ids: [...(outcome?.winners ?? [])],
-            updated_at: new Date().toISOString(),
-        })
-        .eq("id", gameId)
-        .eq("version", expectedVersion)
-        .select("id")
-        .maybeSingle();
-    if (claimError) {
-        record("db_error");
-        return { ok: false, error: "db_error", message: claimError.message };
+    const committed = await commitStep(
+        admin,
+        gameId,
+        expectedVersion,
+        newState,
+        isOver,
+        outcome,
+        actorId,
+        action,
+        result.events,
+    );
+    if (!committed.ok) {
+        record(committed.error);
+        return committed;
     }
-    if (!claimed) {
-        record("version_conflict");
-        return { ok: false, error: "version_conflict" };
-    }
-
-    const [{ error: stateError }, { error: logError }] = await Promise.all([
-        admin
-            .from("game_states")
-            .update({
-                state: newState as unknown as Record<string, unknown>,
-                updated_at: new Date().toISOString(),
-            })
-            .eq("game_id", gameId),
-        admin.from("game_actions").insert({
-            game_id: gameId,
-            seq: newVersion,
-            actor_id: actorId,
-            action: action as unknown as Record<string, unknown>,
-            events: result.events as unknown as Record<string, unknown>[],
-        }),
-    ]);
-    if (stateError) {
-        record("db_error");
-        return { ok: false, error: "db_error", message: stateError.message };
-    }
-    if (logError) {
-        record("db_error");
-        return { ok: false, error: "db_error", message: logError.message };
-    }
+    const newVersion = committed.version;
 
     record("ok");
 
     // Build the actor's fresh payload straight from the in-memory committed
     // state — the client adopts it from the POST response, no follow-up GET.
-    // (`logOf` now includes the action just inserted above.)
+    // (`logOf` now includes the action just committed.)
     const [players, log] = await Promise.all([
         playersOf(admin, newState),
         logOf(admin, gameId),
     ]);
     const payload = buildClientPayload(
-        gameId,
-        meta.module_id,
-        newVersion,
-        isOver,
+        {
+            ...payloadMetaOf(meta),
+            version: newVersion,
+            isOver,
+            endReason: isOver ? "natural" : null,
+            winnerIds: [...(outcome?.winners ?? [])],
+        },
         module,
         newState,
         actorId,
@@ -669,25 +855,28 @@ export async function applyAction(
     );
 
     if (isOver) {
-        await admin
-            .from("rooms")
-            .update({ status: "finished" })
-            .eq("id", meta.room_id);
-        recordGameFinished(module.id, durationSeconds(meta.created_at));
-        await recordEloForGame(admin, meta.module_id, outcome, meta.bot_ids);
-        await recordXpForGame(admin, outcome, meta.bot_ids);
+        await settleGame(
+            admin,
+            {
+                id: gameId,
+                moduleId: meta.module_id,
+                botIds: meta.bot_ids,
+                createdAt: meta.created_at,
+                moveCount: newVersion,
+            },
+            outcome,
+        );
     }
 
     // Let any bots now on turn play out AFTER the response: the human's card
     // animates immediately, then each paced bot move arrives over Realtime as
     // its own update — visible turns instead of one burst. Skip when the game
-    // already ended (no bot to play, and avoids a redundant finish recording).
+    // already ended (no bot to play).
     if (!isOver && meta.bot_ids.length > 0) {
         after(() =>
             advanceBots(
                 admin,
                 gameId,
-                meta.room_id,
                 module,
                 newState,
                 newVersion,
@@ -704,56 +893,204 @@ export type EndGameResult =
     | { ok: true; version: number }
     | { ok: false; error: ApplyErrorCode };
 
+/** Why a live game is closed out of band. */
+export type OutOfBandEndReason = Exclude<GameEndReason, "natural">;
+
+export interface EndGameOptions {
+    /** Recorded in `games.end_reason`; defaults to an admin force-end. */
+    readonly reason?: OutOfBandEndReason;
+    /**
+     * Standings to record. `null` (admin abort, reaper) = no winner, no
+     * rating change; a forfeit passes the leaver-ranked-last outcome.
+     */
+    readonly outcome?: GameOutcome | null;
+    /** The player who forfeited — ranked last by `outcome`, earns no XP. */
+    readonly forfeitedBy?: string | null;
+}
+
+/** Attempts before an out-of-band end gives up racing live moves. */
+const END_GAME_ATTEMPTS = 3;
+
 /**
- * Administrative force-end (admin dashboard "end game" button).
+ * Out-of-band end of a live game: admin force-end (dashboard button), forfeit
+ * (a seated player left, see `leaveRoom`) and the maintenance reaper all come
+ * through here.
  *
- * This is an out-of-band override, NOT a game action: it never runs the module
- * and writes no `game_actions` row (a synthetic action would break replay,
- * which re-dispatches every logged action through the module). Instead it just
- * flips `is_over` on the row and bumps `version` so every connected client
- * refetches and lands on the game-over screen, finishes the room, and records
- * the finish metric.
- *
- * The version bump is a compare-and-set against the loaded version, so a
- * force-end races cleanly against a concurrent player/bot move — exactly one
- * wins, the loser is a no-op. A game already over is an idempotent success.
+ * This is an override, NOT a game action: it never runs the module and writes
+ * no `game_actions` row (a synthetic action would break replay, which
+ * re-dispatches every logged action through the module). It flips `is_over`
+ * with the given winners, records why (`end_reason`, `forfeited_by`) and bumps
+ * `version` — a compare-and-set, so it races cleanly against a concurrent
+ * player/bot move (retried a few times against a busy bot chain) — then
+ * settles the game exactly once ({@link settleGame}): room finished, ELO/XP
+ * from `outcome`, finish metric. Every connected client refetches on the
+ * version bump and lands on the game-over screen. A game already over is an
+ * idempotent success.
  */
 export async function endGame(
     admin: Admin,
     gameId: string,
+    options: EndGameOptions = {},
 ): Promise<EndGameResult> {
-    const { data: meta } = await admin
-        .from("games")
-        .select("id, room_id, module_id, version, is_over, created_at")
-        .eq("id", gameId)
-        .maybeSingle();
-    if (!meta) return { ok: false, error: "not_found" };
+    const outcome = options.outcome ?? null;
+    const reason = options.reason ?? "admin";
+    const forfeitedBy =
+        reason === "forfeit" ? (options.forfeitedBy ?? null) : null;
+
+    for (let attempt = 0; attempt < END_GAME_ATTEMPTS; attempt++) {
+        const { data: meta, error: readError } = await admin
+            .from("games")
+            .select("id, module_id, version, is_over, bot_ids, created_at")
+            .eq("id", gameId)
+            .maybeSingle();
+        if (readError) {
+            console.error(`[game] end read failed (${gameId}):`, readError);
+            return { ok: false, error: "db_error" };
+        }
+        if (!meta) return { ok: false, error: "not_found" };
+        if (meta.is_over) return { ok: true, version: meta.version };
+
+        const newVersion = meta.version + 1;
+        const { data: claimed, error } = await admin
+            .from("games")
+            .update({
+                version: newVersion,
+                is_over: true,
+                end_reason: reason,
+                forfeited_by: forfeitedBy,
+                winner_ids: [...(outcome?.winners ?? [])],
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", gameId)
+            .eq("version", meta.version)
+            .eq("is_over", false)
+            .select("id")
+            .maybeSingle();
+        if (error) {
+            console.error(`[game] end failed (${gameId}):`, error.message);
+            return { ok: false, error: "db_error" };
+        }
+        // Lost the race to a player/bot move — re-read and try again.
+        if (!claimed) continue;
+
+        await settleGame(
+            admin,
+            {
+                id: meta.id,
+                moduleId: meta.module_id,
+                botIds: meta.bot_ids,
+                createdAt: meta.created_at,
+                // The pre-bump version: every move so far, none for this end.
+                moveCount: meta.version,
+            },
+            outcome,
+            forfeitedBy ? [forfeitedBy] : [],
+        );
+        return { ok: true, version: newVersion };
+    }
+
+    return { ok: false, error: "version_conflict" };
+}
+
+/**
+ * Forfeit: `leaverId` walked out of a live game. The game ends at once — the
+ * leaver ranked last, every remaining seat (bots included) sharing first place
+ * — and is settled like any finished game (ELO among humans, XP for those who
+ * stayed). A solo game simply ends without a result. No-op when the game is
+ * already over or the leaver was not dealt in (a spectator).
+ */
+export async function forfeitGame(
+    admin: Admin,
+    gameId: string,
+    leaverId: string,
+): Promise<EndGameResult> {
+    const loaded = await loadGame(admin, gameId);
+    if (!loaded.ok) return loaded;
+    const { meta, state } = loaded.game;
     if (meta.is_over) return { ok: true, version: meta.version };
+    const playerIds = state.players.map((p) => p.id);
+    if (!playerIds.includes(leaverId)) {
+        return { ok: true, version: meta.version };
+    }
 
-    const newVersion = meta.version + 1;
-    const now = new Date().toISOString();
+    const outcome = outcomeFromWinners(
+        playerIds,
+        playerIds.filter((id) => id !== leaverId),
+        leaverId,
+    );
 
-    const { data: claimed, error } = await admin
+    return endGame(admin, gameId, {
+        reason: "forfeit",
+        outcome,
+        forfeitedBy: leaverId,
+    });
+}
+
+/** Max games one {@link settlePendingGames} pass settles. */
+const SETTLE_BATCH = 100;
+
+/**
+ * Settle finished games whose settlement never landed (the process died between
+ * the final commit and {@link settleGame}, or the settle call failed). Idempotent
+ * — run by the maintenance pass at boot. Returns how many games this pass
+ * settled.
+ *
+ * The outcome is rebuilt exactly as the original settlement computed it
+ * ({@link resolveEndOutcome}): from the terminal state for a natural end, from
+ * the stored winners (forfeiter last) for a forfeit, none for an admin / reaper
+ * close — so a retried forfeit still grants its ELO / XP.
+ *
+ * Only rows carrying an `end_reason` are retried: that column is written by the
+ * current code path only, so a game ended by an older instance during a rolling
+ * deploy (settled the old way, `settled_at` never set) is never settled twice.
+ */
+export async function settlePendingGames(admin: Admin): Promise<number> {
+    const { data: pending, error } = await admin
         .from("games")
-        .update({
-            version: newVersion,
-            is_over: true,
-            winner_ids: [],
-            updated_at: now,
-        })
-        .eq("id", gameId)
-        .eq("version", meta.version)
         .select("id")
-        .maybeSingle();
-    if (error) return { ok: false, error: "db_error" };
-    // Lost the race to a player/bot move — that move owns the state now.
-    if (!claimed) return { ok: false, error: "version_conflict" };
+        .eq("is_over", true)
+        .is("settled_at", null)
+        .not("end_reason", "is", null)
+        .limit(SETTLE_BATCH);
+    if (error) {
+        console.error("[game] pending settlements read failed:", error.message);
+        return 0;
+    }
 
-    await admin
-        .from("rooms")
-        .update({ status: "finished" })
-        .eq("id", meta.room_id);
-    recordGameFinished(meta.module_id, durationSeconds(meta.created_at));
-
-    return { ok: true, version: newVersion };
+    let settled = 0;
+    for (const { id } of pending ?? []) {
+        const loaded = await loadGame(admin, id);
+        if (!loaded.ok) continue;
+        const { meta, module, state } = loaded.game;
+        let terminal = false;
+        let stateOutcome: GameOutcome | null = null;
+        try {
+            terminal = module.isOver(state);
+            stateOutcome = terminal ? module.outcome(state) : null;
+        } catch (err) {
+            console.error(`[game] outcome threw (${id}):`, err);
+        }
+        const outcome = resolveEndOutcome({
+            reason: meta.end_reason,
+            terminal,
+            stateOutcome,
+            playerIds: state.players.map((p) => p.id),
+            winnerIds: meta.winner_ids,
+            forfeitedBy: meta.forfeited_by,
+        });
+        const done = await settleGame(
+            admin,
+            {
+                id,
+                moduleId: meta.module_id,
+                botIds: meta.bot_ids,
+                createdAt: meta.created_at,
+                moveCount: playedMoves(meta.version, terminal),
+            },
+            outcome,
+            meta.forfeited_by ? [meta.forfeited_by] : [],
+        );
+        if (done) settled++;
+    }
+    return settled;
 }

@@ -66,7 +66,9 @@ export interface TrickCard {
 export interface CompletedTrick {
     readonly leaderId: string;
     readonly plays: readonly TrickCard[];
-    /** Highest trump, else highest card of the led suit — never the Excuse. */
+    /** Highest trump, else highest card of the led suit. Never the Excuse —
+     * except when a side that swept every earlier trick leads it to the last
+     * one (Excuse au chelem, see `trickWinner`). */
     readonly winnerId: string;
 }
 
@@ -176,7 +178,8 @@ export interface DealResult {
  * The hard part is the Excuse (« L'Excuse »): it never wins a trick. Normally
  * the player who plays it keeps it in their own pile and hands a low (0.5) card
  * to the trick's winner; on the very last trick it is instead captured by the
- * winner — unless its owner's side has swept every trick (grand chelem). We
+ * winner — unless its owner's side has swept every trick (grand chelem; a
+ * chelem side leading the Excuse to the last trick wins that trick). We
  * resolve all of that by assigning each card to the taker or defence pile, then
  * applying the half-point Excuse transfers as a demi-point adjustment, so the
  * 182-demi (91-point) total is always conserved.
@@ -248,14 +251,21 @@ export function scoreDeal(input: DealInput): DealResult {
     const multiplier = BID_MULTIPLIER[contract];
 
     // « Petit au bout » — Petit (trump 1) played in the last trick: +10 (×mult)
-    // to whichever side won that trick.
+    // to whichever side won that trick. When a chelem side spends the last
+    // trick leading the Excuse, the FFT moves "the end" one trick earlier: the
+    // Petit counts au bout if it falls in the penultimate trick.
     let petitAuBout: -1 | 0 | 1 = 0;
     const last = tricks[tricks.length - 1];
+    const excuseClosesSlam =
+        last !== undefined &&
+        last.plays[0]?.card.type === "fool" &&
+        last.winnerId === last.plays[0].playerId;
+    const bout = excuseClosesSlam ? tricks[tricks.length - 2] : last;
     if (
         rules.petitAuBout &&
-        last?.plays.some((p) => p.card.type === "trump" && p.card.index === 1)
+        bout?.plays.some((p) => p.card.type === "trump" && p.card.index === 1)
     ) {
-        petitAuBout = last.winnerId === taker ? 1 : -1;
+        petitAuBout = bout.winnerId === taker ? 1 : -1;
     }
 
     // « Chelem » — unannounced slam: one side wins all the tricks.

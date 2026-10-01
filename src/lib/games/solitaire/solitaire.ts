@@ -31,6 +31,10 @@ import type {
  * column; the stock deals one card at a time to the waste and recycles
  * (unlimited redeals, order preserved) when exhausted. The game is won when
  * all 52 cards reach the foundations.
+ *
+ * Not every Klondike deal is winnable, and unlimited redeals mean a stuck board
+ * never ends on its own — so the player may `resign`, closing the game as a
+ * loss (phase "lost") and letting the room finish.
  */
 
 /** A→K low-to-high (Ace low here — each game owns its order; see `buildRankOrder`).
@@ -62,7 +66,7 @@ export interface SolitaireColumn {
 }
 
 export interface SolitaireState extends GameState {
-    readonly phase: "playing" | "won";
+    readonly phase: "playing" | "won" | "lost";
     /** Face-down draw pile — top is the LAST element. Hidden from everyone. */
     readonly stock: readonly CardDescriptor[];
     /** Face-up discard — top (last) is the only playable waste card. */
@@ -106,7 +110,9 @@ export type SolitaireAction =
      * assured (see {@link isWinAssured}); the server still re-checks, so a
      * tampered client can never use it to skip a genuinely unsolved board.
      */
-    | { readonly type: "autoFinish"; readonly playerId: string };
+    | { readonly type: "autoFinish"; readonly playerId: string }
+    /** Give up an unwinnable (or unwanted) deal — ends the game as a loss. */
+    | { readonly type: "resign"; readonly playerId: string };
 
 export interface SolitaireColumnView {
     readonly downCount: number;
@@ -131,6 +137,26 @@ export interface SolitaireView {
     readonly tableau: readonly SolitaireColumnView[];
     /** The viewer this projection was built for (`null` = spectator). */
     readonly self: string | null;
+}
+
+// ── Payload validation ────────────────────────────────────────────────────
+
+/** A real tableau column index — rejects `"length"`, `1.5`, `-1`, `"0"`…
+ * (client payloads are untrusted; a bad key must fail, never throw). */
+function isColumn(value: unknown): value is number {
+    return (
+        typeof value === "number" &&
+        Number.isInteger(value) &&
+        value >= 0 &&
+        value < COLUMNS
+    );
+}
+
+function isSuit(value: unknown): value is Suit {
+    return (
+        typeof value === "string" &&
+        (SUITS as readonly string[]).includes(value)
+    );
 }
 
 // ── Rule predicates ───────────────────────────────────────────────────────
@@ -231,7 +257,7 @@ function commit(
 ): ApplyResult<SolitaireState> {
     const merged = { ...state, ...patch };
     const won = SUITS.every(
-        (s) => merged.foundations[s].length === FULL_FOUNDATION,
+        (suit) => merged.foundations[suit].length === FULL_FOUNDATION,
     );
     return {
         ok: true,
@@ -360,6 +386,9 @@ export const solitaire: GameModule<
             });
         }
 
+        // Always available while playing: the way out of an unwinnable deal.
+        acts.push({ type: "resign", playerId });
+
         return acts;
     },
 
@@ -431,10 +460,12 @@ export const solitaire: GameModule<
             }
 
             case "wasteToTableau": {
+                if (!isColumn(action.column)) {
+                    return fail("illegal_move", "No such column.");
+                }
                 const card = state.waste.at(-1);
                 if (!card) return fail("illegal_move", "The waste is empty.");
                 const col = state.tableau[action.column];
-                if (!col) return fail("illegal_move", "No such column.");
                 if (!acceptsTableau(col, card)) {
                     return fail("illegal_move", "Card cannot land there.");
                 }
@@ -458,8 +489,10 @@ export const solitaire: GameModule<
             }
 
             case "tableauToFoundation": {
+                if (!isColumn(action.column)) {
+                    return fail("illegal_move", "No such column.");
+                }
                 const col = state.tableau[action.column];
-                if (!col) return fail("illegal_move", "No such column.");
                 const card = col.up.at(-1);
                 if (!card) return fail("illegal_move", "Empty column.");
                 if (!acceptsFoundation(state.foundations, card)) {
@@ -493,17 +526,35 @@ export const solitaire: GameModule<
             }
 
             case "tableauToTableau": {
-                const from = state.tableau[action.from];
-                const to = state.tableau[action.to];
-                if (!from || !to || action.from === action.to) {
+                if (
+                    !isColumn(action.from) ||
+                    !isColumn(action.to) ||
+                    action.from === action.to
+                ) {
                     return fail("illegal_move", "Bad columns.");
                 }
-                if (action.count < 1 || action.count > from.up.length) {
+                const from = state.tableau[action.from];
+                const to = state.tableau[action.to];
+                if (
+                    !Number.isInteger(action.count) ||
+                    action.count < 1 ||
+                    action.count > from.up.length
+                ) {
                     return fail("illegal_move", "No such run.");
                 }
                 const run = from.up.slice(from.up.length - action.count);
                 if (!isValidRun(run) || !acceptsTableau(to, run[0])) {
                     return fail("illegal_move", "Run cannot land there.");
+                }
+                // Moving a whole column (nothing hidden beneath) into an empty
+                // one changes nothing — refused, matching `legalActions`.
+                const toEmpty = to.up.length === 0 && to.down.length === 0;
+                if (
+                    toEmpty &&
+                    action.count === from.up.length &&
+                    from.down.length === 0
+                ) {
+                    return fail("illegal_move", "That move changes nothing.");
                 }
                 return commit(
                     state,
@@ -539,10 +590,15 @@ export const solitaire: GameModule<
             }
 
             case "foundationToTableau": {
+                if (!isSuit(action.suit)) {
+                    return fail("illegal_move", "No such foundation.");
+                }
+                if (!isColumn(action.column)) {
+                    return fail("illegal_move", "No such column.");
+                }
                 const card = state.foundations[action.suit].at(-1);
                 if (!card) return fail("illegal_move", "Empty foundation.");
                 const col = state.tableau[action.column];
-                if (!col) return fail("illegal_move", "No such column.");
                 if (!acceptsTableau(col, card)) {
                     return fail("illegal_move", "Card cannot land there.");
                 }
@@ -626,6 +682,20 @@ export const solitaire: GameModule<
                 };
             }
 
+            case "resign":
+                // Not a move: the counters stay as played, the deal just ends.
+                return {
+                    ok: true,
+                    state: {
+                        ...state,
+                        turn: state.turn + 1,
+                        rngState: rng.state,
+                        phase: "lost",
+                        currentPlayerId: null,
+                    },
+                    events: [{ type: "resigned" }],
+                };
+
             default:
                 return fail(
                     "illegal_action",
@@ -635,15 +705,18 @@ export const solitaire: GameModule<
     },
 
     isOver(state) {
-        return state.phase === "won";
+        return state.phase !== "playing";
     },
 
     outcome(state) {
-        if (state.phase !== "won") return null;
+        if (state.phase === "playing") return null;
         const player = state.players[0];
+        // A solo game has one ranking either way; what separates a win from a
+        // resignation is `winners`. A loss (empty winners) earns participation
+        // XP only, and ELO already skips single-human games.
         return {
             rankings: [{ playerId: player.id, rank: 1, score: state.moves }],
-            winners: [player.id],
+            winners: state.phase === "won" ? [player.id] : [],
         };
     },
 

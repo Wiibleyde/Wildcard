@@ -2,12 +2,9 @@
 
 import { useTranslations } from "next-intl";
 import { GameButton } from "@/components/ui/GameButton";
-import {
-    cardLabel,
-    isRedSuit,
-    type TestSeatState,
-} from "@/hooks/studio/useTestPlay";
+import type { TestSeatState } from "@/hooks/studio/useTestPlay";
 import { cardKey } from "@/lib/card/utils";
+import { ecaCardLabel as cardLabel, isRedSuit } from "@/lib/eca/display";
 import type { EcaAction } from "@/lib/eca/types";
 
 /**

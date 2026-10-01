@@ -1,5 +1,5 @@
 import type { DeckDefinition } from "@/lib/card/decks";
-import type { Rng } from "./rng";
+import type { GameSeed, Rng, RngState } from "./rng";
 
 /** A seat at the table. */
 export interface Player {
@@ -29,10 +29,18 @@ export interface GameState {
     readonly currentPlayerId: string | null;
     /** Increments once per applied action. */
     readonly turn: number;
-    /** Immutable game seed — kept for audit and replay. */
-    readonly seed: number;
-    /** Evolving RNG cursor — advances on each shuffle/draw. */
-    readonly rngState: number;
+    /**
+     * Immutable game seed — kept for audit and replay. Server-only: it must
+     * never appear in a `view()` (it would let a client pre-compute every
+     * shuffle). New games get a 128-bit `"sfc32:…"` seed; a plain `number` is
+     * a legacy 32-bit mulberry32 seed, still replayed bit-identically.
+     */
+    readonly seed: GameSeed;
+    /**
+     * Evolving RNG cursor — advances on each shuffle/draw. Same encoding as
+     * `seed`; the runner rewrites it after every successful `dispatch`.
+     */
+    readonly rngState: RngState;
 }
 
 /**
@@ -119,7 +127,11 @@ export interface GameOutcome {
         /** Game-specific score, if any (points, cards held, …). */
         readonly score?: number;
     }>;
-    /** Convenience: every player sharing rank 1. */
+    /**
+     * Players who won — normally everyone sharing rank 1. May be empty when a
+     * game ends without a winner (a resigned solo game keeps its single
+     * player at rank 1 but lists no winner).
+     */
     readonly winners: readonly string[];
 }
 
@@ -164,7 +176,7 @@ export interface GameModule<S extends GameState, A extends GameAction, V = S> {
     setup(
         players: readonly Player[],
         rng: Rng,
-        seed: number,
+        seed: GameSeed,
         gameId: string,
     ): S;
 
@@ -193,22 +205,25 @@ export interface GameModule<S extends GameState, A extends GameAction, V = S> {
 /**
  * Type-erased game module, as stored in the registry and handled by the runner.
  *
- * Concrete modules are invariant in their own `State`/`Action` (a `BatailleState`
- * reducer cannot accept an arbitrary `GameState`), so they are not structurally
- * assignable to a single supertype. We erase to `unknown` at the registry
- * boundary instead: the registry persists exactly the state each module
- * produced, so feeding it back is sound. The unavoidable cast lives in one
- * place — {@link registerGame} — and nowhere else.
+ * Every hook on {@link GameModule} is declared with METHOD syntax, which
+ * TypeScript checks bivariantly in its parameters (even under
+ * `strictFunctionTypes`). That is what lets a concrete
+ * `GameModule<BatailleState, BatailleAction, BatailleView>` widen to this
+ * erased type with no cast at all. The bivariance is sound here because the
+ * registry only ever feeds a module the state it itself produced
+ * (round-tripped through `game_states`). Keep the hooks as methods: turning
+ * one into a function-typed property (`apply: (s: S) => …`) would make the
+ * module invariant and break registration at compile time — loudly, not
+ * silently.
  */
 export type AnyGameModule = GameModule<GameState, GameAction, unknown>;
 
 /**
- * Register a concrete module under the erased registry type. The single cast in
- * the codebase: justified because a game only ever receives the state it itself
- * created (round-tripped through `game_states`).
+ * Register a concrete module under the erased registry type. Cast-free (see
+ * {@link AnyGameModule}); the function exists to name the erasure boundary.
  */
 export function registerGame<S extends GameState, A extends GameAction, V>(
     module: GameModule<S, A, V>,
 ): AnyGameModule {
-    return module as unknown as AnyGameModule;
+    return module;
 }

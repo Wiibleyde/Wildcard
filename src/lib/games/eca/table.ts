@@ -1,5 +1,5 @@
-import type { CardDescriptor, Suit } from "@/lib/card/types";
 import { cardKey, FACE_DOWN_CARD } from "@/lib/card/utils";
+import { describeEcaEvent } from "@/lib/eca/display";
 import type { EcaAction, EcaView } from "@/lib/eca/types";
 import { playerName } from "../table/helpers";
 import {
@@ -21,22 +21,6 @@ import {
  * Interaction is direct-play (tap a legal card to lay it), matching the studio
  * sandbox: the board a creator tests in is the board everyone else plays on.
  */
-
-const SUIT_GLYPH: Record<Suit, string> = {
-    spades: "♠",
-    hearts: "♥",
-    diamonds: "♦",
-    clubs: "♣",
-};
-
-/** "7♥" for a suited card; "?" for anything face-down/unknown (log lines). */
-function cardLabel(value: unknown): string {
-    if (typeof value !== "object" || value === null) return "?";
-    const card = value as CardDescriptor;
-    return card.type === "suited"
-        ? `${card.rank}${SUIT_GLYPH[card.suit]}`
-        : "?";
-}
 
 export const ecaTable = registerTable<EcaView>({
     zones: [
@@ -209,36 +193,6 @@ export const ecaTable = registerTable<EcaView>({
     },
 
     logLine(event, ctx) {
-        const p = event.payload ?? {};
-        const name = playerName(
-            ctx,
-            typeof p.playerId === "string" ? p.playerId : null,
-        );
-        switch (event.type) {
-            case "cardPlayed":
-                return ctx.t("log_card_played", {
-                    name,
-                    card: cardLabel(p.card),
-                });
-            case "ruleFired":
-                return ctx.t("log_rule_fired", {
-                    rule: typeof p.ruleName === "string" ? p.ruleName : "?",
-                });
-            case "cardsDrawn":
-                return ctx.t("log_cards_drawn", {
-                    name,
-                    count: typeof p.count === "number" ? p.count : 1,
-                });
-            case "directionReversed":
-                return ctx.t("log_direction_reversed");
-            case "playerSkipped":
-                return ctx.t("log_player_skipped", { name });
-            case "turnAdvanced":
-                return ctx.t("log_turn_advanced", { name });
-            case "gameEnded":
-                return ctx.t("log_game_ended");
-            default:
-                return null;
-        }
+        return describeEcaEvent(event, ctx.t, (id) => playerName(ctx, id));
     },
 });

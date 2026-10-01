@@ -11,7 +11,11 @@ interface TableCardAnimations {
     registerCard: (id: string) => (el: HTMLDivElement | null) => void;
 }
 
-/** Animated card ids are tracked so a re-render never re-plays a landing. */
+/**
+ * Animated card ids are tracked so a re-render never re-plays a landing. The
+ * cards already on the table at mount (page load, reconnect, replay seek) are
+ * seeded as "seen": only cards that arrive afterwards animate in.
+ */
 export function useTableCardAnimations(
     data: TableData,
     themeFor: (ownerId: string | undefined) => CardTheme,
@@ -19,15 +23,24 @@ export function useTableCardAnimations(
 ): TableCardAnimations {
     const rootRef = useRef<HTMLDivElement>(null);
     const cardRefs = useRef(new Map<string, HTMLDivElement>());
-    const animatedIds = useRef(new Set<string>());
+    const animatedIds = useRef<Set<string> | null>(null);
 
     useGSAP(
         () => {
+            if (animatedIds.current === null) {
+                animatedIds.current = new Set(
+                    data.zones.flatMap((zone) =>
+                        zone.cards.map((item) => item.id),
+                    ),
+                );
+                return;
+            }
+            const seen = animatedIds.current;
             if (prefersReducedMotion()) return;
             for (const zone of data.zones) {
                 for (const item of zone.cards) {
-                    if (animatedIds.current.has(item.id)) continue;
-                    animatedIds.current.add(item.id);
+                    if (seen.has(item.id)) continue;
+                    seen.add(item.id);
                     const el = cardRefs.current.get(item.id);
                     if (!el) continue;
                     const theme = themeFor(item.ownerId);

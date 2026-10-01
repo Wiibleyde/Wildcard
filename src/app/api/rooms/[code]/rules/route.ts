@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/api/auth";
+import { isJsonObject, readJsonObject } from "@/lib/api/body";
+import { failureResponse } from "@/lib/api/respond";
 import { ROOM_ERROR_STATUS, setRules } from "@/lib/models/room";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -8,17 +10,13 @@ export async function POST(
     ctx: { params: Promise<{ code: string }> },
 ) {
     const { code } = await ctx.params;
-    const auth = await requireUser();
+    const auth = await requireUser(request);
     if (!auth.ok) return auth.response;
 
-    const body = (await request.json().catch(() => ({}))) as {
-        rules?: unknown;
-    };
-    if (
-        typeof body.rules !== "object" ||
-        body.rules === null ||
-        Array.isArray(body.rules)
-    ) {
+    const parsed = await readJsonObject(request);
+    if (!parsed.ok) return parsed.response;
+    const { rules } = parsed.body;
+    if (!isJsonObject(rules)) {
         return NextResponse.json(
             { error: "rules (object) is required" },
             { status: 400 },
@@ -26,17 +24,9 @@ export async function POST(
     }
 
     const admin = createAdminClient();
-    const result = await setRules(
-        admin,
-        auth.user.id,
-        code,
-        body.rules as Record<string, unknown>,
-    );
+    const result = await setRules(admin, auth.user.id, code, rules);
     if (!result.ok) {
-        return NextResponse.json(
-            { error: result.error },
-            { status: ROOM_ERROR_STATUS[result.error] },
-        );
+        return failureResponse("rooms.rules", result, ROOM_ERROR_STATUS);
     }
 
     return NextResponse.json({ rules: result.rules });

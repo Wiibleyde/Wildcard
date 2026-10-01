@@ -7,7 +7,6 @@ import {
     PaletteIcon,
     PlayIcon,
     ShieldIcon,
-    ShopIcon,
     StudioIcon,
     TrophyIcon,
 } from "./NavIcons";
@@ -21,7 +20,6 @@ type NavItemConfig = {
 
 type Props = {
     variant: "sidebar" | "bottom";
-    shown?: boolean;
     canModerate?: boolean;
 };
 
@@ -33,7 +31,6 @@ export function NavLinks({ variant, canModerate = false }: Props) {
         { href: "/", label: t("home"), icon: <HomeIcon /> },
         { href: "/lobby", label: t("play"), icon: <PlayIcon /> },
         { href: "/leaderboard", label: t("leaderboard"), icon: <TrophyIcon /> },
-        { href: "/shop", label: t("shop"), icon: <ShopIcon /> },
         { href: "/customize", label: t("style"), icon: <PaletteIcon /> },
         { href: "/studio", label: t("studio"), icon: <StudioIcon /> },
         ...(canModerate
@@ -71,12 +68,14 @@ export function NavLinks({ variant, canModerate = false }: Props) {
                     <Link
                         key={item.href}
                         href={item.href}
-                        className={`wc-bnav${active ? " wc-bnav--on" : ""}`}
+                        className={`wc-bnav min-w-0${active ? " wc-bnav--on" : ""}`}
                     >
                         <span className="grid h-5.5 w-5.5 place-items-center">
                             {item.icon}
                         </span>
-                        <span>{item.label}</span>
+                        <span className="max-w-full truncate px-0.5">
+                            {item.label}
+                        </span>
                     </Link>
                 );
             })}

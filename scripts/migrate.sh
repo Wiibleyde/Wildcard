@@ -42,13 +42,19 @@ command -v psql >/dev/null 2>&1 || {
 	exit 1
 }
 
+# Strict allow-list: $TARGET is spliced into a sed expression and into SQL
+# identifiers below, so anything beyond [a-z0-9_] (/, &, quotes, spaces…) is
+# refused rather than escaped. The `case` rejects any byte outside the set —
+# newlines included, which a line-oriented grep alone would let through.
 case "$TARGET" in
-wildcard | wildcard_*) ;;
-*)
-	echo "migrate: refusing target schema '$TARGET' (must be wildcard or wildcard_*)" >&2
-	exit 1
-	;;
+*[!a-z0-9_]* | "") TARGET_OK=no ;;
+*) TARGET_OK=yes ;;
 esac
+if [ "$TARGET_OK" != yes ] ||
+	! printf '%s' "$TARGET" | LC_ALL=C grep -Eq '^wildcard(_[a-z0-9]+)?$'; then
+	echo "migrate: refusing target schema '$TARGET' (must match ^wildcard(_[a-z0-9]+)?\$)" >&2
+	exit 1
+fi
 
 # The substitution is only reversible if the sources never mention a derived
 # name. Comments are stripped first: they may legitimately document the rule.

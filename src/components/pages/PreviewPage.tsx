@@ -147,7 +147,9 @@ export function PreviewPage({ deckId, boardId, backHref }: Props) {
     const playArea = <PlayArea cards={table} players={players} />;
 
     return (
-        <div className="flex h-[calc(100dvh-4rem)] flex-col bg-wc-bg md:h-screen">
+        // Mobile: subtract the sticky AppNav header (h-14 + 3px border) and the
+        // AppShell's pb-20 reserved for the bottom nav, so the page never scrolls.
+        <div className="flex h-[calc(100dvh-8.5rem-3px)] flex-col bg-wc-bg md:h-screen">
             <div
                 className="flex shrink-0 items-center justify-between px-4 py-3"
                 style={{
@@ -184,10 +186,7 @@ export function PreviewPage({ deckId, boardId, backHref }: Props) {
                             <span className="text-xs font-semibold text-wc-text">
                                 {cardTheme.name}
                             </span>
-                            <TierBadge
-                                tier={cardTheme.tier}
-                                name={cardTheme.tier}
-                            />
+                            <TierBadge tier={cardTheme.tier} />
                         </div>
                     </div>
                     <div
@@ -202,10 +201,7 @@ export function PreviewPage({ deckId, boardId, backHref }: Props) {
                             <span className="text-xs font-semibold text-wc-text">
                                 {boardTheme.name}
                             </span>
-                            <TierBadge
-                                tier={boardTheme.tier}
-                                name={boardTheme.tier}
-                            />
+                            <TierBadge tier={boardTheme.tier} />
                         </div>
                     </div>
                 </div>

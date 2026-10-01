@@ -15,6 +15,11 @@ export type AppRole = "user" | "moderator" | "admin";
 
 const RANK: Record<AppRole, number> = { user: 0, moderator: 1, admin: 2 };
 
+/** Narrow an untrusted value (a DB column, a JSON field) to an {@link AppRole}. */
+export function isAppRole(value: unknown): value is AppRole {
+    return typeof value === "string" && Object.hasOwn(RANK, value);
+}
+
 /** True when `role` is at least as privileged as `min` in the hierarchy. */
 export function roleAtLeast(role: AppRole, min: AppRole): boolean {
     return RANK[role] >= RANK[min];
@@ -34,5 +39,8 @@ export async function getUserRole(
         .select("role")
         .eq("user_id", userId)
         .maybeSingle();
-    return (data?.role as AppRole | undefined) ?? "user";
+    // An unknown value (schema drift, a typo in a manual grant) is never
+    // trusted as a privilege — it degrades to the base role.
+    const role: unknown = data?.role;
+    return isAppRole(role) ? role : "user";
 }

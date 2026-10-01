@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import { Hanken_Grotesk, Lilita_One, Silkscreen } from "next/font/google";
 import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
-import { getMessages, setRequestLocale } from "next-intl/server";
+import {
+    getMessages,
+    getTranslations,
+    setRequestLocale,
+} from "next-intl/server";
 import "../globals.css";
 import { PublicEnvScript } from "@/components/analytics/PublicEnvScript";
 import { UmamiAnalytics } from "@/components/analytics/UmamiAnalytics";
@@ -36,10 +40,21 @@ const pixel = Silkscreen({
     weight: ["400", "700"],
 });
 
-export const metadata: Metadata = {
-    title: "Wildcard",
-    description: "Plateforme de jeux de carte en ligne",
-};
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+    const { lang } = await params;
+    const locale = hasLocale(routing.locales, lang)
+        ? lang
+        : routing.defaultLocale;
+    const t = await getTranslations({ locale, namespace: "home" });
+    return {
+        title: t("title"),
+        description: t("subtitle"),
+    };
+}
 
 export function generateStaticParams() {
     return routing.locales.map((lang) => ({ lang }));

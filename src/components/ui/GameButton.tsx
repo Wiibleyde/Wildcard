@@ -32,6 +32,8 @@ type BaseProps = {
     children: React.ReactNode;
     className?: string;
     disabled?: boolean;
+    /** Accessible name for icon-only buttons (e.g. ⏮ / ⏭). */
+    ariaLabel?: string;
 };
 
 type AsButton = BaseProps & {
@@ -56,6 +58,7 @@ export function GameButton({
     children,
     className = "",
     disabled = false,
+    ariaLabel,
     ...rest
 }: GameButtonProps) {
     const v = VARIANTS[variant];
@@ -75,13 +78,23 @@ export function GameButton({
         // in-app routes only.
         if (/^https?:\/\//.test(rest.href)) {
             return (
-                <a href={rest.href} className={baseClass} style={style}>
+                <a
+                    href={rest.href}
+                    className={baseClass}
+                    style={style}
+                    aria-label={ariaLabel}
+                >
                     {children}
                 </a>
             );
         }
         return (
-            <Link href={rest.href} className={baseClass} style={style}>
+            <Link
+                href={rest.href}
+                className={baseClass}
+                style={style}
+                aria-label={ariaLabel}
+            >
                 {children}
             </Link>
         );
@@ -95,6 +108,7 @@ export function GameButton({
             className={baseClass}
             style={style}
             disabled={disabled}
+            aria-label={ariaLabel}
             onClick={onClick}
             form={form}
         >

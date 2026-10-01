@@ -12,7 +12,7 @@ import { useRouter } from "@/i18n/navigation";
 import type { EcaDefinition } from "@/lib/eca/types";
 import {
     type EcaValidationError,
-    validateEcaDefinition,
+    validateEcaDefinitionForWrite,
 } from "@/lib/eca/validate";
 import type { Translate } from "@/lib/games/catalogView";
 import type { StudioErrorCode } from "@/lib/models/studio";
@@ -58,17 +58,31 @@ const KNOWN_ERROR_CODES: ReadonlySet<string> = new Set([
     "duplicate_rule_id",
     "no_accepting_rule",
     "invalid_win",
+    "literal_too_long",
+    "unknown_rank_literal",
+    "unknown_suit_literal",
+    "literal_not_numeric",
+    "incompatible_operands",
+    "missing_verdict",
+    "conflicting_verdict",
+    "reject_with_effects",
+    "unreachable_rule",
 ]);
+
+/** Route-level failures (body cap) the model never returns. */
+type StudioRouteErrorCode = "payload_too_large";
 
 /**
  * `studio.api_errors.*` key per CRUD failure code. Typed as a full Record so
  * the compiler flags any drift when {@link StudioErrorCode} changes.
  */
-const API_ERROR_KEYS: Record<StudioErrorCode, string> = {
+const API_ERROR_KEYS: Record<StudioErrorCode | StudioRouteErrorCode, string> = {
     not_found: "api_errors.not_found",
     invalid_definition: "api_errors.invalid_definition",
     invalid_input: "api_errors.invalid_input",
     limit_reached: "api_errors.limit_reached",
+    moderation_locked: "api_errors.moderation_locked",
+    payload_too_large: "api_errors.payload_too_large",
     db_error: "api_errors.db_error",
 };
 
@@ -79,6 +93,8 @@ export interface StudioGameDetail {
     readonly description: string | null;
     readonly status: "draft" | "published";
     readonly imageUrl: string | null;
+    /** Taken down by an admin — publishing is refused until restored. */
+    readonly moderationLocked?: boolean;
     readonly definition: EcaDefinition;
 }
 
@@ -114,7 +130,11 @@ export function useEcaEditor(initialGame: StudioGameDetail) {
         `/api/studio/games/${initialGame.id}`,
     );
 
-    const validation = useMemo(() => validateEcaDefinition(draft), [draft]);
+    // Write-time bar: the editor shows exactly what a save would refuse.
+    const validation = useMemo(
+        () => validateEcaDefinitionForWrite(draft),
+        [draft],
+    );
     const dirty = JSON.stringify(draft) !== savedJson;
     const saving = saveMutation.status === "pending";
     const saved = saveMutation.status === "success";
@@ -195,8 +215,15 @@ export function useEcaEditor(initialGame: StudioGameDetail) {
             : tCommon("error");
     }
 
+    // Locked at load time, or found out on a refused publish (the take-down
+    // may postdate the page load).
+    const locked =
+        (initialGame.moderationLocked ?? false) ||
+        (statusMutation.status === "error" &&
+            statusMutation.error === "moderation_locked");
     const publishDisabled =
-        publishing || (status === "draft" && (dirty || !validation.ok));
+        publishing ||
+        (status === "draft" && (dirty || !validation.ok || locked));
     const mutationFailed =
         saveMutation.status === "error" || statusMutation.status === "error";
     const mutationErrorCode =
@@ -209,6 +236,7 @@ export function useEcaEditor(initialGame: StudioGameDetail) {
     return {
         draft,
         status,
+        locked,
         validation,
         dirty,
         saving,

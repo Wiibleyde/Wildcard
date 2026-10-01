@@ -1,6 +1,6 @@
 import { DECKS } from "@/lib/card/decks";
 import type { CardDescriptor, Rank } from "@/lib/card/types";
-import { cardKey } from "@/lib/card/utils";
+import { cardKey, isCardDescriptor } from "@/lib/card/utils";
 import { buildDeck } from "@/lib/engine/deck";
 import type { Rng } from "@/lib/engine/rng";
 import { fail, seatOrder } from "@/lib/engine/rules";
@@ -13,8 +13,8 @@ import type {
 import {
     buildRuleContext,
     firstMatchingRule,
-    matchingRules,
     ruleHasEffect,
+    ruleMatches,
     topOfDiscard,
 } from "./interpreter";
 import type {
@@ -53,19 +53,28 @@ import type {
  *   ⇒ the actor keeps the turn (a fresh go — they may draw again; skips and
  *   direction changes stay recorded for the next advancement); else the turn
  *   advances by `direction` over seat order, consuming `pendingSkips`.
+ *   `playAgain` continues the SAME turn: turnStarted rules do not fire again.
  * - **drawCard** — legal iff `turn.allowDraw`, not already drawn this turn,
  *   and at least one card is obtainable (draw pile, or reshuffle allowed with
  *   ≥ 2 discards). Draws one card; the turn does NOT advance.
  * - **pass** — legal iff `turn.allowPass` and (`!passRequiresDraw` ‖ already
  *   drawn ‖ drawing is impossible). Deadlock guard: a player with no legal
  *   play, no draw and no pass may always pass regardless of the flags.
- * - **Blocked game** — a full silent cycle (`consecutivePasses ≥ players`)
- *   while drawing cannot help (draws disabled, or no card obtainable even by
- *   reshuffle) ends the game; fewest cards wins (ties share rank 1).
+ * - **Blocked game** — a full cycle of FORCED passes (`consecutivePasses ≥
+ *   players`; a pass by a player who still had a legal play resets the
+ *   streak) while drawing cannot help (draws disabled, or no card obtainable
+ *   even by reshuffle) ends the game; fewest cards wins (ties share rank 1).
+ * - **Turn limit** — after {@link ECA_TURN_LIMIT} actions the game ends with
+ *   the same fewest-cards ranking: a valid definition can describe a game
+ *   that never converges (draw-on-turn-start + accept-anything), and every
+ *   game must end.
  * - **Determinism** — the only randomness is `rng` (setup shuffle, discard
  *   reshuffle); `rng.state` is persisted into `rngState` after every apply,
  *   so a game replays exactly from `(definition, seed, action log)`.
  */
+
+/** Hard cap on actions per game — see "Turn limit" above. */
+export const ECA_TURN_LIMIT = 1000;
 
 // ── Mutable working copy ─────────────────────────────────────────────────────
 
@@ -146,6 +155,12 @@ function canDrawNow(state: EcaState): boolean {
     );
 }
 
+function hasPlayableCard(state: EcaState, actorId: string): boolean {
+    return (state.hands[actorId] ?? []).some(
+        (card) => acceptingRule(state, actorId, card) !== null,
+    );
+}
+
 function canPassNow(state: EcaState, actorId: string): boolean {
     const { turn } = state.definition;
     // passRequiresDraw only applies when drawing is a feature at all.
@@ -158,11 +173,7 @@ function canPassNow(state: EcaState, actorId: string): boolean {
     }
     // Deadlock guard: nothing to play, nothing to draw, no pass allowed —
     // pass becomes legal anyway so the game can never soft-lock a player.
-    const hand = state.hands[actorId] ?? [];
-    const hasPlay = hand.some(
-        (card) => acceptingRule(state, actorId, card) !== null,
-    );
-    return !hasPlay && !canDrawNow(state);
+    return !hasPlayableCard(state, actorId) && !canDrawNow(state);
 }
 
 // ── Effects ──────────────────────────────────────────────────────────────────
@@ -262,6 +273,17 @@ function applyEffects(
     }
 }
 
+/** End the game ranking by fewest cards in hand — ties share the win. */
+function endByFewestCards(draft: Draft, players: readonly Player[]): void {
+    draft.ended = true;
+    const counts = seatOrder(players).map((p) => ({
+        id: p.id,
+        count: draft.hands[p.id]?.length ?? 0,
+    }));
+    const fewest = Math.min(...counts.map((c) => c.count));
+    draft.winnerIds = counts.filter((c) => c.count === fewest).map((c) => c.id);
+}
+
 // ── Turn flow ────────────────────────────────────────────────────────────────
 
 /** Move one seat past `fromId`, consuming pendingSkips on the players passed. */
@@ -311,7 +333,7 @@ function fireTurnStarted(
             null,
             deckRanksOf(definition),
         );
-        if (matchingRules([rule], "turnStarted", ctx).length === 0) continue;
+        if (!ruleMatches(rule, ctx)) continue;
         draft.events.push({
             type: "ruleFired",
             payload: { ruleId: rule.id, ruleName: rule.name },
@@ -324,7 +346,9 @@ function fireTurnStarted(
  * A turn begins for `startId`: fire its turnStarted rules; if they skipped the
  * freshly started turn, pass it onward and fire again for the next player —
  * capped at `players.length` iterations so reverse/skip combinations can never
- * loop forever. Returns the player whose turn finally rests, or `null` when an
+ * loop forever (skips still owed when the cap is hit are dropped — every seat
+ * was already skipped once, carrying them over would only stall the next
+ * advancement). Returns the player whose turn finally rests, or `null` when an
  * endGame effect ended the game mid-chain.
  */
 function runTurnChain(
@@ -351,6 +375,7 @@ function runTurnChain(
             payload: { playerId: current },
         });
     }
+    draft.pendingSkips = 0;
     return current;
 }
 
@@ -380,6 +405,10 @@ function finalize(
     consecutivePasses: number,
     rng: Rng,
 ): ApplyResult<EcaState> {
+    const turn = state.turn + 1;
+    if (!draft.ended && turn >= ECA_TURN_LIMIT) {
+        endByFewestCards(draft, state.players);
+    }
     if (draft.ended) {
         draft.events.push({
             type: "gameEnded",
@@ -392,7 +421,7 @@ function finalize(
             ...state,
             phase: draft.ended ? "done" : "playing",
             currentPlayerId: draft.ended ? null : currentPlayerId,
-            turn: state.turn + 1,
+            turn,
             rngState: rng.state,
             hands: draft.hands,
             drawPile: draft.drawPile,
@@ -521,7 +550,9 @@ export function createEcaModule(
             switch (action.type) {
                 case "playCard": {
                     const hand = state.hands[action.playerId] ?? [];
-                    const key = cardKey(action.card);
+                    const key = isCardDescriptor(action.card)
+                        ? cardKey(action.card)
+                        : null;
                     const held = hand.findIndex((c) => cardKey(c) === key);
                     if (held === -1) {
                         return fail(
@@ -529,11 +560,10 @@ export function createEcaModule(
                             "Card is not in the player's hand.",
                         );
                     }
-                    const rule = acceptingRule(
-                        state,
-                        action.playerId,
-                        action.card,
-                    );
+                    // From here on, only the canonical held card is trusted —
+                    // never the client-supplied object.
+                    const card = hand[held];
+                    const rule = acceptingRule(state, action.playerId, card);
                     if (rule === null) {
                         return fail(
                             "illegal_card",
@@ -542,7 +572,6 @@ export function createEcaModule(
                     }
 
                     const draft = makeDraft(state);
-                    const card = hand[held];
                     draft.hands[action.playerId].splice(held, 1);
                     draft.discardPile.push(card);
                     draft.events.push({
@@ -613,27 +642,22 @@ export function createEcaModule(
                         );
                     }
                     const draft = makeDraft(state);
-                    const passes = state.consecutivePasses + 1;
-                    // Blocked game: a full silent cycle while drawing cannot
-                    // help — draws disabled, or no card obtainable (empty
-                    // pile, no reshuffle). Rank by fewest cards, ties share
-                    // the win. An empty pile alone is NOT enough: with draws
-                    // disabled the pile never empties and the game would
-                    // otherwise loop forever.
+                    // Only a FORCED pass (no legal play) counts toward a
+                    // blocked game — a tactical pass resets the streak.
+                    const passes = hasPlayableCard(state, action.playerId)
+                        ? 0
+                        : state.consecutivePasses + 1;
+                    // Blocked game: a full cycle of forced passes while
+                    // drawing cannot help — draws disabled, or no card
+                    // obtainable (empty pile, no reshuffle). An empty pile
+                    // alone is NOT enough: with draws disabled the pile never
+                    // empties and the game would otherwise loop forever.
                     if (
                         passes >= state.players.length &&
                         (!state.definition.turn.allowDraw ||
                             !drawAvailable(state))
                     ) {
-                        draft.ended = true;
-                        const counts = seatOrder(state.players).map((p) => ({
-                            id: p.id,
-                            count: draft.hands[p.id].length,
-                        }));
-                        const fewest = Math.min(...counts.map((c) => c.count));
-                        draft.winnerIds = counts
-                            .filter((c) => c.count === fewest)
-                            .map((c) => c.id);
+                        endByFewestCards(draft, state.players);
                         return finalize(state, draft, null, false, passes, rng);
                     }
                     const current = completeAdvance(

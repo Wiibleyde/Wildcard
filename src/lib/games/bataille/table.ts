@@ -86,6 +86,10 @@ export const batailleTable = registerTable<BatailleView>({
                       })
                     : ctx.t("log_round_draw", { n: round });
             }
+            case "round_limit":
+                return ctx.t("log_round_limit", {
+                    n: typeof p.rounds === "number" ? p.rounds : 0,
+                });
             case "game_over":
                 return ctx.t("game_over");
             default:

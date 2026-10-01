@@ -77,8 +77,12 @@ export function useMatchmaking(userId: string) {
     );
 
     const refresh = useCallback(async () => {
-        const res = await fetch("/api/matchmaking");
-        if (res.ok) handleStatus((await res.json()) as ServerStatus);
+        try {
+            const res = await fetch("/api/matchmaking");
+            if (res.ok) handleStatus((await res.json()) as ServerStatus);
+        } catch {
+            // Transient: the ticket channel's next doorbell/poll retries.
+        }
     }, [handleStatus]);
 
     // Realtime doorbell on our ticket → refetch the authoritative status.
@@ -97,29 +101,50 @@ export function useMatchmaking(userId: string) {
                 waiting: 1,
                 since: Date.now(),
             });
-            const res = await fetch("/api/matchmaking", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ moduleId }),
-            });
-            const data = await res.json();
-            if (!res.ok) {
-                setState({ phase: "error", code: data.error ?? "generic" });
-                return;
+            try {
+                const res = await fetch("/api/matchmaking", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ moduleId }),
+                });
+                // A 5xx/proxy page isn't JSON — don't let the parse throw.
+                const data = (await res.json().catch(() => ({}))) as {
+                    error?: string;
+                };
+                if (!res.ok) {
+                    // Already matched (409): the game exists — re-read the
+                    // ticket and walk in (active stays true) rather than error.
+                    if (data.error === "match_in_progress") {
+                        await refresh();
+                        return;
+                    }
+                    active.current = false;
+                    // `code` carries rate_limited / maintenance / … for the UI.
+                    setState({ phase: "error", code: data.error ?? "generic" });
+                    return;
+                }
+                handleStatus(data as ServerStatus);
+            } catch {
+                // Network failure: leave the searching overlay instead of
+                // spinning forever on a queue we may never have joined.
+                active.current = false;
+                setState({ phase: "error", code: "generic" });
             }
-            handleStatus(data as ServerStatus);
         },
-        [handleStatus],
+        [handleStatus, refresh],
     );
 
     const cancel = useCallback(async () => {
+        // Also the escape hatch from a "matched" overlay that never resolved:
+        // clear the navigation latch so a real match can still walk us in.
+        navigating.current = false;
         setState({ phase: "idle" });
         // leaveQueue (no `all`) drops only a still-searching ticket; if a match
         // landed in the click window it survives. Re-read the authoritative
         // status so we walk into that game (active stays true → handleStatus
         // navigates) instead of silently abandoning a live match.
         await fetch("/api/matchmaking", { method: "DELETE" }).catch(() => {});
-        await refresh();
+        await refresh().catch(() => {});
     }, [refresh]);
 
     const playBots = useCallback(
@@ -127,29 +152,34 @@ export function useMatchmaking(userId: string) {
             navigating.current = true;
             active.current = true;
             setState({ phase: "matched" });
-            const res = await fetch("/api/matchmaking/bots", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ moduleId }),
-            });
-            const data = await res.json();
-            if (!res.ok) {
-                // A human match grabbed our ticket in the same instant: there's
-                // a real game incoming, so stay on the "matched" overlay and let
-                // the realtime doorbell walk us in (don't navigate from here).
-                if (data.error === "match_in_progress") {
+            try {
+                const res = await fetch("/api/matchmaking/bots", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ moduleId }),
+                });
+                const data = (await res.json().catch(() => ({}))) as {
+                    error?: string;
+                    gameId?: string;
+                };
+                if (!res.ok || !data.gameId) {
                     navigating.current = false;
+                    // A human match grabbed our ticket in the same instant:
+                    // there's a real game incoming, so stay on the "matched"
+                    // overlay and let the realtime doorbell walk us in.
+                    if (data.error === "match_in_progress") return;
+                    setState({ phase: "error", code: data.error ?? "generic" });
                     return;
                 }
+                // Consume the now-spent ticket so a later /lobby visit can't rejoin.
+                fetch("/api/matchmaking?all=1", { method: "DELETE" }).catch(
+                    () => {},
+                );
+                router.push(`/game/${data.gameId}`);
+            } catch {
                 navigating.current = false;
-                setState({ phase: "error", code: data.error ?? "generic" });
-                return;
+                setState({ phase: "error", code: "generic" });
             }
-            // Consume the now-spent ticket so a later /lobby visit can't rejoin.
-            fetch("/api/matchmaking?all=1", { method: "DELETE" }).catch(
-                () => {},
-            );
-            router.push(`/game/${data.gameId}`);
         },
         [router],
     );

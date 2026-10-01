@@ -1,4 +1,5 @@
 import { DECKS } from "@/lib/card/decks";
+import type { Rank, Suit } from "@/lib/card/types";
 import { buildDeck } from "@/lib/engine/deck";
 import {
     ECA_DEFINITION_VERSION,
@@ -22,6 +23,20 @@ import {
  *
  * Errors carry a machine-readable `code` (the UI translates by code) plus an
  * English `message` and a JSON-path-ish `path` for pinpointing the field.
+ *
+ * Two entry points, one parser:
+ * - {@link validateEcaDefinitionForWrite} — EVERY write path (studio API,
+ *   admin publish, the editor's live check, the sandbox). Structural checks
+ *   PLUS the write-time lints: size caps on ids/literals (a definition is
+ *   copied into every game state and sent in every view) and the semantic
+ *   checks that catch rules which could never behave as written (missing or
+ *   conflicting verdict, effects dropped by a refusal, literals that no card
+ *   of the deck can ever equal, rules shadowed by an earlier catch-all).
+ * - {@link validateEcaDefinition} — READ paths (resolving a stored game,
+ *   loading the editor). Structural checks only: a row saved before a lint
+ *   existed must keep loading and playing — its creator fixes it in the
+ *   editor, where the write-time lints show up. Lints are enforced on write,
+ *   never retroactively at runtime.
  */
 
 export interface EcaValidationError {
@@ -51,6 +66,11 @@ export const ECA_EFFECTS_MAX = 8;
 export const ECA_DRAW_COUNT_MIN = 1;
 export const ECA_DRAW_COUNT_MAX = 8;
 export const ECA_RULE_NAME_MAX = 60;
+/** Rule ids are editor-generated uuids — bounded and plain (write-time). */
+export const ECA_RULE_ID_MAX = 64;
+const RULE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+/** Longest rank/suit literal is "diamonds" (8) — 16 leaves headroom. */
+export const ECA_LITERAL_STRING_MAX = 16;
 
 const ECA_DECK_IDS: readonly EcaDeckId[] = ["french52", "french32"];
 const EVENT_TYPES: readonly EcaEventType[] = ["cardPlayed", "turnStarted"];
@@ -675,4 +695,198 @@ export function validateEcaDefinition(input: unknown): EcaValidationResult {
             win,
         },
     };
+}
+
+// ── Write-time lints ─────────────────────────────────────────────────────────
+
+/** What an operand evaluates to, for cross-operand compatibility checks. */
+type OperandDomain = "rank" | "suit" | "number" | "literal";
+
+function domainOf(operand: EcaOperand): OperandDomain {
+    switch (operand.kind) {
+        case "card":
+            return operand.prop === "value" ? "number" : operand.prop;
+        case "stat":
+            return "number";
+        case "literal":
+            return "literal";
+    }
+}
+
+/**
+ * A literal compared against `counterpart` must be a value that side can
+ * actually take — a rank of THIS deck, one of its suits, or a number —
+ * otherwise the condition is silently never true (`"Hearts"`, `"T"`, a `"2"`
+ * in the 32-card deck, the number `7` against a rank string…).
+ */
+function lintLiteral(
+    literal: string | number,
+    counterpart: EcaOperand,
+    path: string,
+    ranks: readonly Rank[],
+    suits: readonly Suit[],
+    out: Collector,
+): void {
+    switch (domainOf(counterpart)) {
+        case "rank":
+            if (
+                typeof literal !== "string" ||
+                !(ranks as readonly string[]).includes(literal)
+            ) {
+                out.add(
+                    path,
+                    "unknown_rank_literal",
+                    `Rank literal must be one of the deck's ranks: ${ranks.join(", ")}.`,
+                );
+            }
+            return;
+        case "suit":
+            if (
+                typeof literal !== "string" ||
+                !(suits as readonly string[]).includes(literal)
+            ) {
+                out.add(
+                    path,
+                    "unknown_suit_literal",
+                    `Suit literal must be one of: ${suits.join(", ")}.`,
+                );
+            }
+            return;
+        case "number":
+            if (typeof literal !== "number") {
+                out.add(
+                    path,
+                    "literal_not_numeric",
+                    "A literal compared with a number must be a number.",
+                );
+            }
+            return;
+        case "literal":
+            return;
+    }
+}
+
+function lintCondition(
+    condition: EcaCondition,
+    path: string,
+    ranks: readonly Rank[],
+    suits: readonly Suit[],
+    out: Collector,
+): void {
+    const sides = [
+        [condition.lhs, condition.rhs, `${path}.lhs`],
+        [condition.rhs, condition.lhs, `${path}.rhs`],
+    ] as const;
+    for (const [operand, counterpart, operandPath] of sides) {
+        if (operand.kind !== "literal") continue;
+        if (
+            typeof operand.value === "string" &&
+            operand.value.length > ECA_LITERAL_STRING_MAX
+        ) {
+            out.add(
+                `${operandPath}.value`,
+                "literal_too_long",
+                `String literals are at most ${ECA_LITERAL_STRING_MAX} characters.`,
+            );
+            continue;
+        }
+        lintLiteral(operand.value, counterpart, operandPath, ranks, suits, out);
+    }
+    const lhs = domainOf(condition.lhs);
+    const rhs = domainOf(condition.rhs);
+    if (lhs !== "literal" && rhs !== "literal" && lhs !== rhs) {
+        out.add(
+            path,
+            "incompatible_operands",
+            `Comparing a ${lhs} with a ${rhs} can never match.`,
+        );
+    }
+}
+
+/**
+ * A cardPlayed rule decides the play: exactly ONE verdict. No verdict ⇒ the
+ * card is refused and the rule's effects silently dropped; both verdicts ⇒
+ * the reject is ignored (accept wins); a refusal leaves the state untouched,
+ * so any effect next to `rejectCard` would be dropped as well.
+ */
+function lintVerdict(rule: EcaRule, path: string, out: Collector): void {
+    const accepts = rule.effects.filter((e) => e.type === "acceptCard").length;
+    const rejects = rule.effects.filter((e) => e.type === "rejectCard").length;
+    if (accepts + rejects === 0) {
+        out.add(
+            `${path}.effects`,
+            "missing_verdict",
+            "A cardPlayed rule must accept or reject the card (exactly one of acceptCard / rejectCard).",
+        );
+    } else if (accepts + rejects > 1) {
+        out.add(
+            `${path}.effects`,
+            "conflicting_verdict",
+            "A cardPlayed rule must contain exactly one acceptCard or rejectCard.",
+        );
+    } else if (rejects === 1 && rule.effects.length > 1) {
+        out.add(
+            `${path}.effects`,
+            "reject_with_effects",
+            "A refused card changes nothing — rejectCard cannot carry other effects.",
+        );
+    }
+}
+
+/** The write-time lints, over an already structurally-valid definition. */
+function lintForWrite(definition: EcaDefinition, out: Collector): void {
+    const { ranks, suits } = DECKS[definition.setup.deckId];
+    // Index of the first cardPlayed rule without conditions: it catches every
+    // card, so any cardPlayed rule below it can never fire (first match wins).
+    let catchAll: number | null = null;
+
+    definition.rules.forEach((rule, i) => {
+        const path = `rules[${i}]`;
+        if (
+            rule.id.length > ECA_RULE_ID_MAX ||
+            !RULE_ID_PATTERN.test(rule.id)
+        ) {
+            out.add(
+                `${path}.id`,
+                "invalid_rule_id",
+                `Rule id must be 1..${ECA_RULE_ID_MAX} characters among letters, digits, "-" and "_".`,
+            );
+        }
+        rule.conditions.forEach((condition, j) => {
+            lintCondition(
+                condition,
+                `${path}.conditions[${j}]`,
+                ranks,
+                suits,
+                out,
+            );
+        });
+        if (rule.event !== "cardPlayed") return;
+        lintVerdict(rule, path, out);
+        if (catchAll !== null) {
+            out.add(
+                path,
+                "unreachable_rule",
+                `This rule can never apply: rule ${catchAll + 1} above has no condition and catches every card.`,
+            );
+        } else if (rule.conditions.length === 0) {
+            catchAll = i;
+        }
+    });
+}
+
+/**
+ * Validate a definition about to be WRITTEN (saved, published, test-played):
+ * {@link validateEcaDefinition} plus the write-time lints described at the
+ * top of this file. Lints run once the structure is valid — they reason over
+ * the rebuilt definition, never over raw input.
+ */
+export function validateEcaDefinitionForWrite(
+    input: unknown,
+): EcaValidationResult {
+    const parsed = validateEcaDefinition(input);
+    if (!parsed.ok) return parsed;
+    const out = new Collector();
+    lintForWrite(parsed.definition, out);
+    return out.errors.length > 0 ? { ok: false, errors: out.errors } : parsed;
 }

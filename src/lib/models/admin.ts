@@ -13,6 +13,8 @@ export type OngoingGame = {
     playerCount: number;
     botCount: number;
     currentPlayerName: string | null;
+    /** The seat on turn is a bot (bots have no portal identity to name). */
+    currentIsBot: boolean;
     startedAt: string;
 };
 
@@ -20,8 +22,12 @@ export type OngoingGame = {
  * Every live game (`is_over = false`) for the moderator dashboard, newest
  * first. Reads only public-safe tables (games / rooms / room_players /
  * profiles) — never `game_states` — so the moderator sees *that* a game is
- * running and who is in it, but no private hand. Runs on the caller's
- * RLS-scoped client; access is gated at the page/route level by role.
+ * running and who is in it, but no private hand.
+ *
+ * Takes the **service-role** client: the members-only room policies
+ * (`can_read_room`) would hide every private-room game the moderator is not
+ * seated in, leaving stuck private games impossible to force-end. The caller
+ * MUST have checked the moderator role server-side first (the admin page does).
  */
 export async function listOngoingGames(
     client: SupabaseClient<Database>,
@@ -54,7 +60,11 @@ export async function listOngoingGames(
         playersByRoom.set(s.room_id, (playersByRoom.get(s.room_id) ?? 0) + 1);
     }
 
+    const isBotTurn = (g: (typeof rows)[number]): boolean =>
+        g.current_player_id !== null &&
+        (g.bot_ids ?? []).includes(g.current_player_id);
     const currentIds = rows
+        .filter((g) => !isBotTurn(g))
         .map((g) => g.current_player_id)
         .filter((id): id is string => id !== null);
     const nameOf = await usernamesByIds(client, currentIds);
@@ -70,9 +80,11 @@ export async function listOngoingGames(
             phase: g.phase,
             playerCount: playersByRoom.get(g.room_id) ?? 0,
             botCount: g.bot_ids?.length ?? 0,
-            currentPlayerName: g.current_player_id
-                ? (nameOf.get(g.current_player_id) ?? null)
-                : null,
+            currentPlayerName:
+                g.current_player_id && !isBotTurn(g)
+                    ? (nameOf.get(g.current_player_id) ?? null)
+                    : null,
+            currentIsBot: isBotTurn(g),
             startedAt: g.created_at,
         };
     });

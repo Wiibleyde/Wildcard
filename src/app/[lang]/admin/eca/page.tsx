@@ -42,6 +42,7 @@ export default async function AdminEcaPage({
         name: g.name,
         description: g.description,
         status: g.status,
+        moderationLocked: g.moderationLocked,
         imageUrl: g.imageUrl
             ? publicStorageUrl(ecaImagesBucket(), g.imageUrl)
             : null,

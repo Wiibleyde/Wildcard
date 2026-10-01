@@ -1,8 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isEcaCoverImagePath, isUuid } from "@/lib/eca/id";
 import {
     type EcaValidationError,
-    validateEcaDefinition,
+    validateEcaDefinitionForWrite,
 } from "@/lib/eca/validate";
+import { ecaImagesBucket } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
 import { usernamesByIds } from "./identities";
 import type { EcaGameStatus, StudioErrorCode } from "./studio";
@@ -30,6 +32,8 @@ export interface AdminEcaGame {
     readonly description: string | null;
     readonly status: EcaGameStatus;
     readonly imageUrl: string | null;
+    /** Taken down by an admin — the owner cannot re-publish it. */
+    readonly moderationLocked: boolean;
     readonly createdAt: string;
     readonly updatedAt: string;
 }
@@ -40,6 +44,8 @@ type AdminEcaResult =
           ok: false;
           error: StudioErrorCode;
           details?: readonly EcaValidationError[];
+          /** Internal detail (DB/driver text) — logged on 5xx, never sent. */
+          message?: string;
       };
 
 /** How many games the moderation table lists at once (newest edit first). */
@@ -50,7 +56,7 @@ export async function listAllEcaGames(admin: Admin): Promise<AdminEcaGame[]> {
     const { data } = await admin
         .from("eca_games")
         .select(
-            "id, owner_id, name, description, status, image_url, created_at, updated_at",
+            "id, owner_id, name, description, status, image_url, moderation_locked, created_at, updated_at",
         )
         .order("updated_at", { ascending: false })
         .limit(ADMIN_ECA_LIMIT);
@@ -70,6 +76,7 @@ export async function listAllEcaGames(admin: Admin): Promise<AdminEcaGame[]> {
         description: r.description,
         status: r.status,
         imageUrl: r.image_url,
+        moderationLocked: r.moderation_locked,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
     }));
@@ -79,6 +86,11 @@ export async function listAllEcaGames(admin: Admin): Promise<AdminEcaGame[]> {
  * Publish or unpublish any game (moderation). Publishing re-validates the
  * stored definition — a broken game can never be forced into the published
  * catalog, the same guarantee the owner path gives.
+ *
+ * The status change carries the moderation lock with it: an admin unpublish
+ * is a TAKE-DOWN (`moderation_locked = true` — the owner can edit but not
+ * re-publish), an admin publish is a RESTORE (lock cleared). The DB CHECK
+ * `eca_games_locked_not_published` keeps the pair consistent.
  */
 export async function adminSetEcaStatus(
     admin: Admin,
@@ -89,16 +101,19 @@ export async function adminSetEcaStatus(
         return { ok: false, error: "invalid_input" };
     }
 
+    if (!isUuid(id)) return { ok: false, error: "not_found" };
     const { data: row, error } = await admin
         .from("eca_games")
         .select("definition")
         .eq("id", id)
         .maybeSingle();
-    if (error) return { ok: false, error: "db_error" };
+    if (error) {
+        return { ok: false, error: "db_error", message: error.message };
+    }
     if (!row) return { ok: false, error: "not_found" };
 
     if (status === "published") {
-        const validated = validateEcaDefinition(row.definition);
+        const validated = validateEcaDefinitionForWrite(row.definition);
         if (!validated.ok) {
             return {
                 ok: false,
@@ -110,29 +125,53 @@ export async function adminSetEcaStatus(
 
     const { error: updateError } = await admin
         .from("eca_games")
-        .update({ status, updated_at: new Date().toISOString() })
+        .update({
+            status,
+            moderation_locked: status === "draft",
+            updated_at: new Date().toISOString(),
+        })
         .eq("id", id);
-    if (updateError) return { ok: false, error: "db_error" };
+    if (updateError) {
+        return { ok: false, error: "db_error", message: updateError.message };
+    }
     return { ok: true };
 }
 
-/** Delete any game (moderation take-down). */
+/** Delete any game (moderation take-down), and its cover object. */
 export async function adminDeleteEcaGame(
     admin: Admin,
     id: string,
 ): Promise<AdminEcaResult> {
+    if (!isUuid(id)) return { ok: false, error: "not_found" };
     const { data: row, error } = await admin
         .from("eca_games")
-        .select("id")
+        .select("id, owner_id, image_url")
         .eq("id", id)
         .maybeSingle();
-    if (error) return { ok: false, error: "db_error" };
+    if (error) {
+        return { ok: false, error: "db_error", message: error.message };
+    }
     if (!row) return { ok: false, error: "not_found" };
 
+    // Scoped to the owner read above: the row deleted is the row checked.
     const { error: deleteError } = await admin
         .from("eca_games")
         .delete()
-        .eq("id", id);
-    if (deleteError) return { ok: false, error: "db_error" };
+        .eq("id", id)
+        .eq("owner_id", row.owner_id);
+    if (deleteError) {
+        return { ok: false, error: "db_error", message: deleteError.message };
+    }
+
+    // Best-effort: only an exact cover path for this game is ever removed.
+    if (
+        row.image_url !== null &&
+        isEcaCoverImagePath(row.image_url, row.owner_id, id)
+    ) {
+        await admin.storage
+            .from(ecaImagesBucket())
+            .remove([row.image_url])
+            .catch(() => undefined);
+    }
     return { ok: true };
 }

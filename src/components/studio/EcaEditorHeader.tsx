@@ -20,6 +20,7 @@ export function EcaEditorHeader({
     const {
         draft,
         status,
+        locked,
         validation,
         dirty,
         saving,
@@ -57,6 +58,17 @@ export function EcaEditorHeader({
                         ? t("status_published")
                         : t("status_draft")}
                 </span>
+                {locked && (
+                    <span
+                        className="stamp"
+                        style={{
+                            background: "var(--red)",
+                            color: "var(--accent-ink)",
+                        }}
+                    >
+                        {t("moderation_locked_badge")}
+                    </span>
+                )}
                 {validation.ok ? (
                     <span
                         className="stamp"
@@ -109,7 +121,11 @@ export function EcaEditorHeader({
                     {t("delete")}
                 </GameButton>
                 {status === "draft" && publishDisabled && !publishing && (
-                    <span className="sub text-xs">{t("publish_hint")}</span>
+                    <span className="sub text-xs">
+                        {locked
+                            ? t("moderation_locked_hint")
+                            : t("publish_hint")}
+                    </span>
                 )}
             </div>
             {(mutationFailed || localError) && (

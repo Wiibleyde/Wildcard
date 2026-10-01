@@ -50,7 +50,7 @@ export function CommunityGames({ games }: Props) {
                     <p className="sub text-sm">{t("community_empty")}</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                     {games.map((g) => (
                         <article
                             key={g.id}

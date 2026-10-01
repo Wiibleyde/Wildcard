@@ -10,7 +10,6 @@ import { CRAZY_EIGHTS_LIKE, MINIMAL_VALID } from "@/lib/eca/fixtures";
 import { ecaModuleIdFor } from "@/lib/eca/id";
 import type { EcaDefinition } from "@/lib/eca/types";
 import { ECA_NAME_MAX } from "@/lib/eca/validate";
-import type { Translate } from "@/lib/games/catalogView";
 // Client-safe: models/studio only pulls @/lib/eca at runtime (supabase imports are type-only).
 import { MAX_ECA_GAMES_PER_OWNER } from "@/lib/models/studio";
 import { fieldClass, fieldStyle, labelClass, labelStyle } from "./fields";
@@ -30,14 +29,16 @@ export interface StudioGameSummary {
     /** Display-ready public cover URL (already resolved), or null. */
     readonly imageUrl: string | null;
     readonly updatedAt: string;
+    /** Taken down by an admin: editable, but only an admin can republish. */
+    readonly moderationLocked?: boolean;
 }
 
 type TemplateId = "blank" | "example";
 
 const TEMPLATES: ReadonlyArray<{
     readonly id: TemplateId;
-    readonly labelKey: string;
-    readonly descKey: string;
+    readonly labelKey: "template_blank" | "template_example";
+    readonly descKey: "template_blank_desc" | "template_example_desc";
     readonly definition: EcaDefinition;
 }> = [
     {
@@ -60,8 +61,6 @@ interface Props {
 
 export function StudioHub({ games }: Props) {
     const t = useTranslations("studio");
-    // Dynamic template labelKey lookups need the loose Translate shape.
-    const td = useTranslations("studio") as unknown as Translate;
     const locale = useLocale();
     const router = useRouter();
     const confirm = useConfirm();
@@ -155,9 +154,14 @@ export function StudioHub({ games }: Props) {
             });
             const data = (await res.json().catch(() => ({}))) as {
                 code?: unknown;
+                error?: unknown;
             };
             if (!res.ok || typeof data.code !== "string") {
-                setError(t("play_error"));
+                setError(
+                    res.status === 423 || data.error === "moderation_locked"
+                        ? t("api_errors.moderation_locked")
+                        : t("play_error"),
+                );
                 setLaunching(null);
                 return;
             }
@@ -178,15 +182,24 @@ export function StudioHub({ games }: Props) {
         if (!accepted) return;
         setDeleting(game.id);
         setError(null);
-        const res = await fetch(`/api/studio/games/${game.id}`, {
-            method: "DELETE",
-        });
-        setDeleting(null);
-        if (!res.ok) {
+        try {
+            const res = await fetch(`/api/studio/games/${game.id}`, {
+                method: "DELETE",
+            });
+            if (!res.ok) {
+                setError(
+                    res.status === 423
+                        ? t("api_errors.moderation_locked")
+                        : t("delete_error"),
+                );
+                return;
+            }
+            router.refresh();
+        } catch {
             setError(t("delete_error"));
-            return;
+        } finally {
+            setDeleting(null);
         }
-        router.refresh();
     }
 
     return (
@@ -219,13 +232,13 @@ export function StudioHub({ games }: Props) {
                                 }}
                             >
                                 <span className="font-display text-lg">
-                                    {td(entry.labelKey)}
+                                    {t(entry.labelKey)}
                                 </span>
                                 <span
                                     className="text-xs font-semibold"
                                     style={{ color: "#5a5340" }}
                                 >
-                                    {td(entry.descKey)}
+                                    {t(entry.descKey)}
                                 </span>
                             </button>
                         );
@@ -345,6 +358,17 @@ export function StudioHub({ games }: Props) {
                                             : t("status_draft")}
                                     </span>
                                 </div>
+                                {game.moderationLocked && (
+                                    <span
+                                        className="stamp self-start"
+                                        style={{
+                                            background: "var(--red)",
+                                            color: "var(--accent-ink)",
+                                        }}
+                                    >
+                                        {t("moderation_locked_badge")}
+                                    </span>
+                                )}
                                 {game.description && (
                                     <p
                                         className="line-clamp-2 text-xs font-semibold"

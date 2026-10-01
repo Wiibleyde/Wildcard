@@ -66,22 +66,31 @@ export default async function Page({
         .map((r) => ({
             userId: r.user_id,
             seat: r.seat as number,
-            username: nameOf.get(r.user_id) ?? "Joueur",
+            username: nameOf.get(r.user_id) ?? t("unknown_player"),
         }));
     const initialSpectators: SpectatorRow[] = rows
         .filter((r) => r.role === "spectator")
         .map((r) => ({
             userId: r.user_id,
-            username: nameOf.get(r.user_id) ?? "Joueur",
+            username: nameOf.get(r.user_id) ?? t("unknown_player"),
         }));
     const me = rows.find((r) => r.user_id === user.id);
     const seated = me !== undefined;
-    const initialRole: "player" | "spectator" =
-        me?.role === "spectator" ? "spectator" : "player";
+    // A non-member is joined on mount; mirror `joinRoom`'s rule (a full table
+    // seats newcomers as spectators) so a late arrival never briefly gets the
+    // player controls. The client refresh then adopts the recorded role.
+    const tableFull = initialSeats.length >= (module?.maxPlayers ?? 8);
+    const initialRole: "player" | "spectator" = me
+        ? me.role === "spectator"
+            ? "spectator"
+            : "player"
+        : tableFull
+          ? "spectator"
+          : "player";
 
     return (
         <div className="min-h-screen px-4 pt-8 pb-16 md:pt-12 xl:px-10">
-            <div className="mx-auto flex max-w-lg flex-col gap-6 lg:max-w-2xl xl:max-w-3xl">
+            <div className="mx-auto flex max-w-lg flex-col gap-6 lg:max-w-3xl xl:max-w-5xl 2xl:max-w-7xl">
                 <h1
                     className="font-display text-3xl xl:text-4xl"
                     style={{ color: "var(--cream)" }}

@@ -15,6 +15,11 @@ export interface AdminEcaGameView {
     readonly description: string | null;
     readonly status: "draft" | "published";
     readonly imageUrl: string | null;
+    /**
+     * Taken down by an admin: the owner cannot re-publish until an admin
+     * publishes it again (restore). Optional so older callers default to false.
+     */
+    readonly moderationLocked?: boolean;
     readonly updatedAt: string;
 }
 
@@ -28,7 +33,9 @@ interface Props {
  * Moderation table for every creator's studio games. Lists all games across
  * owners (fetched server-side on the service role) and — for admins — lets
  * them unpublish a live game or delete it outright. Owner-authored edits stay
- * in the studio; this panel is take-down only.
+ * in the studio; this panel is take-down only. An admin unpublish LOCKS the
+ * game (the owner can edit it but not re-publish); an admin publish restores
+ * it and clears the lock.
  */
 export function EcaGamesAdminPanel({ games, canManage }: Props) {
     const t = useTranslations("admin");
@@ -211,6 +218,17 @@ export function EcaGamesAdminPanel({ games, canManage }: Props) {
                                             ? t("eca_status_published")
                                             : t("eca_status_draft")}
                                     </span>
+                                    {game.moderationLocked && (
+                                        <span
+                                            className="stamp shrink-0"
+                                            style={{
+                                                background: "var(--red)",
+                                                color: "var(--cream)",
+                                            }}
+                                        >
+                                            {t("eca_locked")}
+                                        </span>
+                                    )}
                                 </div>
                                 <p
                                     className="text-xs font-semibold"
@@ -236,7 +254,9 @@ export function EcaGamesAdminPanel({ games, canManage }: Props) {
                                     >
                                         {game.status === "published"
                                             ? t("eca_unpublish")
-                                            : t("eca_publish")}
+                                            : game.moderationLocked
+                                              ? t("eca_restore")
+                                              : t("eca_publish")}
                                     </GameButton>
                                     <GameButton
                                         variant="red"

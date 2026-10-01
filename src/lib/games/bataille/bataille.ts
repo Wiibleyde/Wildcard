@@ -13,6 +13,14 @@ import type { GameEvent, GameModule, GameState } from "@/lib/engine/types";
  * server-side (including any war chain on a tie). This proves the engine can
  * model a *simultaneous, engine-driven* game — there is no "current player",
  * and the entire outcome is derived on the server from hidden piles.
+ *
+ * French rules: on a tie (« bataille ! ») each player lays ONE card face down,
+ * then flips a new one face up; the higher flip takes the whole pot, another
+ * tie repeats the war. A player who runs out of cards loses.
+ *
+ * Bataille has no skill and can, with recycled piles, run for a very long
+ * time, so the game is capped at {@link MAX_ROUNDS} rounds: past it, the game
+ * ends and players are ranked by the cards they hold (ties share the rank).
  */
 
 /** Ace-high ranking (2 lowest → Ace highest). Bataille's own order: Président
@@ -35,12 +43,18 @@ const RANK_VALUE = buildRankOrder([
     "A",
 ]);
 
-/** Cards laid face-down by each player on a tie before the deciding flip. */
-const WAR_STAKE = 3;
+/** Cards laid face-down by each player on a tie before the deciding flip — one
+ * in the French game (the English "War" variant stakes three). */
+export const WAR_STAKE = 1;
 
-/** Hard cap on war iterations — the loser strictly loses ≥1 card per round, so
- *  a game can never reach this; it exists only as a defensive backstop. */
+/** Cap on chained wars (tie → stake → tie …) inside ONE round. Each war step
+ * consumes ≥ 2 cards per player from a 52-card deck, so a single round can
+ * never legitimately reach it; it only bounds the loop defensively. */
 const MAX_WAR_STEPS = 64;
+
+/** Rounds after which the game stops and is decided on card count. Real games
+ * have been observed past 1 000 rounds; the cap keeps a match finite. */
+export const MAX_ROUNDS = 1000;
 
 function cardValue(card: CardDescriptor): number {
     const rank = rankOf(card);
@@ -223,7 +237,10 @@ function resolveRound(state: BatailleState, rng: Rng): BatailleState {
     }
 
     const rounds = state.rounds + 1;
-    const over = totalCards(piles[a.id]) === 0 || totalCards(piles[b.id]) === 0;
+    const over =
+        totalCards(piles[a.id]) === 0 ||
+        totalCards(piles[b.id]) === 0 ||
+        rounds >= MAX_ROUNDS;
 
     return {
         ...state,
@@ -278,6 +295,15 @@ export const bataille: GameModule<BatailleState, BatailleAction, BatailleView> =
             if (state.phase === "done") {
                 return fail("game_over", "The game has already finished.");
             }
+            // Client input: check the shape at runtime so a crafted payload
+            // is refused instead of throwing.
+            if (
+                typeof action !== "object" ||
+                action === null ||
+                typeof action.playerId !== "string"
+            ) {
+                return fail("invalid_action", "Malformed action.");
+            }
             if (action.type !== "flip") {
                 return fail(
                     "illegal_action",
@@ -299,6 +325,15 @@ export const bataille: GameModule<BatailleState, BatailleAction, BatailleView> =
                 },
             ];
             if (next.phase === "done") {
+                // Decided by the round cap rather than a player running dry.
+                if (
+                    next.players.every((p) => totalCards(next.piles[p.id]) > 0)
+                ) {
+                    events.push({
+                        type: "round_limit",
+                        payload: { rounds: next.rounds },
+                    });
+                }
                 events.push({ type: "game_over" });
             }
             return { ok: true, state: next, events };

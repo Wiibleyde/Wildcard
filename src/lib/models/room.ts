@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { after } from "next/server";
-import { createGame } from "@/lib/engine/runner";
+import { createGame, withGameRules } from "@/lib/engine/runner";
 import { type Player, resolveRuleToggles } from "@/lib/engine/types";
 import {
     resolveGameModule,
@@ -8,7 +8,7 @@ import {
 } from "@/lib/games/resolve";
 import { recordGameStarted } from "@/lib/metrics/registry";
 import type { Database } from "@/lib/supabase/types";
-import { advanceBots } from "./game";
+import { advanceBots, forfeitGame, settleGame } from "./game";
 import { usernamesByIds } from "./identities";
 
 type Admin = SupabaseClient<Database>;
@@ -38,6 +38,13 @@ export const ROOM_ERROR_STATUS: Record<RoomErrorCode, number> = {
     invalid_bot_count: 400,
     db_error: 500,
 };
+
+/**
+ * SQLSTATE raised by the `room_players_lobby_only` trigger when a seat write
+ * reaches a room that already left the lobby (lost the race against
+ * `startGame`'s claim) — see 20261001100300_members_only_rooms.sql.
+ */
+const ROOM_NOT_IN_LOBBY = "WCL01";
 
 /** Unambiguous alphabet — no 0/O, 1/I confusion in shared codes. */
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -184,6 +191,9 @@ export async function joinRoom(
             if (!error || error.code === "23505") {
                 return { ok: true, roomId: room.id };
             }
+            if (error.code === ROOM_NOT_IN_LOBBY) {
+                return { ok: false, error: "already_started" };
+            }
             return { ok: false, error: "db_error", message: error.message };
         }
 
@@ -192,6 +202,9 @@ export async function joinRoom(
             .from("room_players")
             .insert({ room_id: room.id, user_id: userId, seat });
         if (!error) return { ok: true, roomId: room.id };
+        if (error.code === ROOM_NOT_IN_LOBBY) {
+            return { ok: false, error: "already_started" };
+        }
         if (error.code !== "23505") {
             return { ok: false, error: "db_error", message: error.message };
         }
@@ -236,6 +249,9 @@ export async function setRoomRole(
             },
             { onConflict: "room_id,user_id" },
         );
+        if (error?.code === ROOM_NOT_IN_LOBBY) {
+            return { ok: false, error: "already_started" };
+        }
         if (error) {
             return { ok: false, error: "db_error", message: error.message };
         }
@@ -270,6 +286,9 @@ export async function setRoomRole(
                 { onConflict: "room_id,user_id" },
             );
         if (!error) return { ok: true, role: "player" };
+        if (error.code === ROOM_NOT_IN_LOBBY) {
+            return { ok: false, error: "already_started" };
+        }
         if (error.code !== "23505") {
             return { ok: false, error: "db_error", message: error.message };
         }
@@ -279,7 +298,17 @@ export async function setRoomRole(
     return { ok: false, error: "room_full" };
 }
 
-/** Remove `userId` from the lobby; reassign host or delete the room if empty. */
+/**
+ * Remove `userId` from the room; reassign host or delete the room if empty.
+ *
+ * Leaving a game in progress is a **forfeit** when the leaver was dealt in: the
+ * game ends at once (leaver last, everyone else sharing first place) and is
+ * settled — ELO, XP, winners, room finished, version bumped so every client
+ * lands on the game-over screen (see {@link forfeitGame}). A spectator leaving
+ * changes nothing. The forfeit runs before the seat is removed: if it fails,
+ * the player stays seated and can retry, rather than leaving a game waiting
+ * forever on someone who is gone.
+ */
 export async function leaveRoom(
     admin: Admin,
     userId: string,
@@ -287,40 +316,74 @@ export async function leaveRoom(
 ): Promise<
     { ok: true } | { ok: false; error: RoomErrorCode; message?: string }
 > {
-    const { data: room } = await admin
+    const { data: room, error: roomError } = await admin
         .from("rooms")
-        .select("id, host_id, status")
+        .select("id, host_id, status, current_game_id")
         .eq("code", code.toUpperCase())
         .maybeSingle();
+    if (roomError) {
+        return { ok: false, error: "db_error", message: roomError.message };
+    }
     if (!room) return { ok: false, error: "not_found" };
 
-    await admin
+    if (room.status === "playing" && room.current_game_id) {
+        // No-op for spectators (not in the dealt players) and finished games.
+        const forfeit = await forfeitGame(admin, room.current_game_id, userId);
+        if (!forfeit.ok && forfeit.error !== "not_found") {
+            return {
+                ok: false,
+                error: "db_error",
+                message: `forfeit failed: ${forfeit.error}`,
+            };
+        }
+    }
+
+    const { error: deleteError } = await admin
         .from("room_players")
         .delete()
         .eq("room_id", room.id)
         .eq("user_id", userId);
+    if (deleteError) {
+        return { ok: false, error: "db_error", message: deleteError.message };
+    }
 
-    const { data: remaining } = await admin
+    const { data: remaining, error: remainingError } = await admin
         .from("room_players")
         .select("user_id, seat")
         .eq("room_id", room.id)
         .order("seat", { ascending: true });
+    if (remainingError) {
+        return {
+            ok: false,
+            error: "db_error",
+            message: remainingError.message,
+        };
+    }
 
     if (!remaining || remaining.length === 0) {
         // Only reap empty LOBBIES. Played rooms stay: deleting them would
         // cascade into games/game_actions and erase the match history that
         // ELO and replays are built on.
         if (room.status === "lobby") {
-            await admin.from("rooms").delete().eq("id", room.id);
+            const { error } = await admin
+                .from("rooms")
+                .delete()
+                .eq("id", room.id);
+            if (error) {
+                return { ok: false, error: "db_error", message: error.message };
+            }
         }
         return { ok: true };
     }
 
     if (room.host_id === userId) {
-        await admin
+        const { error } = await admin
             .from("rooms")
             .update({ host_id: remaining[0].user_id })
             .eq("id", room.id);
+        if (error) {
+            return { ok: false, error: "db_error", message: error.message };
+        }
     }
 
     return { ok: true };
@@ -432,9 +495,8 @@ export async function startGame(
     // Bind the host's chosen rules into a fresh module instance; games with no
     // toggles (Bataille, Solitaire) deal as-is. Player limits are rule-agnostic
     // so seat math below still reads `module`.
-    const configured = module.withRules
-        ? module.withRules(resolveRuleToggles(module.ruleToggles, room.rules))
-        : module;
+    const rules = resolveRuleToggles(module.ruleToggles, room.rules);
+    const configured = withGameRules(module, rules);
 
     // Claim the room with a compare-and-set (lobby → playing). A concurrent
     // start (double-click, two tabs) loses the claim instead of dealing a
@@ -515,9 +577,17 @@ export async function startGame(
         return abort("not_enough_players");
     }
 
+    // The row id is minted here and handed to the engine, so `games.id` and
+    // `state.gameId` are the same id (the replay re-derives with it).
+    const gameId = crypto.randomUUID();
     let state: ReturnType<typeof createGame>;
+    let overAtDeal: boolean;
+    let dealOutcome: ReturnType<typeof configured.outcome>;
     try {
-        state = createGame(configured, players);
+        state = createGame(configured, players, { gameId });
+        // A studio game can end at deal time (a turnStarted → endGame rule).
+        overAtDeal = configured.isOver(state);
+        dealOutcome = overAtDeal ? configured.outcome(state) : null;
     } catch (err) {
         return abort(
             "not_enough_players",
@@ -528,11 +598,14 @@ export async function startGame(
     const { data: game, error: gameError } = await admin
         .from("games")
         .insert({
+            id: gameId,
             room_id: room.id,
             module_id: room.module_id,
             phase: state.phase,
             current_player_id: state.currentPlayerId,
-            is_over: configured.isOver(state),
+            is_over: overAtDeal,
+            end_reason: overAtDeal ? "natural" : null,
+            winner_ids: [...(dealOutcome?.winners ?? [])],
             version: 0,
             bot_ids: botIds,
         })
@@ -553,19 +626,39 @@ export async function startGame(
         return abort("db_error", stateError.message);
     }
 
-    await admin
+    const { error: pointerError } = await admin
         .from("rooms")
         .update({ current_game_id: game.id })
         .eq("id", room.id);
+    if (pointerError) {
+        // Without the pointer nobody can reach the game: drop it (cascades to
+        // the state) and re-open the lobby.
+        await admin.from("games").delete().eq("id", game.id);
+        return abort("db_error", pointerError.message);
+    }
 
-    // If a bot leads (e.g. holds the 3♣ in Président), let it play — after the
-    // response, paced, so every client sees the opening moves animate.
-    if (botIds.length > 0) {
+    if (overAtDeal) {
+        // Settled through the same path as a final move: room finished,
+        // winners, ELO/XP — exactly once.
+        await settleGame(
+            admin,
+            {
+                id: game.id,
+                moduleId: room.module_id,
+                botIds,
+                createdAt: game.created_at,
+                // Over at the deal: nobody played, so no XP (ELO still applies).
+                moveCount: 0,
+            },
+            dealOutcome,
+        );
+    } else if (botIds.length > 0) {
+        // If a bot leads (e.g. holds the 3♣ in Président), let it play — after
+        // the response, paced, so every client sees the opening moves animate.
         after(() =>
             advanceBots(
                 admin,
                 game.id,
-                room.id,
                 configured,
                 state,
                 0,

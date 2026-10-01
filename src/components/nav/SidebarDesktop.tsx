@@ -11,7 +11,6 @@ type Props = {
     avatarUrl: string | null;
     level: number;
     initial: string;
-    coins: string;
     levelShort: string;
     canModerate: boolean;
 };
@@ -21,13 +20,12 @@ export function SidebarDesktop({
     avatarUrl,
     level,
     initial,
-    coins,
     levelShort,
     canModerate,
 }: Props) {
     return (
         <aside
-            className="fixed top-0 left-0 z-40 hidden h-screen w-59 flex-col gap-1.5 px-4 py-5 md:flex"
+            className="fixed top-0 left-0 z-40 hidden h-screen w-55 flex-col gap-1.5 px-4 py-5 md:flex xl:w-64"
             style={{
                 background: "var(--panel-d2)",
                 borderRight: "3px solid var(--ink)",
@@ -42,27 +40,7 @@ export function SidebarDesktop({
             </div>
 
             <div className="mt-auto flex flex-col gap-3">
-                <div className="flex gap-2">
-                    <span
-                        className="inline-flex items-center gap-1.5 rounded-full border-nb px-3 py-1 font-display text-sm"
-                        style={{
-                            background: "var(--cream)",
-                            borderColor: "var(--ink)",
-                            color: "var(--ink)",
-                            boxShadow: "0 3px 0 var(--ink)",
-                        }}
-                    >
-                        <span style={{ color: "var(--gold)" }}>◆</span>0
-                        <span
-                            className="font-body text-wc-tag font-semibold"
-                            style={{ color: "#7a7052" }}
-                        >
-                            {coins}
-                        </span>
-                    </span>
-                </div>
-
-                <NavActions variant="sidebar" shown={true} />
+                <NavActions variant="sidebar" />
 
                 <Link href="/profile" className="wc-me">
                     <NavAvatar

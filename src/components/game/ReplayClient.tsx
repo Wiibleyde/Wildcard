@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
+import { nameOf } from "@/components/game/GameChrome";
 import { GameTable } from "@/components/game/GameTable";
 import { GameButton } from "@/components/ui/GameButton";
 import { useReplayPlayback } from "@/hooks/game/useReplayPlayback";
@@ -48,6 +49,7 @@ export function ReplayClient({
         return {
             gameId: payload.gameId,
             moduleId: payload.moduleId,
+            roomCode: null,
             version: index,
             phase: step.phase,
             isOver: step.isOver,
@@ -55,6 +57,8 @@ export function ReplayClient({
             view: step.view,
             legalActions: [],
             outcome: step.outcome,
+            // A replay re-shows the board, never the settlement (no XP widget).
+            end: null,
             players: payload.players,
             log,
             viewerId: payload.viewerId,
@@ -86,7 +90,7 @@ export function ReplayClient({
     if (!table) {
         return (
             <div className="p-8 text-center" style={{ color: "var(--muted)" }}>
-                {payload.moduleId}
+                {t("unknown_game")}
             </div>
         );
     }
@@ -101,15 +105,33 @@ export function ReplayClient({
                 >
                     ← {t("back")}
                 </Link>
-                {payload.adminEnded && (
+                {payload.interruptedBy && (
                     <span
                         className="text-xs font-semibold"
                         style={{ color: "var(--muted)" }}
                     >
-                        {t("admin_ended")}
+                        {payload.interruptedBy === "forfeit"
+                            ? t("forfeit_ended", {
+                                  name: nameOf(
+                                      payload.players,
+                                      payload.forfeitedBy,
+                                  ),
+                              })
+                            : payload.interruptedBy === "abandoned"
+                              ? t("abandoned_ended")
+                              : t("admin_ended")}
                     </span>
                 )}
             </div>
+
+            {payload.diverged && (
+                <p
+                    className="mx-auto w-full max-w-3xl text-center text-xs font-semibold xl:max-w-5xl 2xl:max-w-7xl"
+                    style={{ color: "var(--muted)" }}
+                >
+                    {t("diverged")}
+                </p>
+            )}
 
             <GameTable
                 table={table}
@@ -130,6 +152,7 @@ export function ReplayClient({
                         size="sm"
                         onClick={() => step(-1)}
                         disabled={index <= 0}
+                        ariaLabel={t("prev_move")}
                     >
                         ⏮
                     </GameButton>
@@ -141,6 +164,7 @@ export function ReplayClient({
                         size="sm"
                         onClick={() => step(1)}
                         disabled={index >= last}
+                        ariaLabel={t("next_move")}
                     >
                         ⏭
                     </GameButton>

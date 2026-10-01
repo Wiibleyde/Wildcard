@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/api/auth";
+import { readJsonObject } from "@/lib/api/body";
+import { rateLimit } from "@/lib/api/rateLimit";
+import { failureResponse } from "@/lib/api/respond";
 import {
     clearTicket,
     enqueue,
@@ -11,13 +14,16 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 /** POST — join the quick-match queue for a game and try to form a match. */
 export async function POST(request: Request) {
-    const auth = await requireUser();
+    const auth = await requireUser(request);
     if (!auth.ok) return auth.response;
 
-    const body = (await request.json().catch(() => ({}))) as {
-        moduleId?: unknown;
-    };
-    if (typeof body.moduleId !== "string") {
+    const limited = rateLimit("matchmaking", auth.user.id);
+    if (limited) return limited;
+
+    const parsed = await readJsonObject(request);
+    if (!parsed.ok) return parsed.response;
+    const { moduleId } = parsed.body;
+    if (typeof moduleId !== "string") {
         return NextResponse.json(
             { error: "moduleId is required" },
             { status: 400 },
@@ -25,11 +31,12 @@ export async function POST(request: Request) {
     }
 
     const admin = createAdminClient();
-    const result = await enqueue(admin, auth.user.id, body.moduleId);
+    const result = await enqueue(admin, auth.user.id, moduleId);
     if (!result.ok) {
-        return NextResponse.json(
-            { error: result.error },
-            { status: MATCH_ERROR_STATUS[result.error] },
+        return failureResponse(
+            "matchmaking.enqueue",
+            result,
+            MATCH_ERROR_STATUS,
         );
     }
 
@@ -38,8 +45,8 @@ export async function POST(request: Request) {
 }
 
 /** GET — the caller's current ticket status (idle | searching | matched). */
-export async function GET() {
-    const auth = await requireUser();
+export async function GET(request: Request) {
+    const auth = await requireUser(request);
     if (!auth.ok) return auth.response;
 
     const admin = createAdminClient();
@@ -53,7 +60,7 @@ export async function GET() {
  * once the player has entered the game.
  */
 export async function DELETE(request: Request) {
-    const auth = await requireUser();
+    const auth = await requireUser(request);
     if (!auth.ok) return auth.response;
 
     const all = new URL(request.url).searchParams.get("all") === "1";

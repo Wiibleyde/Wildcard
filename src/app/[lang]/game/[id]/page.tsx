@@ -3,6 +3,7 @@ import type { Locale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 import { GamePlayClient } from "@/components/game/GamePlayClient";
 import { requireAuthUser } from "@/lib/auth/session";
+import { canViewGame } from "@/lib/models/access";
 import { getGameClientState } from "@/lib/models/game";
 import { identityOf } from "@/lib/models/identities";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -20,7 +21,9 @@ export default async function Page({
     const supabase = await createClient();
 
     // Service-role read: secret state stays server-side; client gets only the redacted view().
+    // RLS does not apply to it, so authorize first — same rule as the game API.
     const admin = createAdminClient();
+    if (!(await canViewGame(admin, id, user.id))) notFound();
     const result = await getGameClientState(admin, id, user.id);
     if (!result.ok) notFound();
 

@@ -43,6 +43,7 @@ export function SeatPanel({
                             type="button"
                             onClick={() => onSetBots(botCount - 1)}
                             disabled={botCount <= 0}
+                            aria-label={t("remove_bot")}
                             className="flex h-7 w-7 items-center justify-center rounded-lg border-nb font-display disabled:opacity-30"
                             style={{
                                 background: "var(--cream)",
@@ -51,7 +52,7 @@ export function SeatPanel({
                                 boxShadow: "0 3px 0 var(--ink)",
                             }}
                         >
-                            −
+                            <span aria-hidden="true">−</span>
                         </button>
                         <span
                             className="w-5 text-center font-display"
@@ -63,6 +64,7 @@ export function SeatPanel({
                             type="button"
                             onClick={() => onSetBots(botCount + 1)}
                             disabled={total >= maxPlayers}
+                            aria-label={t("add_bot")}
                             className="flex h-7 w-7 items-center justify-center rounded-lg border-nb font-display disabled:opacity-30"
                             style={{
                                 background: "var(--cream)",
@@ -71,12 +73,12 @@ export function SeatPanel({
                                 boxShadow: "0 3px 0 var(--ink)",
                             }}
                         >
-                            +
+                            <span aria-hidden="true">+</span>
                         </button>
                     </div>
                 )}
             </div>
-            <ul className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
                 {slots.map((slot, index) => {
                     const key =
                         slot?.kind === "human"

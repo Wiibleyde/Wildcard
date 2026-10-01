@@ -1,8 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isEcaModuleId } from "@/lib/eca/id";
 import type { EcaState } from "@/lib/eca/types";
-import { createGame, dispatch } from "@/lib/engine/runner";
+import { replayFrames } from "@/lib/engine/runner";
 import type {
+    AnyGameModule,
     GameAction,
     GameEvent,
     GameOutcome,
@@ -11,7 +12,7 @@ import type {
 import { getGameModule } from "@/lib/games";
 import { ecaModuleFromState } from "@/lib/games/resolve";
 import { type GamePlayer, playersOf } from "@/lib/models/game";
-import type { Database } from "@/lib/supabase/types";
+import type { Database, GameEndReason } from "@/lib/supabase/types";
 
 type Admin = SupabaseClient<Database>;
 
@@ -36,26 +37,88 @@ export interface ReplayPayload {
     readonly players: readonly GamePlayer[];
     /** Frame 0 = initial deal; one extra frame per logged action. */
     readonly steps: readonly ReplayStep[];
-    /** True when an admin force-ended the game before it reached a terminal state. */
-    readonly adminEnded: boolean;
-    /** True when the move log was pruned by the 15-day retention sweep. */
+    /**
+     * How the game was closed when it ended out of band (the recorded state
+     * never reached a terminal position): `forfeit` (a player left — see
+     * `forfeitedBy`), `admin` (force-ended by staff) or `abandoned` (closed by
+     * the inactivity reaper). `null` for a game that played to its end.
+     */
+    readonly interruptedBy: Exclude<GameEndReason, "natural"> | null;
+    /** The player who forfeited (`interruptedBy === "forfeit"`). */
+    readonly forfeitedBy: string | null;
+    /** True when the move log was pruned by the 15-day retention sweep (or is incomplete). */
     readonly expired: boolean;
+    /**
+     * True when the log did not re-derive the recorded game: an action was
+     * refused mid-way, or the fold ended on a state different from the stored
+     * one (tampered log, or rules changed since recording). `steps` then holds
+     * only the frames that re-derived cleanly.
+     */
+    readonly diverged: boolean;
 }
 
 type LoadError = "not_found" | "unknown_game";
 
 /**
+ * The table rules a game was dealt with, read back from its persisted state
+ * (configurable modules stamp them as `state.rules`, a `key → boolean` map).
+ */
+function persistedRules(state: GameState): Record<string, boolean> | undefined {
+    const raw = (state as GameState & { rules?: unknown }).rules;
+    if (typeof raw !== "object" || raw === null) return undefined;
+    const rules: Record<string, boolean> = {};
+    for (const [key, value] of Object.entries(raw)) {
+        if (typeof value === "boolean") rules[key] = value;
+    }
+    return rules;
+}
+
+/**
+ * Structural equality of two JSON values, ignoring object key order — the
+ * stored state comes back from `jsonb`, which reorders keys and drops
+ * `undefined` members, so both sides are compared as JSON.
+ */
+function sameJson(a: unknown, b: unknown): boolean {
+    return (
+        JSON.stringify(canonical(JSON.parse(JSON.stringify(a ?? null)))) ===
+        JSON.stringify(canonical(JSON.parse(JSON.stringify(b ?? null))))
+    );
+}
+
+function canonical(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(canonical);
+    if (typeof value === "object" && value !== null) {
+        const out: Record<string, unknown> = {};
+        for (const key of Object.keys(value).sort()) {
+            out[key] = canonical((value as Record<string, unknown>)[key]);
+        }
+        return out;
+    }
+    return value;
+}
+
+/** Whether the logged seqs are exactly 1..n — anything else is a partial log. */
+function isCompleteLog(seqs: readonly number[]): boolean {
+    return seqs.every((seq, i) => seq === i + 1);
+}
+
+/**
  * Reconstruct a finished game frame-by-frame from its inputs — the headline
  * payoff of the deterministic engine (see {@link AGENTS} / `runner.replay`).
  *
- * A game is a pure function of `(seed, players, action log)`: we re-run
- * `createGame` from the recorded seed, then fold the logged actions one at a
- * time, snapshotting the **redacted** `view()` after each. No secret state ever
- * leaves the server, and "replay" costs nothing to store — the log we already
- * keep for audit is the replay.
+ * A game is a pure function of `(seed, players, rules, action log)`: the
+ * runner's {@link replayFrames} re-deals from the recorded seed with the
+ * persisted table rules bound through `module.withRules`, then folds the logged
+ * actions through `dispatch` one at a time; we snapshot the **redacted**
+ * `view()` of each frame. No secret state ever leaves the server, and "replay"
+ * costs nothing to store — the log we already keep for audit is the replay.
  *
- * Must run with the service-role `admin` client: `game_states` is RLS-denied to
- * every client key. We surface only per-frame views to the page.
+ * Integrity is checked, not assumed: a refused action or a fold that does not
+ * land on the stored final state flags the replay as `diverged`; a log that
+ * was pruned or has holes in its `seq` is `expired`.
+ *
+ * Must run with the service-role `admin` client: `game_states` and
+ * `game_actions` are RLS-denied to every client key.
  */
 export async function getReplay(
     admin: Admin,
@@ -64,27 +127,23 @@ export async function getReplay(
 ): Promise<
     { ok: true; payload: ReplayPayload } | { ok: false; error: LoadError }
 > {
-    const { data: meta } = await admin
+    const { data, error } = await admin
         .from("games")
-        .select("id, module_id, is_over, version")
+        .select(
+            "id, module_id, is_over, end_reason, forfeited_by, actions_pruned_at, game_states(state)",
+        )
         .eq("id", gameId)
         .maybeSingle();
-    if (!meta) return { ok: false, error: "not_found" };
-
-    const { data: secret } = await admin
-        .from("game_states")
-        .select("state")
-        .eq("game_id", gameId)
-        .maybeSingle();
+    if (error)
+        console.error(`[replay] load failed (${gameId}):`, error.message);
+    if (!data) return { ok: false, error: "not_found" };
+    const { game_states: embedded, ...meta } = data;
+    const secret = (Array.isArray(embedded) ? embedded[0] : embedded) as
+        | { state: unknown }
+        | null
+        | undefined;
     if (!secret) return { ok: false, error: "not_found" };
-    const finalState = secret.state as unknown as GameState;
-
-    // Studio games rebuild from the definition stamped into the final state, so
-    // a replay re-derives bit-identically without an `eca_games` read.
-    const module = isEcaModuleId(meta.module_id)
-        ? ecaModuleFromState(finalState as EcaState, meta.module_id)
-        : getGameModule(meta.module_id);
-    if (!module) return { ok: false, error: "unknown_game" };
+    const finalState = secret.state as GameState;
 
     // A replay is private to its participants: only someone who actually sat in
     // the game may open it. We answer `not_found` (not a distinct `forbidden`)
@@ -97,66 +156,115 @@ export async function getReplay(
     if (!isPlayer) return { ok: false, error: "not_found" };
     const viewer = viewerId;
 
+    // Studio games rebuild from the definition stamped into the final state, so
+    // a replay re-derives bit-identically without an `eca_games` read.
+    let module: AnyGameModule | undefined;
+    try {
+        module = isEcaModuleId(meta.module_id)
+            ? ecaModuleFromState(finalState as EcaState, meta.module_id)
+            : getGameModule(meta.module_id);
+    } catch (err) {
+        console.error(`[replay] module rebuild failed (${gameId}):`, err);
+    }
+    if (!module) return { ok: false, error: "unknown_game" };
+
     // Whole action log, oldest first — this drives the re-derivation.
-    const { data: rows } = await admin
+    const { data: rows, error: logError } = await admin
         .from("game_actions")
         .select("seq, actor_id, action, events")
         .eq("game_id", gameId)
         .order("seq", { ascending: true });
+    if (logError) {
+        console.error(
+            `[replay] log read failed (${gameId}):`,
+            logError.message,
+        );
+    }
     const actions = rows ?? [];
 
-    // Fold the log, capturing a redacted frame after every applied action. The
-    // seed and original seating come from the persisted state, so the re-run is
-    // bit-identical to how the game actually played out.
-    const fresh = createGame(
-        module,
-        finalState.players,
-        finalState.seed,
-        meta.id,
-    );
-    // Configurable games (Président) stamp the lobby's chosen table rules into
-    // state at setup, and `apply` reads them back from there. createGame re-runs
-    // setup, which stamps the module *defaults* — so a game played with a
-    // non-default rule (e.g. `revolution: false`) would diverge mid-replay. The
-    // deal is seed-only, so grafting the persisted rules onto the fresh initial
-    // state reproduces the recorded game exactly.
-    const persisted = finalState as GameState & { rules?: unknown };
-    let state: GameState =
-        persisted.rules !== undefined
-            ? ({ ...fresh, rules: persisted.rules } as GameState)
-            : fresh;
-    const frame = (
-        actorId: string | null,
-        events: readonly GameEvent[],
-    ): ReplayStep => ({
-        view: module.view(state, viewer),
-        phase: state.phase,
-        currentPlayerId: state.currentPlayerId,
-        isOver: module.isOver(state),
-        outcome: module.outcome(state),
-        actorId,
-        events,
-    });
+    // Pruned by retention, or with holes (missing first seq / gaps): the frames
+    // could only be a misleading prefix, so the replay is reported expired.
+    const expired =
+        meta.actions_pruned_at !== null ||
+        logError !== null ||
+        !isCompleteLog(actions.map((r) => r.seq));
 
-    const steps: ReplayStep[] = [frame(null, [])];
-    for (const row of actions) {
-        const action = row.action as unknown as GameAction;
-        const result = dispatch(module, state, action, action.playerId);
-        // A divergence means the log was tampered with or the rules changed
-        // since recording — stop gracefully and replay what re-derives cleanly.
-        if (!result.ok) break;
-        state = result.state;
-        steps.push(
-            frame(row.actor_id, (row.events ?? []) as unknown as GameEvent[]),
+    // An expired log still shows the opening deal (frame 0), nothing more.
+    const folded = expired ? [] : actions;
+    const steps: ReplayStep[] = [];
+    let lastState: GameState | null = null;
+    let diverged = false;
+    try {
+        const frames = replayFrames(
+            module,
+            finalState.players,
+            finalState.seed,
+            folded.map((r) => r.action as unknown as GameAction),
+            // The id stamped in the state (equal to games.id since deal-time
+            // ids are shared; older games carry their own engine id).
+            { gameId: finalState.gameId, rules: persistedRules(finalState) },
+        );
+        for (;;) {
+            const step = frames.next();
+            if (step.done) {
+                if (step.value) {
+                    diverged = true;
+                    console.error(
+                        `[replay] game ${gameId} diverged at action ${step.value.index}: ${step.value.error.code}`,
+                    );
+                }
+                break;
+            }
+            const { index, state, events } = step.value;
+            lastState = state;
+            steps.push({
+                view: module.view(state, viewer),
+                phase: state.phase,
+                currentPlayerId: state.currentPlayerId,
+                isOver: module.isOver(state),
+                outcome: module.outcome(state),
+                actorId: index < 0 ? null : folded[index].actor_id,
+                events:
+                    index < 0
+                        ? events
+                        : ((folded[index].events ??
+                              []) as unknown as GameEvent[]),
+            });
+        }
+    } catch (err) {
+        diverged = true;
+        console.error(`[replay] game ${gameId}: module threw:`, err);
+    }
+    // Every action applied, yet the fold does not land on the recorded
+    // state: the log does not describe this game. The RNG cursor is left out:
+    // games recorded before the runner persisted it on every step may carry a
+    // stale cursor while every game-visible field still matches.
+    if (
+        !expired &&
+        !diverged &&
+        lastState &&
+        !sameJson(
+            { ...lastState, rngState: null },
+            { ...finalState, rngState: null },
+        )
+    ) {
+        diverged = true;
+        console.error(
+            `[replay] game ${gameId}: final state does not match the log`,
         );
     }
 
+    // Not even the deal re-derived (the module throws at setup): nothing to show.
+    if (steps.length === 0) return { ok: false, error: "unknown_game" };
+
     const players = await playersOf(admin, finalState);
 
-    // A finished game that bumped its version but has no surviving moves had its
-    // log pruned by retention (vs. one that never got a move). Computed once so
-    // the two flags stay mutually exclusive below.
-    const expired = meta.is_over && meta.version > 0 && actions.length === 0;
+    let terminal = false;
+    try {
+        terminal = module.isOver(finalState);
+    } catch {
+        terminal = false;
+    }
 
     return {
         ok: true,
@@ -166,12 +274,20 @@ export async function getReplay(
             viewerId: viewer,
             players,
             steps,
-            // An admin force-ended the game (DB says over, but the re-derived
-            // state isn't terminal). Excludes the expired case, where state is
-            // stuck at the deal only because the log is gone, not because it was
-            // cut short.
-            adminEnded: meta.is_over && !expired && !module.isOver(state),
+            // A forfeit / admin force-end / reap: the DB says over, but the
+            // recorded state never reached a terminal position. Read from the
+            // stored state, so a zero-move force-ended game is labelled
+            // correctly (and never as expired). `end_reason` tells which; a
+            // legacy row (null) keeps the old "admin" label.
+            interruptedBy:
+                meta.is_over && !terminal
+                    ? meta.end_reason === "natural" || meta.end_reason === null
+                        ? "admin"
+                        : meta.end_reason
+                    : null,
+            forfeitedBy: meta.forfeited_by,
             expired,
+            diverged,
         },
     };
 }

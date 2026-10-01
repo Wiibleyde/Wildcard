@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/api/auth";
+import { readJsonBody } from "@/lib/api/body";
+import { failureResponse } from "@/lib/api/respond";
 import {
     type CustomizationPatchErrorCode,
     parseCustomizationPatch,
@@ -14,22 +16,19 @@ const HTTP_STATUS: Record<CustomizationPatchErrorCode, number> = {
 };
 
 export async function PATCH(request: Request) {
-    const auth = await requireUser();
+    const auth = await requireUser(request);
     if (!auth.ok) return auth.response;
 
-    const body: unknown = await request.json().catch(() => null);
-    const patch = parseCustomizationPatch(body);
+    const parsed = await readJsonBody(request);
+    if (!parsed.ok) return parsed.response;
+    const patch = parseCustomizationPatch(parsed.body);
     if (!patch) {
         return NextResponse.json({ error: "invalid_body" }, { status: 400 });
     }
 
     const result = await patchCustomization(auth.supabase, auth.user.id, patch);
-
     if (!result.ok) {
-        return NextResponse.json(
-            { error: result.error },
-            { status: HTTP_STATUS[result.error] ?? 500 },
-        );
+        return failureResponse("customization.patch", result, HTTP_STATUS);
     }
 
     return NextResponse.json({ ok: true });

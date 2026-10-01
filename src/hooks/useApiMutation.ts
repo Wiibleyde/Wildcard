@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export type MutationStatus = "idle" | "pending" | "success" | "error";
 
@@ -25,17 +25,31 @@ export function useApiMutation<TBody = unknown>(
     const [status, setStatus] = useState<MutationStatus>("idle");
     const [error, setError] = useState<string | null>(null);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Double-submit guard read synchronously: `status` from the render closure
+    // is stale for a second call fired before React re-renders.
+    const pendingRef = useRef(false);
+
+    const clearTimer = useCallback(() => {
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+    }, []);
+
+    // Never let the success auto-reset fire into an unmounted component.
+    useEffect(() => clearTimer, [clearTimer]);
 
     const reset = useCallback(() => {
-        if (timerRef.current) clearTimeout(timerRef.current);
+        clearTimer();
         setStatus("idle");
         setError(null);
-    }, []);
+    }, [clearTimer]);
 
     const mutate = useCallback(
         async (body: TBody): Promise<boolean> => {
-            if (status === "pending") return false;
-            if (timerRef.current) clearTimeout(timerRef.current);
+            if (pendingRef.current) return false;
+            pendingRef.current = true;
+            clearTimer();
 
             setStatus("pending");
             setError(null);
@@ -68,9 +82,11 @@ export function useApiMutation<TBody = unknown>(
                 setError("error");
                 setStatus("error");
                 return false;
+            } finally {
+                pendingRef.current = false;
             }
         },
-        [url, method, status, successDuration],
+        [url, method, successDuration, clearTimer],
     );
 
     return { status, error, mutate, reset };

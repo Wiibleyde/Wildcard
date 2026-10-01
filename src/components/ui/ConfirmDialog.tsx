@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { GameButton, type GameButtonVariant } from "./GameButton";
 
 export interface ConfirmDialogProps {
@@ -32,6 +33,10 @@ export function ConfirmDialog({
     onCancel,
 }: ConfirmDialogProps) {
     const panelRef = useRef<HTMLDivElement>(null);
+    // Focus lands on the panel (not the confirm button, so a destructive action
+    // isn't one stray Enter away), Tab stays inside, and the opener gets focus
+    // back on close.
+    useFocusTrap(open, panelRef);
 
     useEffect(() => {
         if (!open) return;
@@ -41,9 +46,6 @@ export function ConfirmDialog({
         document.addEventListener("keydown", onKey);
         const prevOverflow = document.body.style.overflow;
         document.body.style.overflow = "hidden";
-        // Focus the panel, not the confirm button, so a destructive action
-        // isn't one stray Enter away.
-        panelRef.current?.focus();
         return () => {
             document.removeEventListener("keydown", onKey);
             document.body.style.overflow = prevOverflow;

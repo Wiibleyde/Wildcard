@@ -74,137 +74,147 @@ export async function ProfilePage({ lang }: { lang: string }) {
 
     return (
         <div className="min-h-screen px-4 xl:px-10 pt-6 md:pt-10 pb-16">
-            <div className="max-w-lg lg:max-w-4xl xl:max-w-6xl mx-auto flex flex-col gap-5">
-                <div className="panel-d relative overflow-hidden">
-                    <DecoSuit
-                        suit="♠"
-                        style={{
-                            fontSize: "18rem",
-                            opacity: 0.06,
-                            color: "var(--cream)",
-                            top: "-3rem",
-                            right: "-2rem",
-                            transform: "rotate(8deg)",
-                        }}
-                    />
+            {/* lg+: identity / account / history on the left, ELO table on the right. */}
+            <div className="mx-auto grid max-w-lg gap-5 lg:max-w-4xl lg:grid-cols-2 lg:items-start xl:max-w-6xl 2xl:max-w-7xl">
+                <div className="flex min-w-0 flex-col gap-5">
+                    <div className="panel-d relative overflow-hidden">
+                        <DecoSuit
+                            suit="♠"
+                            style={{
+                                fontSize: "18rem",
+                                opacity: 0.06,
+                                color: "var(--cream)",
+                                top: "-3rem",
+                                right: "-2rem",
+                                transform: "rotate(8deg)",
+                            }}
+                        />
 
-                    <div className="relative z-10 p-6 xl:p-8">
-                        <div className="flex items-start justify-between mb-6">
-                            <span
-                                className="stamp"
+                        <div className="relative z-10 p-6 xl:p-8">
+                            <div className="flex items-start justify-between mb-6">
+                                <span
+                                    className="stamp"
+                                    style={{
+                                        background: "var(--gold)",
+                                        color: "var(--ink)",
+                                    }}
+                                >
+                                    {t("title")}
+                                </span>
+                                <SignOutButton />
+                            </div>
+
+                            <div className="flex items-center gap-5 xl:gap-6">
+                                <AvatarHero
+                                    name={identity.name}
+                                    avatarUrl={avatarUrl}
+                                />
+                                <div className="flex-1 min-w-0">
+                                    <h1
+                                        className="font-display text-3xl xl:text-4xl truncate leading-tight"
+                                        style={{ color: "var(--cream)" }}
+                                    >
+                                        {identity.name}
+                                    </h1>
+                                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                                        <span
+                                            className="stamp"
+                                            style={{
+                                                background: "var(--purple)",
+                                                color: "var(--accent-ink)",
+                                            }}
+                                        >
+                                            ♟ {t("level_short")} {level}
+                                        </span>
+                                        {memberSince && (
+                                            <span
+                                                className="text-xs font-semibold"
+                                                style={{
+                                                    color: "var(--muted)",
+                                                }}
+                                            >
+                                                {t("member_since")}{" "}
+                                                {memberSince}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-5">
+                                <ProfileXPCard xp={xp} />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="panel-d p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                            <h2
+                                className="stamp mb-2"
+                                style={{
+                                    background: "var(--blue)",
+                                    color: "var(--accent-ink)",
+                                }}
+                            >
+                                {t("account_title")}
+                            </h2>
+                            <p
+                                className="text-sm font-semibold"
+                                style={{ color: "var(--muted)" }}
+                            >
+                                {manageUrl
+                                    ? t("account_desc")
+                                    : t("account_dev")}
+                            </p>
+                        </div>
+                        {manageUrl && (
+                            <a
+                                href={manageUrl}
+                                className="wc-btn px-4 py-2 text-sm shrink-0 text-center"
                                 style={{
                                     background: "var(--gold)",
                                     color: "var(--ink)",
                                 }}
                             >
-                                {t("title")}
-                            </span>
-                            <SignOutButton />
-                        </div>
-
-                        <div className="flex items-center gap-5 xl:gap-6">
-                            <AvatarHero
-                                name={identity.name}
-                                avatarUrl={avatarUrl}
-                            />
-                            <div className="flex-1 min-w-0">
-                                <h1
-                                    className="font-display text-3xl xl:text-4xl truncate leading-tight"
-                                    style={{ color: "var(--cream)" }}
-                                >
-                                    {identity.name}
-                                </h1>
-                                <div className="flex flex-wrap items-center gap-2 mt-2">
-                                    <span
-                                        className="stamp"
-                                        style={{
-                                            background: "var(--purple)",
-                                            color: "var(--accent-ink)",
-                                        }}
-                                    >
-                                        ♟ {t("level_short")} {level}
-                                    </span>
-                                    {memberSince && (
-                                        <span
-                                            className="text-xs font-semibold"
-                                            style={{ color: "var(--muted)" }}
-                                        >
-                                            {t("member_since")} {memberSince}
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="mt-5">
-                            <ProfileXPCard xp={xp} />
-                        </div>
+                                {t("account_manage")}
+                            </a>
+                        )}
                     </div>
-                </div>
 
-                <div className="panel-d p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                        <h2
-                            className="stamp mb-2"
-                            style={{
-                                background: "var(--blue)",
-                                color: "var(--accent-ink)",
-                            }}
-                        >
-                            {t("account_title")}
-                        </h2>
-                        <p
-                            className="text-sm font-semibold"
-                            style={{ color: "var(--muted)" }}
-                        >
-                            {manageUrl ? t("account_desc") : t("account_dev")}
-                        </p>
-                    </div>
-                    {manageUrl && (
-                        <a
-                            href={manageUrl}
-                            className="wc-btn px-4 py-2 text-sm shrink-0 text-center"
-                            style={{
-                                background: "var(--gold)",
-                                color: "var(--ink)",
-                            }}
-                        >
-                            {t("account_manage")}
-                        </a>
-                    )}
-                </div>
-
-                <ProfileEloCard ratings={ratings} />
-
-                <Link
-                    href="/profile/history"
-                    className="panel-d lift group p-6 flex items-center justify-between gap-4"
-                >
-                    <div className="min-w-0">
-                        <h2
-                            className="stamp mb-2"
-                            style={{
-                                background: "var(--gold)",
-                                color: "var(--ink)",
-                            }}
-                        >
-                            {t("history")}
-                        </h2>
-                        <p
-                            className="text-sm font-semibold"
-                            style={{ color: "var(--muted)" }}
-                        >
-                            {t("history_desc")}
-                        </p>
-                    </div>
-                    <span
-                        className="font-display text-2xl shrink-0 transition-transform group-hover:translate-x-1"
-                        style={{ color: "var(--gold)" }}
-                        aria-hidden="true"
+                    <Link
+                        href="/profile/history"
+                        className="panel-d lift group p-6 flex items-center justify-between gap-4"
                     >
-                        →
-                    </span>
-                </Link>
+                        <div className="min-w-0">
+                            <h2
+                                className="stamp mb-2"
+                                style={{
+                                    background: "var(--gold)",
+                                    color: "var(--ink)",
+                                }}
+                            >
+                                {t("history")}
+                            </h2>
+                            <p
+                                className="text-sm font-semibold"
+                                style={{ color: "var(--muted)" }}
+                            >
+                                {t("history_desc")}
+                            </p>
+                        </div>
+                        <span
+                            className="font-display text-2xl shrink-0 transition-transform group-hover:translate-x-1"
+                            style={{ color: "var(--gold)" }}
+                            aria-hidden="true"
+                        >
+                            →
+                        </span>
+                    </Link>
+                </div>
+
+                <div className="min-w-0">
+                    <ProfileEloCard ratings={ratings} />
+                </div>
             </div>
         </div>
     );

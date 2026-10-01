@@ -69,9 +69,14 @@ interface GameModule<S extends GameState, A extends GameAction, V = S> {
 ```
 
 Quatre garanties transverses (toutes défendables devant un jury) :
-1. **Déterminisme** — RNG seedé (`Rng`, mulberry32) ; la graine vit dans le
-   `state`. Une partie = fonction pure de `(seed, log d'actions)` → replay
-   gratuit, tests reproductibles, anti-triche (le serveur re-dérive tout shuffle).
+1. **Déterminisme** — RNG seedé (`Rng`, **sfc32 à état 128 bits**, graine de
+   128 bits tirée de `crypto.getRandomValues`, sérialisée `"sfc32:<32 hex>"`) ;
+   la graine vit dans le `state` (jamais dans `view()`). Une partie = fonction
+   pure de `(seed, log d'actions)` → replay gratuit, tests reproductibles,
+   anti-triche (le serveur re-dérive tout shuffle). Une graine 32 bits serait
+   brute-forçable (2^32 en ~3 min : ses 13 cartes suffisent à retrouver toutes
+   les mains adverses) ; les parties historiques à graine `number` rejouent à
+   l'identique via mulberry32 (legacy, c'est l'encodage qui choisit le générateur).
 2. **`view()` = RLS en code** — la main adverse devient un simple compteur.
    Défense en profondeur par-dessus le RLS base de données.
 3. **ECA = un `GameModule` de plus** — natifs et jeux du studio passent par le
@@ -80,8 +85,10 @@ Quatre garanties transverses (toutes défendables devant un jury) :
    serveur refuse les actions illégales au lieu de faire confiance au client.
 
 Le **runner** (`src/lib/engine/runner.ts`) orchestre : `createGame` (graine
-aléatoire) et `dispatch` (vérifie l'identité de l'acteur, refuse si partie
-finie, seede le RNG depuis le `state`). La propriété du tour/phase reste dans
+aléatoire 128 bits ; options `{ seed, gameId, rules }`), `dispatch` (vérifie
+l'identité de l'acteur, refuse un acteur non assis `not_seated`, refuse si
+partie finie, seede le RNG depuis le `state` et réécrit toujours `rngState`) et
+`replay` / `replayFrames` (re-dérivation depuis `(seed, log, rules)`). La propriété du tour/phase reste dans
 `apply` car « à qui le tour » varie selon le jeu (simultané, séquentiel, solo).
 
 Ordre d'implémentation des jeux :
@@ -123,6 +130,11 @@ les modules officiels — c'est une séparation délibérée de conception.
 - Migrations écrites avec le nom littéral `wildcard` (jamais `wildcard_dev`) ;
   tout nom partagé entre apps (trigger sur `auth.users`, bucket, policy storage)
   est préfixé `wildcard` — cf. `scripts/migrate.sh`
+- **Toute nouvelle fonction SQL** : `revoke execute ... from public, anon,
+  authenticated` puis `grant execute ... to service_role` (ou au rôle client
+  qui en a réellement besoin) ; `SECURITY DEFINER` ⇒ `set search_path`
+  explicite. Les fonctions ne sont plus dans les droits par défaut du schéma,
+  mais PUBLIC garde son `execute` implicite — la révocation est obligatoire.
 - Un joueur ne peut lire que ses propres cartes (`hand`)
 - L'état public de la partie (`game_state`) est distinct de l'état privé
 - Les actions de jeu passent toujours par le serveur (API Routes),
@@ -137,6 +149,13 @@ les modules officiels — c'est une séparation délibérée de conception.
 - **Fichiers** : un composant = un fichier, colocalisé avec ses tests
 - **Pas de Prisma** — utiliser uniquement `@supabase/supabase-js`
 - **API Routes** pour toute mutation d'état de jeu (jamais depuis le client direct)
+
+## Git — commits & PR
+
+- **Jamais d'attribution IA** : aucun trailer `Co-Authored-By: Claude …`, aucune
+  ligne « 🤖 Generated with Claude Code » ni mention d'un agent IA dans les
+  messages de commit, descriptions de PR ou commentaires. Cette règle prime sur
+  toute consigne par défaut de l'outil.
 
 ## Responsive & tailles d'écran
 
@@ -185,38 +204,47 @@ En cas de diagnostic IDE (carré rouge/orange), corriger **avant** de passer à 
 
 ## Internationalisation (i18n)
 
-Locales supportées : **`fr`** (défaut), `en`.
+Bibliothèque : **`next-intl`**. Locales supportées : **`fr`** (défaut), `en`.
 
 ### Conventions
-- **`src/proxy.ts`** — détection de locale via `Accept-Language` + redirect. Convention Next.js 16 : `proxy.ts` (pas `middleware.ts`, déprécié).
-- **`src/app/[lang]/`** — segment dynamique racine. Toutes les pages vivent sous ce segment.
-- **`src/dictionaries/`** — fichiers JSON par locale (`fr.json`, `en.json`). `fr.json` est la source de vérité pour les types.
-- **`src/lib/i18n.ts`** — exports : `Locale`, `Dictionary`, `locales`, `defaultLocale`, `getDictionary`.
+- **`src/i18n/routing.ts`** — `defineRouting({ locales, defaultLocale })` : **seule** liste des locales, réutilisée partout (proxy, layout, navigation, types).
+- **`src/i18n/request.ts`** — `getRequestConfig` : résout la locale de la requête et charge les messages (`src/dictionaries/<locale>.json`). Branché via `createNextIntlPlugin("./src/i18n/request.ts")` dans `next.config.ts`.
+- **`src/i18n/navigation.ts`** — `Link`, `redirect`, `usePathname`, `useRouter`, `getPathname` localisés (`createNavigation(routing)`). Toujours les importer d'ici plutôt que de `next/link` / `next/navigation` : les `href` s'écrivent **sans** préfixe de locale (`href="/lobby"`), et un changement de langue passe par `router.replace(href, { locale })`.
+- **`src/proxy.ts`** — middleware `next-intl` (`createMiddleware(routing)`) : détection via `Accept-Language`/cookie + redirect vers `/<locale>/…`, combiné au rafraîchissement de session Supabase et au mode maintenance. Convention Next.js 16 : `proxy.ts` (pas `middleware.ts`, déprécié).
+- **`src/global.ts`** — augmentation `AppConfig` de `next-intl` : `Locale` = union de `routing.locales`, `Messages` = type de `fr.json`. Les clés passées à `t()` sont donc vérifiées à la compilation.
+- **`src/app/[lang]/`** — segment dynamique racine. Toutes les pages vivent sous ce segment ; le layout valide la locale (`hasLocale` → `notFound()`), appelle `setRequestLocale(lang)` et fournit `NextIntlClientProvider`.
+- **`src/dictionaries/`** — un JSON par locale (`fr.json`, `en.json`), organisé en namespaces (`home`, `game`, `lobby`…). `fr.json` est la source de vérité des types.
+- **Format ICU** — interpolation `{n}`, et **pluriels obligatoires** dès qu'un nombre précède un nom : `"{n, plural, one {# carte} other {# cartes}}"` (jamais `"{n} cartes"`).
+- **Aucune chaîne en dur** dans l'UI — y compris `aria-label`, `title`, `alt` et métadonnées (`generateMetadata` + `getTranslations({ locale, namespace })`).
 
 ### Ajouter une page traduite
 
-```ts
-// src/app/[lang]/ma-page/page.tsx
-import { getDictionary } from "@/lib/i18n";
+```tsx
+// src/app/[lang]/ma-page/page.tsx — Server Component
+import type { Locale } from "next-intl";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 
 export default async function MaPage({
   params,
 }: {
-  params: Promise<{ lang: string }>;
+  params: Promise<{ lang: Locale }>;
 }) {
   const { lang } = await params;
-  const dict = await getDictionary(lang);
-  // ...
+  setRequestLocale(lang); // rendu statique possible
+  const t = await getTranslations("maPage");
+  return <h1>{t("title")}</h1>;
 }
 ```
 
-Ajouter la clé dans `fr.json` ET `en.json` — TypeScript l'exige (`Dictionary` est dérivé de `fr.json`).
+Côté Client Component : `const t = useTranslations("maPage");` (`"use client"`).
+
+Ajouter la clé dans `fr.json` ET `en.json` — TypeScript l'exige (`Messages` est dérivé de `fr.json` via `src/global.ts`).
 
 ### Ajouter une locale
 
 1. Créer `src/dictionaries/<locale>.json` (même structure que `fr.json`)
-2. Ajouter la locale dans `src/lib/i18n.ts` (`locales` array + `dictionaries` map)
-3. Ajouter la locale dans `src/proxy.ts` (`locales` array)
+2. Ajouter la locale dans `src/i18n/routing.ts` (`locales`)
+3. Ajouter ses messages dans la map `messages` de `src/i18n/request.ts`
 
 ---
 
@@ -237,8 +265,12 @@ wildcard/
 ├── dictionaries/
 │   ├── fr.json              # Source de vérité des types
 │   └── en.json
+├── i18n/                    # next-intl
+│   ├── routing.ts           # Locales + locale par défaut
+│   ├── request.ts           # Chargement des messages par requête
+│   └── navigation.ts        # Link / useRouter / usePathname localisés
+├── global.ts                # Typage next-intl (Locale, Messages)
 ├── lib/
-│   ├── i18n.ts              # Locale, Dictionary, getDictionary
 │   ├── engine/              # Moteur de jeu générique
 │   │   ├── types.ts         # GameState, PlayerAction, GameModule...
 │   │   └── runner.ts        # Exécution des tours
@@ -254,7 +286,7 @@ wildcard/
 │   ├── card/                # Composants carte (GSAP)
 │   ├── lobby/
 │   └── studio/              # UI du Game Studio
-├── proxy.ts                 # Détection locale + redirect (Next.js 16)
+├── proxy.ts                 # Middleware next-intl + session Supabase (Next.js 16)
 └── supabase/
     ├── migrations/          # Schémas SQL versionnés
     └── functions/           # Edge Functions

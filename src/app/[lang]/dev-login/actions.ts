@@ -1,14 +1,31 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { routing } from "@/i18n/routing";
 import { createClient } from "@/lib/supabase/server";
 
-/** Only same-origin paths: never bounce to an attacker-chosen site. */
+/** The form's `lang` is user input: only a known locale may enter a URL. */
+function safeLang(value: FormDataEntryValue | null): string {
+    return typeof value === "string" &&
+        (routing.locales as readonly string[]).includes(value)
+        ? value
+        : routing.defaultLocale;
+}
+
+/**
+ * Only same-origin paths: never bounce to an attacker-chosen site. Browsers
+ * treat `\` like `/` in URLs, so `/\evil.com` would be protocol-relative —
+ * any backslash is refused, as is `//` anywhere and control characters.
+ */
 function safeNext(next: FormDataEntryValue | null, lang: string): string {
     const value = typeof next === "string" ? next : "";
-    return value.startsWith("/") && !value.startsWith("//")
-        ? value
-        : `/${lang}`;
+    const ok =
+        value.startsWith("/") &&
+        !value.includes("//") &&
+        !value.includes("\\") &&
+        // biome-ignore lint/suspicious/noControlCharactersInRegex: rejecting them is the point
+        !/[\u0000-\u001f\u007f]/.test(value);
+    return ok ? value : `/${lang}`;
 }
 
 /**
@@ -20,7 +37,7 @@ export async function devSignIn(formData: FormData): Promise<void> {
     if (process.env.NODE_ENV !== "development") {
         throw new Error("dev-login is only available under `next dev`");
     }
-    const lang = String(formData.get("lang") ?? "fr");
+    const lang = safeLang(formData.get("lang"));
     const email = String(formData.get("email") ?? "");
     const password = String(formData.get("password") ?? "");
 

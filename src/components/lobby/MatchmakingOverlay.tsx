@@ -1,9 +1,13 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { GameButton } from "@/components/ui/GameButton";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import type { PlayGame } from "@/lib/games/catalog";
+
+/** How long a "matched" flash may hang before an exit is offered (ms). */
+const MATCHED_EXIT_DELAY = 8000;
 
 /** Stable ids for the (purely decorative) queue avatar discs. */
 const SEAT_IDS = ["you", "p2", "p3", "p4", "p5"] as const;
@@ -34,12 +38,35 @@ export function MatchmakingOverlay({
 }: Props) {
     const t = useTranslations("lobby");
     const [now, setNow] = useState(() => Date.now());
+    // A "matched" overlay normally navigates away within a second; if the game
+    // never arrives (lost doorbell, failed request) offer a way out instead of
+    // trapping the player behind a modal with no buttons.
+    const [stuck, setStuck] = useState(false);
+    const panelRef = useRef<HTMLDivElement>(null);
+    const titleId = useId();
+    useFocusTrap(true, panelRef);
 
     useEffect(() => {
         if (matched) return;
         const id = setInterval(() => setNow(Date.now()), 1000);
         return () => clearInterval(id);
     }, [matched]);
+
+    useEffect(() => {
+        setStuck(false);
+        if (!matched) return;
+        const id = setTimeout(() => setStuck(true), MATCHED_EXIT_DELAY);
+        return () => clearTimeout(id);
+    }, [matched]);
+
+    useEffect(() => {
+        if (matched && !stuck) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") onCancel();
+        };
+        document.addEventListener("keydown", onKey);
+        return () => document.removeEventListener("keydown", onKey);
+    }, [matched, stuck, onCancel]);
 
     const elapsed = Math.max(0, Math.floor((now - since) / 1000));
     const accent = game?.accent ?? "var(--green)";
@@ -54,7 +81,14 @@ export function MatchmakingOverlay({
                 backdropFilter: "blur(4px)",
             }}
         >
-            <div className="panel-d relative flex w-full max-w-md flex-col items-center gap-6 px-8 py-10 text-center">
+            <div
+                ref={panelRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={titleId}
+                tabIndex={-1}
+                className="panel-d relative flex w-full max-w-md flex-col items-center gap-6 px-8 py-10 text-center outline-none"
+            >
                 {/* Spinner / found mark */}
                 <div className="relative flex h-24 w-24 items-center justify-center">
                     {!matched && (
@@ -79,6 +113,8 @@ export function MatchmakingOverlay({
 
                 <div className="flex flex-col gap-1.5">
                     <h2
+                        id={titleId}
+                        aria-live="polite"
                         className="font-display text-2xl leading-tight"
                         style={{ color: "var(--cream)" }}
                     >
@@ -147,6 +183,17 @@ export function MatchmakingOverlay({
                             </GameButton>
                         </div>
                     </>
+                )}
+
+                {matched && stuck && (
+                    <GameButton
+                        variant="ghost"
+                        size="sm"
+                        onClick={onCancel}
+                        className="w-full"
+                    >
+                        {t("cancel")}
+                    </GameButton>
                 )}
             </div>
         </div>
