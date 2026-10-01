@@ -57,6 +57,9 @@ if sed 's/--.*$//' "$MIGRATIONS_DIR"/*.sql | grep -q "wildcard_"; then
 	exit 1
 fi
 
+# Keep the log to what matters: no "already exists, skipping" NOTICEs.
+export PGOPTIONS="${PGOPTIONS:-} -c client_min_messages=warning"
+
 LOCK_KEY="$(printf '%s' "wildcard-migrations-$TARGET" | cksum | cut -d' ' -f1)"
 
 # Schema + ledger first: the ledger must exist before anything is recorded.

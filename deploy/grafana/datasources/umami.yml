@@ -1,0 +1,24 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Wildcard — datasource Grafana « Umami (PostgreSQL) »
+#
+# À déposer dans infra/monitoring/grafana/provisioning/datasources/ du serveur.
+# Les datasources `prometheus` existent déjà ; seule celle-ci manque. L'`uid`
+# DOIT rester `umami-postgres` : le dashboard wildcard-web.json le référence.
+#
+# Réseau : Grafana doit être attaché au réseau `umami` (où vit `umami-db`).
+# Mot de passe : variable UMAMI_DB_PASSWORD dans l'env du conteneur Grafana.
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: 1
+datasources:
+  - name: Umami (PostgreSQL)
+    uid: umami-postgres
+    type: postgres
+    access: proxy
+    url: umami-db:5432
+    user: umami
+    jsonData:
+      database: umami
+      sslmode: disable
+      postgresVersion: 1700
+    secureJsonData:
+      password: ${UMAMI_DB_PASSWORD}

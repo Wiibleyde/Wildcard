@@ -93,12 +93,17 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          # Same model as the other apps of the infra: the stack lives in
+          # DEPLOY_PATH (~/infra/services/wildcard, compose from
+          # deploy/compose.yml); pulling the new image and recreating the
+          # container runs the migrations through the entrypoint.
           # Pipes the run's GITHUB_TOKEN to the host to pull from GHCR. Prefer a
           # long-lived PAT logged in once on the server? Drop the docker login
           # line and pre-authenticate the host instead.
           script: |
             set -euo pipefail
             cd "${{ secrets.DEPLOY_PATH }}"
-            git pull --ff-only
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-            ./scripts/deploy.sh
+            docker compose pull
+            docker compose up -d
+            docker image prune -f --filter "label=org.opencontainers.image.source=https://github.com/Wiibleyde/Wildcard"

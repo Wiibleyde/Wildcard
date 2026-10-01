@@ -44,3 +44,7 @@ next-env.d.ts
 
 # local UI screenshot harness
 .uitest/
+
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/

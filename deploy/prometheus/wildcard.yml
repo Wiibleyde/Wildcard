@@ -1,18 +1,18 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Wildcard — fragment de scrape Prometheus
 #
-# Job PROPRE À WILDCARD à ajouter aux `scrape_configs` du Prometheus CENTRAL
-# (cf. deploy/README.md). Cible l'endpoint applicatif /api/metrics (prom-client).
+# Job PROPRE À WILDCARD à ajouter aux `scrape_configs` du Prometheus du serveur
+# (infra/monitoring/prometheus/prometheus.yml, cf. deploy/README.md). Cible
+# l'endpoint applicatif /api/metrics (prom-client).
 #
-# Réseau : Prometheus central et Wildcard partagent le réseau Docker externe
-# `edge` ; l'app y est joignable par son alias `wildcard-app` — aucun port hôte
-# publié requis.
+# Réseau : Prometheus et Wildcard partagent le réseau Docker `monitoring` ;
+# le conteneur y est joignable par son nom `wildcard` — aucun port hôte publié.
 #
 # Auth : /api/metrics exige `Authorization: Bearer <METRICS_TOKEN>` dès que
 # METRICS_TOKEN est défini côté app. Le token DOIT être identique des deux côtés.
-# Prometheus ne sait pas interpoler l'env → écrire le token dans un fichier monté
-# et le référencer via `credentials_file` (cf. entrypoint du service prometheus
-# central dans deploy/README.md).
+# Prometheus ne sait pas interpoler l'env → écrire le token dans un fichier
+# (une ligne, sans retour final) monté en lecture seule dans le conteneur
+# Prometheus à /etc/prometheus/wildcard-token (cf. deploy/README.md).
 # ─────────────────────────────────────────────────────────────────────────────
 - job_name: wildcard-app
   metrics_path: /api/metrics
@@ -21,6 +21,6 @@
     credentials_file: /etc/prometheus/wildcard-token
   static_configs:
     - targets:
-        - wildcard-app:3000
+        - wildcard:3000
       labels:
         project: wildcard

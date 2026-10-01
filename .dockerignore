@@ -1,0 +1,8 @@
+# Never ship local secrets or state into the build context.
+.env*
+!.env*.example
+node_modules
+.next
+.git
+supabase/.temp
+supabase/.branches

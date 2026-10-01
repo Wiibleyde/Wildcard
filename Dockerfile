@@ -28,12 +28,18 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup --system --gid 1001 nodejs \
+# psql: the entrypoint applies the migrations to the shared Postgres (17) before
+# the server starts — see scripts/migrate.sh.
+RUN apk add --no-cache postgresql17-client \
+ && addgroup --system --gid 1001 nodejs \
  && adduser  --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+COPY --chown=nextjs:nodejs supabase/migrations ./supabase/migrations
+COPY --chown=nextjs:nodejs scripts/migrate.sh scripts/docker-entrypoint.sh ./scripts/
 
 USER nextjs
 
@@ -41,4 +47,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
+ENTRYPOINT ["/app/scripts/docker-entrypoint.sh"]
 CMD ["bun", "server.js"]
