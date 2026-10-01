@@ -175,7 +175,12 @@ export const solitaireTable = registerTable<SolitaireView>({
             match: (a: SolitaireAction) => boolean,
         ): SolitaireAction | undefined => legal.find(match);
 
-        const banner = ctx.isOver ? ctx.t("you_win") : ctx.t("your_turn");
+        const banner =
+            view.phase === "won"
+                ? ctx.t("you_win")
+                : view.phase === "lost"
+                  ? ctx.t("solitaire_resigned")
+                  : ctx.t("your_turn");
 
         // One-click finish — surfaced only when the engine deems the win
         // assured (no face-down cards left). It plays the rest out in a quick
@@ -191,6 +196,18 @@ export const solitaireTable = registerTable<SolitaireView>({
                   },
               ]
             : [];
+        // Resign — the only exit from a deal that cannot be won (unlimited
+        // redeals mean a stuck board would otherwise never finish).
+        const resign = find((a) => a.type === "resign");
+        if (resign) {
+            controls.push({
+                key: "resign",
+                label: ctx.t("solitaire_resign"),
+                action: resign,
+                variant: "danger",
+                confirm: true,
+            });
+        }
 
         // ── Stock: a face-down pile. Clicking anywhere on it draws a card, or
         //    recycles the waste once empty (the click lives on the zone, so it
@@ -375,6 +392,8 @@ export const solitaireTable = registerTable<SolitaireView>({
                 return ctx.t("log_recycle");
             case "won":
                 return ctx.t("you_win");
+            case "resigned":
+                return ctx.t("solitaire_resigned");
             // Draws and tableau shuffling are noise — keep the feed to progress.
             default:
                 return null;

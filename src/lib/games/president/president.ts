@@ -1,8 +1,8 @@
 import { french52 } from "@/lib/card/decks";
-import { dealRoundRobin, removeCards } from "@/lib/card/hand";
+import { dealRoundRobin } from "@/lib/card/hand";
 import { buildRankOrder, groupByRank, rankOf } from "@/lib/card/rank";
 import type { CardDescriptor, Rank } from "@/lib/card/types";
-import { cardKey } from "@/lib/card/utils";
+import { cardKey, isCardDescriptor } from "@/lib/card/utils";
 import { buildDeck } from "@/lib/engine/deck";
 import type { Rng } from "@/lib/engine/rng";
 import { fail, seatOrder } from "@/lib/engine/rules";
@@ -34,8 +34,9 @@ import type {
  * - Going out ranks you: 1st = Président, 2nd = Vice-Président …
  *   second-to-last = Vice-Trou, last (still holding cards) = Trou du cul.
  *
- * French table rules — configurable via {@link PresidentRules}, all enabled
- * by default; see {@link createPresident}:
+ * French table rules — configurable via {@link PresidentRules}; all enabled
+ * by default except `revolution` (opt-in, matching the lobby toggle); see
+ * {@link createPresident}:
  * - `twoClosesTrick` — « le 2 ferme le pli » : playing 2s wins the trick on
  *   the spot (count must still match); the table sweeps and the same player
  *   leads again. Inactive while a revolution holds (the 2 is then the
@@ -50,13 +51,20 @@ import type {
  *   it re-arms each time a player matches, so an unbroken run of matches still
  *   completes a carré.
  * - `revolution` — playing four of a kind inverts the ranking (3 strongest,
- *   2 weakest) for the rest of the trick; a counter-revolution (another
- *   quad) flips it back. The table sweeping ends it.
+ *   2 weakest) for the rest of the round: it survives trick sweeps and only
+ *   a counter-revolution (another quad) flips it back; the next deal starts
+ *   with the normal order. A play is always judged under the hierarchy in
+ *   force when it is laid, and the inversion applies from the next play on.
+ *   Hence a quad of 2s laid under the normal order both triggers the
+ *   revolution AND closes the trick (`twoClosesTrick`: the 2s were still the
+ *   strongest cards when laid); its layer then leads under the inverted
+ *   order. Under a revolution, a quad of 2s is a counter-revolution that
+ *   closes nothing (the 2 was the weakest card when laid).
  * - `quadClosesTrick` — « le carré ferme le pli » : completing the fourth
  *   card of a rank on the table (via « ou rien » plays) sweeps the trick on
  *   the spot and the completer leads anew. A quad laid from hand in one play
- *   stays a revolution when that rule is on — it closes nothing, otherwise
- *   the inversion would die the instant it was born.
+ *   is a revolution when that rule is on, not a completed carré — it leaves
+ *   the trick open (only another quad, a counter-revolution, can answer it).
  *
  * The chosen rules are stamped into the state at setup and read back by
  * `apply`, so ANY module instance can resume or replay a saved game —
@@ -98,7 +106,8 @@ export interface PresidentRules {
     /** « Ou rien » — an equal-rank play locks the trick on that rank: only
      * that rank may follow until the table sweeps; others pass themselves. */
     readonly equalRankLock: boolean;
-    /** Four of a kind inverts the ranking until the trick clears. */
+    /** Four of a kind inverts the ranking for the rest of the round (until a
+     * counter-revolution). */
     readonly revolution: boolean;
     /** « Le carré ferme le pli » — completing four of a kind on the table
      * sweeps the trick; the completer leads anew. */
@@ -110,7 +119,8 @@ export const DEFAULT_PRESIDENT_RULES: PresidentRules = {
     finishOnTwoPenalty: true,
     equalRank: true,
     equalRankLock: true,
-    revolution: true,
+    // Opt-in — same default as the lobby toggle below.
+    revolution: false,
     quadClosesTrick: true,
 };
 
@@ -151,7 +161,8 @@ export interface PresidentState extends GameState {
     readonly pile: readonly TrickPlay[];
     /** Shape to beat; `null` when the table is open (a fresh lead). */
     readonly combo: ComboShape | null;
-    /** Ranking inverted by a quad — holds until the trick clears. */
+    /** Ranking inverted by a quad — holds for the rest of the round, until a
+     * counter-revolution. */
     readonly revolution: boolean;
     /** « Ou rien » armed by the last play — the next player must match the
      * combo's rank or pass; a pass or a raise lifts it. */
@@ -241,6 +252,32 @@ function isOut(state: PresidentState, id: string): boolean {
     return state.finished.includes(id) || state.demoted.includes(id);
 }
 
+/** Most cards one play can hold — a quad (four of a kind). */
+const MAX_PLAY_SIZE = 4;
+
+/**
+ * Take one occurrence of each requested card out of `hand`, returning the
+ * canonical hand copies alongside the new hand — or `null` if any is not
+ * held. The reducer stores `taken`, never the client's objects, so a crafted
+ * payload (numeric rank, extra fields) can neither alter rule checks nor be
+ * persisted and broadcast. `requested` must already pass `isCardDescriptor`.
+ */
+function takeFromHand(
+    hand: readonly CardDescriptor[],
+    requested: readonly CardDescriptor[],
+): { taken: CardDescriptor[]; remaining: CardDescriptor[] } | null {
+    const remaining = [...hand];
+    const taken: CardDescriptor[] = [];
+    for (const card of requested) {
+        const key = cardKey(card);
+        const index = remaining.findIndex((c) => cardKey(c) === key);
+        if (index === -1) return null;
+        taken.push(remaining[index]);
+        remaining.splice(index, 1);
+    }
+    return { taken, remaining };
+}
+
 /** The single rank shared by `cards`, or `null` if mixed/empty/non-suited. */
 function comboRank(cards: readonly CardDescriptor[]): Rank | null {
     if (cards.length === 0) return null;
@@ -309,7 +346,7 @@ function clearTrick(
         // closing carré/2 is actually seen instead of vanishing on the spot.
         lastTrick: state.pile,
         combo: null,
-        revolution: false, // a revolution only holds for the trick
+        // `revolution` is kept on purpose: it lasts the whole round.
         equalLock: false, // « ou rien » dies with the trick
         passed: [],
         currentPlayerId: leader,
@@ -397,6 +434,16 @@ const base: Omit<
         if (state.phase === "done") {
             return fail("game_over", "The round has already finished.");
         }
+        // The action is client input: check its shape at runtime so a crafted
+        // payload is refused instead of throwing deep in the reducer.
+        if (
+            typeof action !== "object" ||
+            action === null ||
+            typeof action.playerId !== "string" ||
+            (action.type !== "play" && action.type !== "pass")
+        ) {
+            return fail("invalid_action", "Malformed action.");
+        }
         if (action.playerId !== state.currentPlayerId) {
             return fail("not_your_turn", "It is not this player's turn.");
         }
@@ -432,18 +479,32 @@ const base: Omit<
             return { ok: true, state: advanced, events };
         }
 
-        const { cards } = action;
-        if (cards.length === 0) {
+        const requested: unknown = action.cards;
+        if (!Array.isArray(requested)) {
+            return fail("invalid_action", "`cards` must be an array.");
+        }
+        if (requested.length === 0) {
             return fail("empty_play", "Must play at least one card.");
         }
+        if (requested.length > MAX_PLAY_SIZE) {
+            return fail(
+                "invalid_action",
+                `A play holds at most ${MAX_PLAY_SIZE} cards.`,
+            );
+        }
+        if (!requested.every(isCardDescriptor)) {
+            return fail("illegal_card", "Malformed card descriptor.");
+        }
+
+        const held = takeFromHand(state.hands[action.playerId], requested);
+        if (held === null) {
+            return fail("not_in_hand", "Played a card not held in hand.");
+        }
+        // From here on only the canonical hand copies are used and stored.
+        const { taken: cards, remaining } = held;
         const rank = comboRank(cards);
         if (rank === null) {
             return fail("mixed_ranks", "All cards must share a single rank.");
-        }
-
-        const remaining = removeCards(state.hands[action.playerId], cards);
-        if (remaining === null) {
-            return fail("not_in_hand", "Played a card not held in hand.");
         }
 
         if (state.combo) {
@@ -500,7 +561,9 @@ const base: Omit<
             });
         }
 
-        // Revolution — a quad flips the hierarchy; another quad flips it back.
+        // Revolution — a quad flips the hierarchy for the rest of the round;
+        // another quad flips it back. `state.revolution` (the order in force
+        // when the cards were laid) still judges THIS play below.
         const revolution =
             state.rules.revolution && cards.length === 4
                 ? !state.revolution
@@ -537,8 +600,8 @@ const base: Omit<
         // « Le carré ferme le pli » — this play completed the fourth card of
         // the rank on the table: sweep and hand the completer the lead. A
         // quad laid from hand in one play is excluded while the revolution
-        // rule is on — it inverts the ranking instead of closing, otherwise
-        // the inversion could never outlive the play that created it.
+        // rule is on — it is a revolution, not a completed carré, and stays
+        // open to a counter-revolution.
         let quadCompleted = false;
         if (
             state.rules.quadClosesTrick &&
@@ -562,8 +625,10 @@ const base: Omit<
         }
 
         // « Le 2 ferme le pli » — the table sweeps and the actor leads again.
-        // Under a revolution the 2 is the weakest card and closes nothing.
-        // A completed carré sweeps the same way.
+        // Judged under the order in force when laid (`state.revolution`):
+        // under a revolution the 2 is the weakest card and closes nothing,
+        // while a quad of 2s laid under the normal order still closes the
+        // trick it also revolts. A completed carré sweeps the same way.
         const closesTrick =
             quadCompleted ||
             (state.rules.twoClosesTrick && rank === "2" && !state.revolution);
@@ -644,6 +709,25 @@ const base: Omit<
     },
 };
 
+/** Map a resolved `key → boolean` toggle set onto {@link PresidentRules},
+ * keeping the default for any key that is absent (or not a boolean). */
+function resolvePresidentRules(
+    chosen: Readonly<Record<string, boolean>>,
+): PresidentRules {
+    const pick = (key: keyof PresidentRules): boolean =>
+        typeof chosen[key] === "boolean"
+            ? chosen[key]
+            : DEFAULT_PRESIDENT_RULES[key];
+    return {
+        twoClosesTrick: pick("twoClosesTrick"),
+        finishOnTwoPenalty: pick("finishOnTwoPenalty"),
+        equalRank: pick("equalRank"),
+        equalRankLock: pick("equalRankLock"),
+        revolution: pick("revolution"),
+        quadClosesTrick: pick("quadClosesTrick"),
+    };
+}
+
 /**
  * Build a Président module for a given table-rule configuration. The rules
  * are stamped into the state, so a saved game resumes/replays identically on
@@ -657,10 +741,7 @@ export function createPresident(
         // Rebuild bound to a host-chosen set — the resolved map is merged over
         // the defaults so any unspecified field keeps its standard value.
         withRules(chosen) {
-            return createPresident({
-                ...DEFAULT_PRESIDENT_RULES,
-                ...chosen,
-            } as PresidentRules);
+            return createPresident(resolvePresidentRules(chosen));
         },
         setup(players, rng, seed, gameId) {
             const order = seatOrder(players);
@@ -709,5 +790,5 @@ export function createPresident(
     };
 }
 
-/** Default module — French table rules enabled. */
+/** Default module — {@link DEFAULT_PRESIDENT_RULES}. */
 export const president = createPresident();

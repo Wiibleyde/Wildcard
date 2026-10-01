@@ -4,7 +4,13 @@ import { cardKey } from "@/lib/card/utils";
 import { createRng } from "@/lib/engine/rng";
 import { createGame, dispatch } from "@/lib/engine/runner";
 import type { Player } from "@/lib/engine/types";
-import { type BatailleState, bataille } from "./bataille";
+import {
+    type BatailleAction,
+    type BatailleState,
+    bataille,
+    MAX_ROUNDS,
+    WAR_STAKE,
+} from "./bataille";
 
 const players: Player[] = [
     { id: "alice", name: "Alice", seat: 0 },
@@ -76,19 +82,27 @@ describe("bataille rounds", () => {
         expect(total(res.state, "bob")).toBe(0);
     });
 
+    it("uses the French war stake: one card face down", () => {
+        expect(WAR_STAKE).toBe(1);
+    });
+
     it("resolves a war on a tie and sweeps the whole pot", () => {
-        // Top cards (last element) tie on 7; after each lays 3 face-down, the
-        // deciding flip is Alice's Ace vs Bob's 2.
+        // Top cards (last element) tie on 7; after each lays ONE face-down
+        // (French rule), the deciding flip is Alice's Ace vs Bob's 2.
         const s = makeState(
-            [suited("A"), suited("3"), suited("3"), suited("3"), suited("7")],
-            [suited("2"), suited("3"), suited("3"), suited("3"), suited("7")],
+            [suited("A"), suited("3"), suited("7")],
+            [
+                suited("2", "hearts"),
+                suited("3", "hearts"),
+                suited("7", "hearts"),
+            ],
         );
         const res = bataille.apply(s, flip("alice"), createRng(s.rngState));
 
         expect(res.ok).toBe(true);
         if (!res.ok) return;
         expect(res.state.lastWinner).toBe("alice");
-        expect(total(res.state, "alice")).toBe(10);
+        expect(total(res.state, "alice")).toBe(6);
         expect(total(res.state, "bob")).toBe(0);
         // Face-down war stakes stay hidden: only the two flipped cards show.
         expect(res.state.lastReveal.alice).toHaveLength(2);
@@ -110,7 +124,95 @@ describe("bataille rounds", () => {
     });
 });
 
+describe("bataille round cap", () => {
+    it("ends the game after MAX_ROUNDS and ranks by card count", () => {
+        const s: BatailleState = {
+            ...makeState(
+                [suited("5"), suited("3"), suited("K")],
+                [suited("4", "hearts"), suited("Q", "hearts")],
+            ),
+            rounds: MAX_ROUNDS - 1,
+        };
+        const res = bataille.apply(s, flip("alice"), createRng(s.rngState));
+
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(res.state.rounds).toBe(MAX_ROUNDS);
+        expect(bataille.isOver(res.state)).toBe(true);
+        expect(res.events.map((e) => e.type)).toEqual([
+            "round_resolved",
+            "round_limit",
+            "game_over",
+        ]);
+        // K beats Q: Alice holds 4, Bob 1 — both still in, decided on count.
+        expect(bataille.outcome(res.state)).toEqual({
+            rankings: [
+                { playerId: "alice", rank: 1, score: 4 },
+                { playerId: "bob", rank: 2, score: 1 },
+            ],
+            winners: ["alice"],
+        });
+    });
+
+    it("shares the rank when the capped game ends on equal counts", () => {
+        const s: BatailleState = {
+            ...makeState(
+                [suited("5"), suited("K")],
+                [
+                    suited("5", "hearts"),
+                    suited("6", "hearts"),
+                    suited("7", "hearts"),
+                    suited("Q", "hearts"),
+                ],
+            ),
+            rounds: MAX_ROUNDS - 1,
+        };
+        const res = bataille.apply(s, flip("bob"), createRng(s.rngState));
+
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        const outcome = bataille.outcome(res.state);
+        expect(outcome?.rankings.map((r) => r.rank)).toEqual([1, 1]);
+        expect(outcome?.winners).toHaveLength(2);
+    });
+
+    it("keeps playing below the cap", () => {
+        const s: BatailleState = {
+            ...makeState(
+                [suited("5"), suited("K")],
+                [suited("4", "hearts"), suited("Q", "hearts")],
+            ),
+            rounds: MAX_ROUNDS - 2,
+        };
+        const res = bataille.apply(s, flip("alice"), createRng(s.rngState));
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(bataille.isOver(res.state)).toBe(false);
+    });
+});
+
 describe("bataille runner contract", () => {
+    it("refuses a malformed action instead of throwing", () => {
+        const s = createGame(bataille, players, 3);
+        const bogus = [
+            null,
+            { type: "flip" },
+            { type: "flip", playerId: 42 },
+        ] as unknown as BatailleAction[];
+        for (const action of bogus) {
+            const res = bataille.apply(s, action, createRng(s.rngState));
+            expect(res.ok).toBe(false);
+            if (res.ok) continue;
+            expect(res.error.code).toBe("invalid_action");
+        }
+        const unknown = {
+            type: "cheat",
+            playerId: "alice",
+        } as unknown as BatailleAction;
+        const res = bataille.apply(s, unknown, createRng(s.rngState));
+        expect(res.ok).toBe(false);
+    });
+
     it("rejects an action spoofing another player", () => {
         const s = createGame(bataille, players, 3);
         const res = dispatch(bataille, s, flip("alice"), "bob");
@@ -135,7 +237,7 @@ describe("bataille end to end", () => {
     it("plays to completion, conserves all 52 cards, and names a winner", () => {
         let s = createGame(bataille, players, 20260606);
         let guard = 0;
-        while (!bataille.isOver(s) && guard++ < 10_000) {
+        while (!bataille.isOver(s) && guard++ < MAX_ROUNDS + 10) {
             const res = dispatch(bataille, s, flip("alice"), "alice");
             expect(res.ok).toBe(true);
             if (!res.ok) break;

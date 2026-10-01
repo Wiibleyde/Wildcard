@@ -11,7 +11,12 @@ import {
     type TableZoneInstance,
 } from "../table/types";
 import type { Bid } from "./scoring";
-import type { TarotAction, TarotPlayerView, TarotView } from "./tarot";
+import {
+    SUIT_STRENGTH,
+    type TarotAction,
+    type TarotPlayerView,
+    type TarotView,
+} from "./tarot";
 
 /** Hand reading order: suits grouped low→high, then trumps, then the Excuse. */
 const SUIT_GROUP: Record<Suit, number> = {
@@ -20,25 +25,9 @@ const SUIT_GROUP: Record<Suit, number> = {
     diamonds: 2,
     clubs: 3,
 };
-const RANK_ORDER: Record<string, number> = {
-    A: 1,
-    "2": 2,
-    "3": 3,
-    "4": 4,
-    "5": 5,
-    "6": 6,
-    "7": 7,
-    "8": 8,
-    "9": 9,
-    "10": 10,
-    J: 11,
-    C: 12,
-    Q: 13,
-    K: 14,
-};
 function handOrder(card: CardDescriptor): number {
     if (card.type === "suited") {
-        return SUIT_GROUP[card.suit] * 100 + (RANK_ORDER[card.rank] ?? 0);
+        return SUIT_GROUP[card.suit] * 100 + SUIT_STRENGTH[card.rank];
     }
     if (card.type === "trump") return 400 + card.index;
     return 500; // the Excuse sits at the end
@@ -353,7 +342,6 @@ function statusLine(ctx: TableContext, view: TarotView): string | undefined {
     if (view.phase === "dog") {
         return ctx.t("tarot_ecart_progress", { n: view.ecartCount });
     }
-    if (view.passedOut) return ctx.t("tarot_log_passed_out");
     if (view.phase === "done" && view.result) {
         const pts = Math.abs(view.result.perDefender);
         return ctx.t(

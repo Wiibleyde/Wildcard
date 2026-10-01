@@ -360,3 +360,35 @@ describe("scoreDeal — conservation", () => {
         expect(total).toBe(0);
     });
 });
+
+describe("scoreDeal — Excuse au chelem", () => {
+    it("moves Petit au bout to the penultimate trick when the Excuse closes a slam", () => {
+        const tricks: CompletedTrick[] = [
+            trick("a", [
+                ["a", T(1)],
+                ["b", C("2", "hearts")],
+                ["c", C("3", "hearts")],
+                ["d", C("4", "hearts")],
+            ]),
+            trick("a", [
+                ["a", FOOL],
+                ["b", C("5", "hearts")],
+                ["c", C("6", "hearts")],
+                ["d", C("7", "hearts")],
+            ]),
+        ];
+        const r = scoreDeal({
+            players: ["a", "b", "c", "d"],
+            taker: "a",
+            contract: "garde-sans",
+            tricks,
+            chien: [],
+            ecart: [],
+            rules: { gardeSansContre: true, petitAuBout: true, slam: true },
+        });
+        expect(r.chelem).toBe(200);
+        expect(r.petitAuBout).toBe(1);
+        // The Excuse stays with the slam side — no half-point leaves.
+        expect(r.bouts).toBe(2);
+    });
+});

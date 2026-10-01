@@ -371,3 +371,117 @@ describe("solitaire — runner contract", () => {
         expect(replayed).toEqual(manual);
     });
 });
+
+describe("solitaire — resign", () => {
+    const resign: SolitaireAction = { type: "resign", playerId: "solo" };
+
+    it("is always offered while playing", () => {
+        const state = createGame(solitaire, players, 3, "g");
+        expect(solitaire.legalActions(state, "solo")).toContainEqual(resign);
+    });
+
+    it("ends an unwinnable deal as a loss with a well-formed outcome", () => {
+        const state = makeState({ moves: 42 });
+        expect(solitaire.isOver(state)).toBe(false);
+        const res = dispatch(solitaire, state, resign, "solo");
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(res.state.phase).toBe("lost");
+        expect(res.state.currentPlayerId).toBeNull();
+        expect(res.state.moves).toBe(42); // resigning is not a move
+        expect(solitaire.isOver(res.state)).toBe(true);
+        expect(solitaire.outcome(res.state)).toEqual({
+            rankings: [{ playerId: "solo", rank: 1, score: 42 }],
+            winners: [],
+        });
+        expect(solitaire.legalActions(res.state, "solo")).toEqual([]);
+        expect(solitaire.view(res.state, "solo").phase).toBe("lost");
+    });
+
+    it("refuses any action once resigned", () => {
+        const res = dispatch(solitaire, makeState({}), resign, "solo");
+        if (!res.ok) throw new Error("resign refused");
+        const again = solitaire.apply(res.state, resign, createRng(1));
+        expect(again.ok).toBe(false);
+        if (!again.ok) expect(again.error.code).toBe("game_over");
+    });
+});
+
+describe("solitaire — untrusted payloads", () => {
+    const state = (() => {
+        const tableau = Array.from({ length: 7 }, () => EMPTY_COLUMN);
+        tableau[0] = { down: [], up: [suited("9", "hearts")] };
+        return makeState({
+            tableau,
+            waste: [suited("8", "spades")],
+            foundations: {
+                spades: [suited("A")],
+                hearts: [],
+                diamonds: [],
+                clubs: [],
+            },
+        });
+    })();
+    const bad: unknown[] = [
+        { type: "wasteToTableau", column: "length" },
+        { type: "wasteToTableau", column: 0.5 },
+        { type: "wasteToTableau", column: -1 },
+        { type: "wasteToTableau", column: "0" },
+        { type: "tableauToFoundation", column: "length" },
+        { type: "tableauToFoundation", column: 7 },
+        { type: "tableauToTableau", from: "length", to: 1, count: 1 },
+        { type: "tableauToTableau", from: 0, to: "length", count: 1 },
+        { type: "tableauToTableau", from: 0, to: 1, count: 0.5 },
+        { type: "tableauToTableau", from: 0, to: 1, count: "1" },
+        { type: "foundationToTableau", suit: "bogus", column: 0 },
+        { type: "foundationToTableau", suit: "toString", column: 0 },
+        { type: "foundationToTableau", suit: "spades", column: "length" },
+    ];
+
+    it.each(bad)("refuses %o without throwing", (payload) => {
+        const action = {
+            ...(payload as object),
+            playerId: "solo",
+        } as SolitaireAction;
+        const res = solitaire.apply(state, action, createRng(1));
+        expect(res.ok).toBe(false);
+    });
+
+    it("refuses moving a lone King between empty columns (a no-op)", () => {
+        const tableau = Array.from({ length: 7 }, () => EMPTY_COLUMN);
+        tableau[0] = { down: [], up: [suited("K", "hearts")] };
+        const s = makeState({ tableau });
+        const move: SolitaireAction = {
+            type: "tableauToTableau",
+            playerId: "solo",
+            from: 0,
+            to: 1,
+            count: 1,
+        };
+        expect(solitaire.legalActions(s, "solo")).not.toContainEqual(move);
+        const res = dispatch(solitaire, s, move, "solo");
+        expect(res.ok).toBe(false);
+    });
+
+    it("still lets a King leave a column that hides cards", () => {
+        const tableau = Array.from({ length: 7 }, () => EMPTY_COLUMN);
+        tableau[0] = {
+            down: [suited("2", "clubs")],
+            up: [suited("K", "hearts")],
+        };
+        const s = makeState({ tableau });
+        const res = dispatch(
+            solitaire,
+            s,
+            {
+                type: "tableauToTableau",
+                playerId: "solo",
+                from: 0,
+                to: 1,
+                count: 1,
+            },
+            "solo",
+        );
+        expect(res.ok).toBe(true);
+    });
+});

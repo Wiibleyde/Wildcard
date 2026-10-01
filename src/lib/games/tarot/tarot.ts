@@ -2,7 +2,7 @@ import { tarot78 } from "@/lib/card/decks";
 import { dealRoundRobin, removeCards } from "@/lib/card/hand";
 import { buildRankOrder } from "@/lib/card/rank";
 import type { CardDescriptor, Suit } from "@/lib/card/types";
-import { cardKey } from "@/lib/card/utils";
+import { cardKey, isCardDescriptor } from "@/lib/card/utils";
 import { buildDeck } from "@/lib/engine/deck";
 import type { Rng } from "@/lib/engine/rng";
 import { fail, seatOrder } from "@/lib/engine/rules";
@@ -11,6 +11,7 @@ import type {
     GameModule,
     GameRuleToggle,
     GameState,
+    Player,
 } from "@/lib/engine/types";
 import {
     BID_RANK,
@@ -56,8 +57,9 @@ import {
  * poignées, and announced chelems. Chelem here is auto-detected, unannounced.
  */
 
-/** Suited strength inside one suit: 1(A) low → King high (K>Q>C>J>10>…>1). */
-const SUIT_STRENGTH = buildRankOrder([
+/** Suited strength inside one suit: 1(A) low → King high (K>Q>C>J>10>…>1).
+ * Shared with the table adapter's hand sort so there is one source of truth. */
+export const SUIT_STRENGTH = buildRankOrder([
     "A",
     "2",
     "3",
@@ -103,8 +105,10 @@ export interface TarotState extends GameState {
     readonly bids: Readonly<Record<string, Bid | "pass">>;
     readonly taker: string | null;
     readonly contract: Bid | null;
-    /** Everyone passed — the deal is void (redeal in a real table). */
-    readonly passedOut: boolean;
+    /** Times the cards were redealt because everyone passed (« tout le monde
+     * passe »). Each redeal reshuffles from the seeded RNG and moves the deal
+     * one seat on, so it stays a pure function of (seed, action log). */
+    readonly redeals: number;
 
     // ── dog / écart ───────────────────────────────────────────────────────────
     /** The six chien cards (public on Petite/Garde once bidding resolves). */
@@ -158,7 +162,7 @@ export interface TarotView {
     readonly rules: TarotRules;
     readonly taker: string | null;
     readonly contract: Bid | null;
-    readonly passedOut: boolean;
+    readonly redeals: number;
     /** Strongest bid so far — drives the legal overcalls in the UI. */
     readonly highestBid: Bid | null;
     /** The chien, revealed during the dog phase and at game end; else `[]`. */
@@ -257,31 +261,66 @@ export function legalCards(
     return [...hand]; // no trump to follow with — discard anything
 }
 
-/** Resolve a completed trick's winner: highest trump, else highest card of the
- * led suit. The Excuse never wins. */
-export function trickWinner(plays: readonly TrickCard[]): string {
-    const trumps = plays.filter((p) => isTrump(p.card));
-    if (trumps.length > 0) {
-        return trumps.reduce((best, p) =>
-            (p.card as { index: number }).index >
-            (best.card as { index: number }).index
-                ? p
-                : best,
-        ).playerId;
+/** Where a trick sits in the deal — only needed for the Excuse-au-chelem rule. */
+export interface TrickContext {
+    /** This is the deal's final trick (every hand is now empty). */
+    readonly isLastTrick: boolean;
+    /** The side of the player who led this trick won every previous trick. */
+    readonly leaderSideWonAll: boolean;
+}
+
+/**
+ * Resolve a completed trick's winner: highest trump, else highest card of the
+ * led suit. The Excuse never wins — with one FFT exception: a side that has won
+ * every previous trick and *leads* the Excuse to the last trick wins that trick
+ * with it, so playing the Excuse last never breaks a chelem.
+ */
+export function trickWinner(
+    plays: readonly TrickCard[],
+    context?: TrickContext,
+): string {
+    const opener = plays[0];
+    if (
+        opener?.card.type === "fool" &&
+        context?.isLastTrick &&
+        context.leaderSideWonAll
+    ) {
+        return opener.playerId;
     }
+
+    let bestTrump: { playerId: string; index: number } | null = null;
+    for (const p of plays) {
+        if (isTrump(p.card) && (!bestTrump || p.card.index > bestTrump.index)) {
+            bestTrump = { playerId: p.playerId, index: p.card.index };
+        }
+    }
+    if (bestTrump) return bestTrump.playerId;
+
     const lead = plays.find((p) => p.card.type !== "fool");
     if (!lead || lead.card.type !== "suited") {
         return (lead ?? plays[0]).playerId;
     }
     const suit = lead.card.suit;
-    const followers = plays.filter(
-        (p) => p.card.type === "suited" && p.card.suit === suit,
-    );
-    return followers.reduce((best, p) => {
-        const a = (p.card as { rank: keyof typeof SUIT_STRENGTH }).rank;
-        const b = (best.card as { rank: keyof typeof SUIT_STRENGTH }).rank;
-        return SUIT_STRENGTH[a] > SUIT_STRENGTH[b] ? p : best;
-    }).playerId;
+    let best = { playerId: lead.playerId, strength: 0 };
+    for (const p of plays) {
+        if (p.card.type !== "suited" || p.card.suit !== suit) continue;
+        const strength = SUIT_STRENGTH[p.card.rank];
+        if (strength > best.strength) {
+            best = { playerId: p.playerId, strength };
+        }
+    }
+    return best.playerId;
+}
+
+/** Did `playerId`'s side (taker vs. defence) win every trick in `tricks`?
+ * Vacuously true before the first trick. */
+function sideWonAll(
+    tricks: readonly CompletedTrick[],
+    playerId: string,
+    taker: string | null,
+): boolean {
+    const isTakerSide = playerId === taker;
+    return tricks.every((t) => (t.winnerId === taker) === isTakerSide);
 }
 
 /**
@@ -326,6 +365,60 @@ function availableBids(floor: number, rules: TarotRules): Bid[] {
     );
 }
 
+/** Players in turn order starting from `eldestId` (bidding / dealing order). */
+function orderFrom(
+    players: readonly Player[],
+    eldestId: string,
+): readonly Player[] {
+    const order = seatOrder(players);
+    const start = Math.max(
+        0,
+        order.findIndex((p) => p.id === eldestId),
+    );
+    return [...order.slice(start), ...order.slice(0, start)];
+}
+
+/**
+ * Shuffle a full deck and deal it: 72 cards round-robin from the eldest hand,
+ * the last six form the chien. A uniform shuffle makes which cards land in the
+ * chien uniformly random — the traditional packet-deal ritual only matters at a
+ * physical table.
+ */
+function deal(
+    players: readonly Player[],
+    eldestId: string,
+    rng: Rng,
+): {
+    hands: Record<string, readonly CardDescriptor[]>;
+    chien: readonly CardDescriptor[];
+} {
+    const order = orderFrom(players, eldestId);
+    const deck = rng.shuffle(buildDeck(tarot78));
+    const dealt = dealRoundRobin(
+        deck.slice(0, DECK_SIZE - CHIEN_SIZE),
+        order.length,
+    );
+    const hands: Record<string, readonly CardDescriptor[]> = {};
+    order.forEach((p, i) => {
+        hands[p.id] = dealt[i];
+    });
+    return { hands, chien: deck.slice(DECK_SIZE - CHIEN_SIZE) };
+}
+
+/**
+ * The canonical card in `hand` matching an untrusted client card, or `null`.
+ * Strict shape validation first: `cardKey` alone stringifies, so a trump sent
+ * as `index: "1"` would otherwise pass for the Petit.
+ */
+function heldCard(
+    hand: readonly CardDescriptor[],
+    card: unknown,
+): CardDescriptor | null {
+    if (!isCardDescriptor(card)) return null;
+    const key = cardKey(card);
+    return hand.find((c) => cardKey(c) === key) ?? null;
+}
+
 /** Next seat after `id`, cyclically — turn order within a trick. */
 function nextSeat(state: TarotState, id: string): string {
     const order = seatOrder(state.players);
@@ -339,21 +432,37 @@ function nextSeat(state: TarotState, id: string): string {
  * Bidding is over (everyone has spoken). Resolve the contract and move into the
  * dog or straight to the trick play — or end the deal if all passed.
  */
-function resolveBidding(state: TarotState): {
+function resolveBidding(
+    state: TarotState,
+    rng: Rng,
+): {
     state: TarotState;
     events: GameEvent[];
 } {
     const best = highestBid(state.bids);
     if (!best) {
-        // « Tout le monde passe » — void deal, scored as a draw.
+        // « Tout le monde passe » — the deal is void: shuffle a fresh deck from
+        // the seeded RNG and pass the deal one seat on, as at a real table. A
+        // void deal is never "finished", so it can't feed ELO/history as a
+        // fake four-way draw.
+        const eldestId = nextSeat(state, state.eldestId);
+        const { hands, chien } = deal(state.players, eldestId, rng);
         return {
             state: {
                 ...state,
-                phase: "done",
-                passedOut: true,
-                currentPlayerId: state.eldestId,
+                phase: "bidding",
+                rngState: rng.state,
+                redeals: state.redeals + 1,
+                eldestId,
+                currentPlayerId: eldestId,
+                hands,
+                chien,
+                bids: {},
             },
-            events: [{ type: "passed_out" }],
+            events: [
+                { type: "passed_out" },
+                { type: "redeal", payload: { playerId: eldestId } },
+            ],
         };
     }
 
@@ -404,20 +513,20 @@ function closeTrick(
     state: TarotState,
     pile: readonly TrickCard[],
 ): { state: TarotState; events: GameEvent[] } {
-    const winnerId = trickWinner(pile);
-    const trick: CompletedTrick = {
-        leaderId: state.trickLeaderId ?? pile[0].playerId,
-        plays: pile,
-        winnerId,
-    };
+    const leaderId = state.trickLeaderId ?? pile[0].playerId;
+    const handsEmpty = state.players.every(
+        (p) => state.hands[p.id].length === 0,
+    );
+    const winnerId = trickWinner(pile, {
+        isLastTrick: handsEmpty,
+        leaderSideWonAll: sideWonAll(state.tricks, leaderId, state.taker),
+    });
+    const trick: CompletedTrick = { leaderId, plays: pile, winnerId };
     const tricks = [...state.tricks, trick];
     const events: GameEvent[] = [
         { type: "trick_won", payload: { playerId: winnerId } },
     ];
 
-    const handsEmpty = state.players.every(
-        (p) => state.hands[p.id].length === 0,
-    );
     if (handsEmpty && state.taker && state.contract) {
         const result = scoreDeal({
             players: state.players.map((p) => p.id),
@@ -506,7 +615,7 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
         }));
     },
 
-    apply(state, action, _rng: Rng) {
+    apply(state, action, rng: Rng) {
         if (state.phase === "done") {
             return fail("game_over", "The deal has already finished.");
         }
@@ -522,6 +631,9 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
             const best = highestBid(state.bids);
             const floor = best ? BID_RANK[best.bid] : 0;
             if (action.type === "bid") {
+                if (!ALL_BIDS.includes(action.bid)) {
+                    return fail("bad_bid", "Unknown contract.");
+                }
                 if (BID_RANK[action.bid] <= floor) {
                     return fail(
                         "bid_too_low",
@@ -553,7 +665,8 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
                       },
             ];
 
-            const order = seatOrder(state.players);
+            // Bidding runs from the eldest hand, which moves on each redeal.
+            const order = orderFrom(state.players, state.eldestId);
             const spoken = Object.keys(bids).length;
             const advanced: TarotState = {
                 ...state,
@@ -569,7 +682,7 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
                 };
             }
 
-            const resolved = resolveBidding(advanced);
+            const resolved = resolveBidding(advanced, rng);
             return {
                 ok: true,
                 state: resolved.state,
@@ -582,24 +695,25 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
             if (action.type !== "discard") {
                 return fail("wrong_phase", "Bury a card to form the écart.");
             }
-            const legal = discardableCards(
-                state.hands[action.playerId],
-                state.ecart.length,
-            );
-            if (!legal.some((c) => cardKey(c) === cardKey(action.card))) {
+            const hand = state.hands[action.playerId];
+            const held = heldCard(hand, action.card);
+            if (!held) {
+                return fail("not_in_hand", "Buried a card not held in hand.");
+            }
+            const legal = discardableCards(hand, state.ecart.length);
+            if (!legal.some((c) => cardKey(c) === cardKey(held))) {
                 return fail(
                     "illegal_discard",
                     "Kings, bouts and (unless forced) trumps stay in hand.",
                 );
             }
-            const remaining = removeCards(state.hands[action.playerId], [
-                action.card,
-            ]);
+            const remaining = removeCards(hand, [held]);
             if (remaining === null) {
                 return fail("not_in_hand", "Buried a card not held in hand.");
             }
 
-            const ecart = [...state.ecart, action.card];
+            // Store the canonical held card, never the client's object.
+            const ecart = [...state.ecart, held];
             const events: GameEvent[] = [
                 { type: "discarded", payload: { playerId: action.playerId } },
             ];
@@ -638,23 +752,25 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
         if (action.type !== "play") {
             return fail("wrong_phase", "Play a card to the trick.");
         }
-        const legal = legalCards(state.hands[action.playerId], state.pile);
-        if (!legal.some((c) => cardKey(c) === cardKey(action.card))) {
+        const hand = state.hands[action.playerId];
+        const held = heldCard(hand, action.card);
+        if (!held) {
+            return fail("not_in_hand", "Played a card not held in hand.");
+        }
+        const legal = legalCards(hand, state.pile);
+        if (!legal.some((c) => cardKey(c) === cardKey(held))) {
             return fail("illegal_play", "Must follow suit, trump, or excuse.");
         }
-        const remaining = removeCards(state.hands[action.playerId], [
-            action.card,
-        ]);
+        const remaining = removeCards(hand, [held]);
         if (remaining === null) {
             return fail("not_in_hand", "Played a card not held in hand.");
         }
 
         // A fresh lead clears the previous trick still on display.
         const leadingNow = state.pile.length === 0;
-        const pile = [
-            ...state.pile,
-            { playerId: action.playerId, card: action.card },
-        ];
+        // The canonical held card goes on the table (and to scoring/events) —
+        // never the client's object, which may carry a lookalike or junk.
+        const pile = [...state.pile, { playerId: action.playerId, card: held }];
         const withPlay: TarotState = {
             ...state,
             hands: { ...state.hands, [action.playerId]: remaining },
@@ -666,10 +782,7 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
         const events: GameEvent[] = [
             {
                 type: "played",
-                payload: {
-                    playerId: action.playerId,
-                    card: action.card as unknown as Record<string, unknown>,
-                },
+                payload: { playerId: action.playerId, card: { ...held } },
             },
         ];
 
@@ -699,14 +812,10 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
     outcome(state) {
         if (state.phase !== "done") return null;
 
+        // Every `done` state carries a result: a passed-out deal is redealt
+        // instead of ending, so there is no void outcome to report.
+        if (!state.result) return null;
         const ids = state.players.map((p) => p.id);
-        // Void deal (everyone passed): a draw, nobody rated up or down.
-        if (state.passedOut || !state.result) {
-            return {
-                rankings: ids.map((playerId) => ({ playerId, rank: 1 })),
-                winners: ids,
-            };
-        }
 
         // Taker vs. defenders: the two sides win or lose together, so defenders
         // always share a rank. Rank by final signed score, taker's `score`
@@ -751,7 +860,7 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
             rules: state.rules,
             taker: state.taker,
             contract: state.contract,
-            passedOut: state.passedOut,
+            redeals: state.redeals,
             highestBid: best?.bid ?? null,
             chien: chienRevealed ? state.chien : [],
             chienRevealed,
@@ -789,42 +898,33 @@ export function createTarot(
     return {
         ...base,
         withRules(chosen) {
+            const pick = (key: keyof TarotRules): boolean =>
+                chosen[key] ?? DEFAULT_TAROT_RULES[key];
             return createTarot({
-                ...DEFAULT_TAROT_RULES,
-                ...chosen,
-            } as TarotRules);
+                gardeSansContre: pick("gardeSansContre"),
+                petitAuBout: pick("petitAuBout"),
+                slam: pick("slam"),
+            });
         },
         setup(players, rng, seed, gameId) {
-            const order = seatOrder(players);
-            const deck = rng.shuffle(buildDeck(tarot78));
-            // 72 cards dealt round-robin; the last six form the chien. A uniform
-            // shuffle makes which cards land in the chien uniformly random — the
-            // traditional packet-deal ritual only matters at a physical table.
-            const dealt = dealRoundRobin(
-                deck.slice(0, DECK_SIZE - CHIEN_SIZE),
-                order.length,
-            );
-            const chien = deck.slice(DECK_SIZE - CHIEN_SIZE);
-            const hands: Record<string, readonly CardDescriptor[]> = {};
-            order.forEach((p, i) => {
-                hands[p.id] = dealt[i];
-            });
+            const eldestId = seatOrder(players)[0].id;
+            const { hands, chien } = deal(players, eldestId, rng);
 
             return {
                 gameId,
                 players,
                 phase: "bidding",
-                currentPlayerId: order[0].id,
+                currentPlayerId: eldestId,
                 turn: 0,
                 seed,
                 rngState: rng.state,
                 rules,
-                eldestId: order[0].id,
+                eldestId,
                 hands,
                 bids: {},
                 taker: null,
                 contract: null,
-                passedOut: false,
+                redeals: 0,
                 chien,
                 ecart: [],
                 pile: [],

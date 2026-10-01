@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { CardDescriptor, Rank, Suit } from "@/lib/card/types";
 import { cardKey } from "@/lib/card/utils";
+import { createRng } from "@/lib/engine/rng";
 import { createGame, dispatch } from "@/lib/engine/runner";
 import type { Player } from "@/lib/engine/types";
 import {
     DEFAULT_PRESIDENT_RULES,
+    PRESIDENT_RULE_TOGGLES,
     type PresidentAction,
+    type PresidentRules,
     type PresidentState,
     president,
 } from "./president";
@@ -58,6 +61,9 @@ const CLASSIC = {
     revolution: false,
     quadClosesTrick: false,
 } as const;
+
+/** Every French table rule on, révolution included (it is opt-in). */
+const ALL_RULES = { ...DEFAULT_PRESIDENT_RULES, revolution: true } as const;
 
 /** Route through the runner (supplies rng + identity check). */
 function step(
@@ -440,12 +446,29 @@ describe("president revolution", () => {
         card(rank, "clubs"),
     ];
 
-    it("a quad inverts the ranking until the trick clears", () => {
-        let s = state3({
-            a: [...quad("9"), card("K")],
-            b: [card("5"), card("A")],
-            c: [card("J"), card("3")],
-        });
+    it("is opt-in: off by default, like the lobby toggle", () => {
+        expect(DEFAULT_PRESIDENT_RULES.revolution).toBe(false);
+        const toggle = PRESIDENT_RULE_TOGGLES.find(
+            (t) => t.key === "revolution",
+        );
+        expect(toggle?.default).toBe(DEFAULT_PRESIDENT_RULES.revolution);
+        // Every toggle default mirrors the module defaults.
+        for (const t of PRESIDENT_RULE_TOGGLES) {
+            expect(t.default).toBe(
+                DEFAULT_PRESIDENT_RULES[t.key as keyof PresidentRules],
+            );
+        }
+    });
+
+    it("a quad inverts the ranking for the rest of the round", () => {
+        let s = state3(
+            {
+                a: [...quad("9"), card("K"), card("4")],
+                b: [card("5"), card("A")],
+                c: [card("J"), card("3")],
+            },
+            { rules: ALL_RULES },
+        );
         const res = step(s, play("a", quad("9")));
         expect(res.ok).toBe(true);
         if (!res.ok) return;
@@ -461,8 +484,42 @@ describe("president revolution", () => {
 
         s = ok(s, pass("b"));
         s = ok(s, pass("c")); // trick clears back to a
-        expect(s.revolution).toBe(false); // revolution ends with the sweep
         expect(s.combo).toBeNull();
+        expect(s.revolution).toBe(true); // survives the sweep
+
+        // Next trick: a leads the K; under the inversion b's 5 beats it and
+        // the A does not.
+        s = ok(s, play("a", [card("K")]));
+        expect(summary(president.legalActions(s, "b"))).toEqual([
+            "5x1",
+            "pass",
+        ]);
+        s = ok(s, play("b", [card("5")]));
+        s = ok(s, pass("c"));
+        s = ok(s, pass("a")); // second sweep
+        expect(s.combo).toBeNull();
+        expect(s.revolution).toBe(true); // still holds two tricks later
+    });
+
+    it("lasts until a counter-revolution, even across tricks", () => {
+        let s = state3(
+            {
+                a: [card("K"), card("4")],
+                b: [...quad("5"), card("A")],
+                c: [card("J"), card("3")],
+            },
+            {
+                rules: ALL_RULES,
+                revolution: true,
+                currentPlayerId: "b",
+            },
+        );
+        s = ok(s, play("b", quad("5"))); // counter-revolution from the lead
+        expect(s.revolution).toBe(false);
+        s = ok(s, pass("c"));
+        s = ok(s, pass("a"));
+        expect(s.combo).toBeNull();
+        expect(s.revolution).toBe(false); // normal order is back for good
     });
 
     it("a counter-quad flips the ranking back", () => {
@@ -477,6 +534,7 @@ describe("president revolution", () => {
                 revolution: true,
                 lastPlayerId: "a",
                 currentPlayerId: "b",
+                rules: ALL_RULES,
             },
         );
         // Quad of 5s beats the quad of 9s under revolution AND cancels it.
@@ -509,6 +567,51 @@ describe("president revolution", () => {
         expect(high.ok).toBe(false);
         const low = step(s, play("b", [card("3")]));
         expect(low.ok).toBe(true);
+    });
+
+    it("a quad of 2s under the normal order revolts AND closes the trick", () => {
+        const s = state3(
+            {
+                a: [...quad("2"), card("K")],
+                b: [card("5"), card("A")],
+                c: [card("J"), card("3")],
+            },
+            { rules: ALL_RULES },
+        );
+        const res = step(s, play("a", quad("2")));
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        // Judged under the order in force when laid: the 2s were the
+        // strongest, so « le 2 ferme le pli » applies…
+        expect(res.state.combo).toBeNull();
+        expect(res.state.currentPlayerId).toBe("a");
+        expect(res.events).toContainEqual({
+            type: "trick_cleared",
+            payload: { leadPlayerId: "a" },
+        });
+        // …and the revolution takes effect for the rest of the round.
+        expect(res.state.revolution).toBe(true);
+        expect(res.events).toContainEqual({
+            type: "revolution",
+            payload: { active: true },
+        });
+    });
+
+    it("a quad of 2s under a revolution is a counter-revolution that closes nothing", () => {
+        const s = state3(
+            {
+                a: [...quad("2"), card("K")],
+                b: [card("5"), card("A")],
+                c: [card("J"), card("3")],
+            },
+            { rules: ALL_RULES, revolution: true },
+        );
+        const res = step(s, play("a", quad("2")));
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(res.state.revolution).toBe(false);
+        expect(res.state.combo).toEqual({ rank: "2", count: 4 }); // open
+        expect(res.state.currentPlayerId).toBe("b");
     });
 
     it("does not trigger when the rule is disabled", () => {
@@ -624,17 +727,20 @@ describe("president carré (« le carré ferme le pli »)", () => {
     });
 
     it("a quad from hand stays a revolution and does not close the trick", () => {
-        const s = state3({
-            a: [
-                card("9", "spades"),
-                card("9", "hearts"),
-                card("9", "diamonds"),
-                card("9", "clubs"),
-                card("K"),
-            ],
-            b: [card("5"), card("A")],
-            c: [card("J"), card("3")],
-        });
+        const s = state3(
+            {
+                a: [
+                    card("9", "spades"),
+                    card("9", "hearts"),
+                    card("9", "diamonds"),
+                    card("9", "clubs"),
+                    card("K"),
+                ],
+                b: [card("5"), card("A")],
+                c: [card("J"), card("3")],
+            },
+            { rules: ALL_RULES },
+        );
         const res = step(s, play("a", s.hands.a.slice(0, 4)));
         expect(res.ok).toBe(true);
         if (!res.ok) return;
@@ -854,5 +960,114 @@ describe("president legal actions (which cards are playable)", () => {
         for (const action of president.legalActions(respond, "b")) {
             expect(step(respond, action).ok).toBe(true);
         }
+    });
+});
+
+describe("president action validation (anti-cheat)", () => {
+    /** Forge a client payload the type system would never allow. */
+    const forged = (payload: unknown): PresidentAction =>
+        payload as PresidentAction;
+
+    it("a numeric rank cannot dodge the 2 rules (regression)", () => {
+        // a goes out on a 2 → « finir par un 2 » must demote, whatever the
+        // payload says. `rank: 2` (number) used to match "2" by cardKey, slip
+        // past the `rank === "2"` checks and crown a Président.
+        const s = state3({
+            a: [card("2")],
+            b: [card("5"), card("A")],
+            c: [card("J"), card("3")],
+        });
+        const res = step(
+            s,
+            forged({
+                type: "play",
+                playerId: "a",
+                cards: [{ type: "suited", suit: "spades", rank: 2 }],
+            }),
+        );
+        expect(res.ok).toBe(false);
+        if (res.ok) return;
+        expect(res.error.code).toBe("illegal_card");
+    });
+
+    it("stores the canonical hand cards, never the client's objects", () => {
+        const s = state3({
+            a: [card("9"), card("K")],
+            b: [card("5"), card("A")],
+            c: [card("J"), card("3")],
+        });
+        const res = step(
+            s,
+            forged({
+                type: "play",
+                playerId: "a",
+                cards: [
+                    {
+                        type: "suited",
+                        suit: "spades",
+                        rank: "9",
+                        junk: "<script>",
+                    },
+                ],
+            }),
+        );
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(res.state.pile).toEqual([{ playerId: "a", cards: [card("9")] }]);
+        expect(res.state.pile[0].cards[0]).toBe(s.hands.a[0]); // same object
+        expect(res.state.combo).toEqual({ rank: "9", count: 1 });
+    });
+
+    it("refuses malformed actions instead of throwing", () => {
+        const s = state3({
+            a: [card("9"), card("K")],
+            b: [card("5")],
+            c: [card("J")],
+        });
+        const cases: [unknown, string][] = [
+            [null, "invalid_action"],
+            [{ type: "play", playerId: "a" }, "invalid_action"],
+            [{ type: "play", playerId: "a", cards: "9" }, "invalid_action"],
+            [{ type: "cheat", playerId: "a" }, "invalid_action"],
+            [{ type: "play", playerId: 1, cards: [] }, "invalid_action"],
+            [{ type: "play", playerId: "a", cards: [] }, "empty_play"],
+            [
+                {
+                    type: "play",
+                    playerId: "a",
+                    cards: Array.from({ length: 5 }, () => card("9")),
+                },
+                "invalid_action",
+            ],
+            [{ type: "play", playerId: "a", cards: [null] }, "illegal_card"],
+            [
+                { type: "play", playerId: "a", cards: [{ type: "suited" }] },
+                "illegal_card",
+            ],
+        ];
+        for (const [payload, code] of cases) {
+            const res = president.apply(s, forged(payload), createRng(1));
+            expect(res.ok).toBe(false);
+            if (res.ok) continue;
+            expect(res.error.code).toBe(code);
+        }
+    });
+});
+
+describe("president withRules", () => {
+    it("maps known keys, defaults the rest, and ignores unknown keys", () => {
+        const configured = president.withRules?.({
+            revolution: true,
+            twoClosesTrick: false,
+            bogus: true,
+        });
+        if (!configured) throw new Error("withRules unavailable");
+        const s = createGame(configured, P4, 5);
+        expect(s.rules).toEqual({
+            ...DEFAULT_PRESIDENT_RULES,
+            revolution: true,
+            twoClosesTrick: false,
+        });
+        expect(Object.keys(s.rules)).not.toContain("bogus");
     });
 });
