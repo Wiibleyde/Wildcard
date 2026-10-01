@@ -248,7 +248,7 @@ sequenceDiagram
 | **Server-authoritative** | toute action validée par `module.apply` côté serveur ; coup illégal refusé (422), jamais joué sur confiance client |
 | **Anti-double-coup / anti-stale** | concurrence optimiste : `POST` envoie `version`, `applyAction` fait un compare-and-set sur `games.version` (loser → 409) |
 | **Confidentialité (RLS en code)** | `view()` redacte les mains adverses ; `game_states` en RLS deny-all (service-role only) |
-| **Déterminisme / replay** | RNG seedé dans le `state` ; `game_actions` rejoue toute partie depuis `(seed, log)` |
+| **Déterminisme / replay** | RNG sfc32 (état 128 bits, graine crypto 128 bits — non brute-forçable) seedé dans le `state` ; `game_actions` rejoue toute partie depuis `(seed, log, rules)` via `replay`/`replayFrames` ; graines `number` historiques rejouées en mulberry32 (legacy) |
 | **UX instantanée** | `predict()` applique le coup localement ; le serveur réconcilie via le gate strictement-plus-récent ; rollback sur rejet |
 | **1 aller-retour / coup** | `applyAction` renvoie le payload redacté dans la réponse POST → le client l'adopte sans `GET` de suivi (avant : POST + GET) |
 | **Poll bon marché** | deux étages : probe `version` (méta) → payload complet seulement si bump |
