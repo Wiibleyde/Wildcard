@@ -5,7 +5,7 @@ description: Run, screenshot, and drive the Wildcard app locally — launch the 
 
 # Run Wildcard
 
-Next.js 16 app + local Supabase stack (docker). Drive it with
+Next.js 16 app + local Supabase (Supabase CLI, schema `wildcard`). Drive it with
 `.claude/skills/run-wildcard/driver.mjs` (Playwright, headless Chromium).
 All paths below are relative to the repo root.
 
@@ -21,25 +21,25 @@ bunx playwright install chromium
 ## Launch
 
 ```bash
-bun run dev   # docker compose (supabase) + next dev on :3000
+bun run dev:up   # Supabase CLI: start + migrations (once; --fresh to reset + seed)
+bun run dev      # next dev on :3000 (.env.local from .env.local.example + dev:up keys)
 ```
 
 Often already running — check first:
 
 ```bash
-curl -sf -o /dev/null -w "%{http_code}\n" http://localhost:3000   # 307 = up
+curl -sf -o /dev/null -w "%{http_code}\n" http://localhost:3000   # 200 = up
 ```
 
-`supabase-storage` and `supabase-studio` containers may show *unhealthy* in
-`docker ps` — harmless for UI work.
 
 ## Run (agent path) — the driver
 
-No UI login exists for agents (OAuth-only). The driver self-authenticates:
-it admin-creates a confirmed user `ui-test@wildcard.local` on the local
-Supabase, does a password-grant login, and forges the `sb-localhost-auth-token`
-cookie through `@supabase/ssr` itself — so the session matches exactly what
-Next.js expects.
+In prod, sign-in happens on the portal (auth.wiibleyde.dev). The driver
+self-authenticates: it admin-creates a confirmed user `ui-test@wildcard.local`
+on the local Supabase (SUPABASE_SECRET_KEY), does a password-grant login, and
+forges the session cookie through `@supabase/ssr` with `cookieEncoding: "raw"`
+— the portal's format, exactly what the app reads. That user has no portal
+pseudo, so it shows as the fallback name `Joueur xxxx`.
 
 **Screenshot matrix** — every key route × widths, with automated
 horizontal-overflow + console-error report (JSON on stdout):
@@ -49,7 +49,7 @@ node .claude/skills/run-wildcard/driver.mjs shoot
 node .claude/skills/run-wildcard/driver.mjs shoot --routes=lobby,game --widths=375,1920
 ```
 
-Routes: `home login lobby profile customize preview room game` — `room` and
+Routes: `home login lobby profile customize preview room game` (`login` = the dev-login page) — `room` and
 `game` are real: the driver creates rooms via `POST /api/rooms`
 (`{moduleId: "president"}`), adds bots, and starts a game. Screenshots land in
 `.uitest/shots/<route>-<width>.png` (gitignored). **Read the screenshots** —
@@ -64,8 +64,8 @@ node .claude/skills/run-wildcard/driver.mjs play
 
 ## Run (human path)
 
-`bun run dev` → http://localhost:3000 → login via Google/Discord OAuth.
-Useless headless; agents use the driver.
+`bun run dev` → http://localhost:3000/fr/dev-login → one click on a seeded
+account (`dev@local.test` admin / `player@local.test`, password `password123`).
 
 ## Test
 
@@ -88,14 +88,16 @@ bun run test   # vitest run — engine/game-module unit tests
   directly: `./node_modules/.bin/biome`, `./node_modules/.bin/tsc`.
 - Game modules registered: `bataille` (2 players), `president` (3–6 → use
   `count: 3` bots before `start`).
-- Game action buttons all carry the `btn-game` class (the shared
-  `GameButton`) — `button.btn-game:enabled` is the stable selector for
-  controls.
+- Game action buttons are `GameButton`s with the `wc-btn` class. The chat
+  "Envoyer" and "Quitter la partie" buttons are `wc-btn` too, so filter them
+  out: `locator("button.wc-btn:enabled").filter({ hasNotText: /Envoyer|Quitter/ })`.
+  When the player leads a trick there is no pass button — the controls are
+  one button per playable combination.
 
 ## Troubleshooting
 
 - `Dev server not responding on http://localhost:3000` (driver exit 1) →
-  run `bun run dev`, wait for the 307 from the curl check above. (Auth is
+  run `bun run dev:up` then `bun run dev`, wait for the curl check above. (Auth is
   self-healing: the driver re-creates its test user on every run.)
 - Hand/clickable cards rendering as ~4px slivers → `Card`'s root must keep
   `block w-full` (buttons collapse to their borders without it; regression

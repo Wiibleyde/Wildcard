@@ -30,8 +30,8 @@ async function authCookies(email, password, username) {
     await fetch(`${SB}/auth/v1/admin/users`, {
         method: "POST",
         headers: {
-            apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-            Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+            apikey: env.SUPABASE_SECRET_KEY,
+            Authorization: `Bearer ${env.SUPABASE_SECRET_KEY}`,
             "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -53,6 +53,7 @@ async function authCookies(email, password, username) {
     const session = await res.json();
     let captured = [];
     const sb = createServerClient(SB, env.SUPABASE_ANON_KEY, {
+        cookieEncoding: "raw",
         cookies: {
             getAll: () => [],
             setAll: (cs) => {

@@ -42,8 +42,8 @@ async function authCookies() {
     await fetch(`${SB}/auth/v1/admin/users`, {
         method: "POST",
         headers: {
-            apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-            Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+            apikey: env.SUPABASE_SECRET_KEY,
+            Authorization: `Bearer ${env.SUPABASE_SECRET_KEY}`,
             "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -67,6 +67,7 @@ async function authCookies() {
     // Let @supabase/ssr serialize the session into its own cookie format
     let captured = [];
     const sb = createServerClient(SB, env.SUPABASE_ANON_KEY, {
+        cookieEncoding: "raw",
         cookies: {
             getAll: () => [],
             setAll: (cs) => {
@@ -130,7 +131,7 @@ if (mode === "shoot") {
 
     const ALL = {
         home: "/fr",
-        login: "/fr/login",
+        login: "/fr/dev-login",
         lobby: "/fr/lobby",
         profile: "/fr/profile",
         history: "/fr/profile/history",
@@ -194,9 +195,15 @@ if (mode === "play") {
     await page.waitForTimeout(1800);
     await page.screenshot({ path: `${SHOTS}play-before.png`, fullPage: true });
 
-    // Controls bar buttons are GameButtons (.btn-game); click the first enabled one.
-    const button = page.locator("button.btn-game:enabled").first();
-    await button.waitFor({ timeout: 10000 });
+    // Turn controls are GameButtons (.wc-btn) rendered by TableControls — a
+    // pass button, or one button per playable combination when leading. Chat
+    // "Envoyer" and "Quitter la partie" are wc-btn too: skip them.
+    const button = page
+        .locator("button.wc-btn:enabled")
+        .filter({ hasNotText: /Envoyer|Send|Quitter|Leave/ })
+        .first();
+    // Bots lead first and are paced by the client: allow a few bot turns.
+    await button.waitFor({ timeout: 30000 });
     await button.click();
     await page.waitForTimeout(2000); // server round-trip + realtime refetch + animation
     await page.screenshot({ path: `${SHOTS}play-after.png`, fullPage: true });

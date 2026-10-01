@@ -22,7 +22,7 @@ const env = Object.fromEntries(
         .map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]),
 );
 const SB = env.SUPABASE_URL;
-const SERVICE = env.SUPABASE_SERVICE_ROLE_KEY;
+const SERVICE = env.SUPABASE_SECRET_KEY;
 
 const CRAZY_EIGHTS = {
     version: 1,
@@ -114,6 +114,7 @@ async function authCookiesAndUser() {
 
     let captured = [];
     const sb = createServerClient(SB, env.SUPABASE_ANON_KEY, {
+        cookieEncoding: "raw",
         cookies: {
             getAll: () => [],
             setAll: (cs) => {
@@ -143,6 +144,7 @@ async function seedPublishedGame(ownerId) {
             Authorization: `Bearer ${SERVICE}`,
             "Content-Type": "application/json",
             Prefer: "return=representation",
+            "Content-Profile": env.SUPABASE_SCHEMA || "wildcard",
         },
         body: JSON.stringify({
             owner_id: ownerId,
@@ -210,7 +212,10 @@ const handCard = p1
         '[data-zone-key="hand"] button:enabled, [data-zone-key="hand"] [role="button"]',
     )
     .first();
-const control = p1.locator("button.btn-game:enabled").first();
+const control = p1
+    .locator("button.wc-btn:enabled")
+    .filter({ hasNotText: /Envoyer|Send|Quitter|Leave/ })
+    .first();
 if (await handCard.count()) {
     await handCard.click().catch(() => {});
     acted = "hand-card";

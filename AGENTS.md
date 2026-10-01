@@ -29,8 +29,11 @@ technique fullstack et une architecture solide, présentable devant un jury.
 - **Supabase Edge Functions** — logique serveur isolée si besoin
 
 ### Base de données & Auth
-- **Supabase** — PostgreSQL managé
-- **Supabase Auth**
+- **Supabase partagé** de l'infra wiibleyde.dev (serveur *rivendell*, Postgres 17)
+  — Wildcard vit dans **son propre schéma `wildcard`** (jumeau de dev : `wildcard_dev`)
+- **Auth via le portal** `auth.wiibleyde.dev` — cookie de session partagé sur
+  `.wiibleyde.dev` (encodage `raw`), pas de page de login dans l'app ; pseudo et
+  avatar dans `portal.profiles`, lus via `wildcard.player_identities`
 - **RLS (Row Level Security)** — chaque joueur ne voit que sa propre main
 - **`@supabase/supabase-js`** — seul client DB utilisé (pas Prisma)
 
@@ -115,6 +118,11 @@ les modules officiels — c'est une séparation délibérée de conception.
 ## Sécurité & RLS
 
 - RLS activé sur toutes les tables sensibles
+- Identité côté serveur : `auth.getClaims()` (JWT vérifié), jamais `getSession()`
+  ni `user_metadata` — helpers dans `src/lib/auth/session.ts`
+- Migrations écrites avec le nom littéral `wildcard` (jamais `wildcard_dev`) ;
+  tout nom partagé entre apps (trigger sur `auth.users`, bucket, policy storage)
+  est préfixé `wildcard` — cf. `scripts/migrate.sh`
 - Un joueur ne peut lire que ses propres cartes (`hand`)
 - L'état public de la partie (`game_state`) est distinct de l'état privé
 - Les actions de jeu passent toujours par le serveur (API Routes),
@@ -218,7 +226,7 @@ Ajouter la clé dans `fr.json` ET `en.json` — TypeScript l'exige (`Dictionary`
 wildcard/
 ├── app/
 │   ├── [lang]/              # Segment i18n racine
-│   │   ├── (auth)/          # Login, register
+│   │   ├── dev-login/       # Connexion dev locale (next dev uniquement) — prod : portal
 │   │   ├── (lobby)/         # Accueil, liste des rooms
 │   │   ├── game/[roomId]/   # Interface de jeu
 │   │   ├── studio/          # Game Studio (ECA editor)
