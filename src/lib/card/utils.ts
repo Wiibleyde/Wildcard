@@ -1,4 +1,4 @@
-import type { CardDescriptor, Rank } from "./types";
+import { type CardDescriptor, RANKS, type Rank, SUITS } from "./types";
 
 const PIP_INDEX: Partial<Record<string, number>> = {
     A: 1,
@@ -40,9 +40,42 @@ export function cardKey(card: CardDescriptor): string {
     }
 }
 
-/** Structural card equality, via {@link cardKey}. */
-export function sameCard(a: CardDescriptor, b: CardDescriptor): boolean {
-    return cardKey(a) === cardKey(b);
+/**
+ * Strict runtime check of an untrusted value (client action payload) against
+ * {@link CardDescriptor}: exact field types, known suits/ranks, integer trump
+ * index. `cardKey` alone is NOT a validator — it stringifies, so `rank: 2`
+ * and `rank: "2"` collide. Game modules must still store the canonical card
+ * taken from the hand, never the client object.
+ */
+export function isCardDescriptor(value: unknown): value is CardDescriptor {
+    if (typeof value !== "object" || value === null) return false;
+    const card = value as Record<string, unknown>;
+    switch (card.type) {
+        case "suited":
+            return (
+                typeof card.suit === "string" &&
+                (SUITS as readonly string[]).includes(card.suit) &&
+                typeof card.rank === "string" &&
+                (RANKS as readonly string[]).includes(card.rank)
+            );
+        case "trump":
+            return (
+                typeof card.index === "number" &&
+                Number.isInteger(card.index) &&
+                card.index >= 1 &&
+                card.index <= 21
+            );
+        case "fool":
+            return true;
+        case "joker":
+            return (
+                card.variant === undefined ||
+                card.variant === "red" ||
+                card.variant === "black"
+            );
+        default:
+            return false;
+    }
 }
 
 /**

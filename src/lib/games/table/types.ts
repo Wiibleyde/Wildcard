@@ -168,6 +168,11 @@ export interface TableControl {
     readonly action: GameAction;
     readonly variant?: "primary" | "success" | "danger";
     /**
+     * Irreversible verb (e.g. solitaire resign): the UI asks for confirmation
+     * before dispatching. Separate from `variant` — a red "Passer" is routine.
+     */
+    readonly confirm?: boolean;
+    /**
      * Greys the button out instead of hiding it — keeps the controls bar stable
      * so a verb the player always sees (e.g. "Passer") never appears/disappears
      * between turns. Defaults to enabled.
@@ -256,12 +261,14 @@ export interface GameTableConfig<V> {
 export type AnyGameTableConfig = GameTableConfig<unknown>;
 
 /**
- * Register a concrete table config under the erased catalog type. Same
- * single-cast justification as `registerGame`: a table only ever receives
- * the view its own module produced.
+ * Register a concrete table config under the erased catalog type. Cast-free
+ * for the same reason as `registerGame`: `mapView`/`predict` are declared as
+ * methods (bivariant parameters), and a table only ever receives the view its
+ * own module produced. Keep them methods — a function-typed property would
+ * make the config invariant in `V` and fail to compile here.
  */
 export function registerTable<V>(
     config: GameTableConfig<V>,
 ): AnyGameTableConfig {
-    return config as AnyGameTableConfig;
+    return config;
 }

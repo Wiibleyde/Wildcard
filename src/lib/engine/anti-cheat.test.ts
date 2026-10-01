@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { cardKey } from "@/lib/card/utils";
+import { GAMES } from "@/lib/games";
 import { type BatailleState, bataille } from "@/lib/games/bataille/bataille";
 import {
     type PresidentAction,
     type PresidentState,
     president,
 } from "@/lib/games/president/president";
+import { randomSeed } from "./rng";
 import { createGame, dispatch, replay } from "./runner";
 import type { Player } from "./types";
 
@@ -92,6 +94,36 @@ describe("anti-cheat — the seed never leaves the server", () => {
     });
 });
 
+describe("anti-cheat — no registered game leaks its 128-bit seed", () => {
+    const seats = (n: number): Player[] =>
+        Array.from({ length: n }, (_, seat) => ({
+            id: `p${seat}`,
+            name: `P${seat}`,
+            seat,
+        }));
+    // The hex body of an sfc32 state is what a client would need to brute-force
+    // nothing at all: it IS the generator state.
+    const body = (state: unknown): string =>
+        String(state).slice("sfc32:".length);
+
+    it.each(Object.values(GAMES).map((m) => [m.id, m] as const))(
+        "%s: seed and rngState never appear in any view",
+        (_id, module) => {
+            const players = seats(module.minPlayers);
+            const seed = randomSeed();
+            const state = createGame(module, players, { seed });
+            expect(state.seed).toBe(seed);
+
+            for (const viewer of [...players.map((p) => p.id), null]) {
+                const json = JSON.stringify(module.view(state, viewer));
+                expect(json).not.toContain(body(seed));
+                expect(json).not.toContain(body(state.rngState));
+                expect(json).not.toMatch(/sfc32:/);
+            }
+        },
+    );
+});
+
 describe("anti-cheat — re-derivation exposes a forged client state", () => {
     it("rebuilds the true state from (seed, log) and rejects a tampered hand", () => {
         const seed = 20260718;
@@ -170,5 +202,19 @@ describe("anti-cheat — dispatch is the single server chokepoint", () => {
         expect(result.ok).toBe(false);
         if (result.ok) return;
         expect(result.error.code).toBe("game_over");
+    });
+
+    it("refuses an authenticated user who is not seated in the game", () => {
+        const state = createGame(bataille, TWO, 7);
+        const result = dispatch(
+            bataille,
+            state,
+            { type: "flip", playerId: "intruder" },
+            "intruder",
+        );
+
+        expect(result.ok).toBe(false);
+        if (result.ok) return;
+        expect(result.error.code).toBe("not_seated");
     });
 });
