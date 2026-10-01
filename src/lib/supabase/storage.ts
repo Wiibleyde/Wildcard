@@ -1,4 +1,4 @@
-import { getSupabaseEnv } from "./env";
+import { getSupabaseEnv, getSupabaseSchema } from "./env";
 
 /**
  * Public URL for an object in a public bucket, always built from the **public**
@@ -21,4 +21,13 @@ import { getSupabaseEnv } from "./env";
 export function publicStorageUrl(bucket: string, path: string): string {
     const { url } = getSupabaseEnv();
     return `${url}/storage/v1/object/public/${bucket}/${path}`;
+}
+
+/**
+ * Bucket of the Game Studio cover images. Named after the schema
+ * (`wildcard-eca-images`, `wildcard_dev-eca-images`): storage is shared by every
+ * app of the instance, and the prod and dev schemas each own their bucket.
+ */
+export function ecaImagesBucket(): string {
+    return `${getSupabaseSchema()}-eca-images`;
 }

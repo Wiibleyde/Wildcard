@@ -42,17 +42,17 @@ declare
 begin
   foreach tbl in array array['rooms', 'room_players', 'games', 'game_actions']
   loop
-    execute format('alter table public.%I replica identity full', tbl);
+    execute format('alter table wildcard.%I replica identity full', tbl);
 
     if not exists (
       select 1
       from pg_publication_tables
       where pubname = 'supabase_realtime'
-        and schemaname = 'public'
+        and schemaname = 'wildcard'
         and tablename = tbl
     ) then
       execute format(
-        'alter publication supabase_realtime add table public.%I', tbl
+        'alter publication supabase_realtime add table wildcard.%I', tbl
       );
     end if;
   end loop;

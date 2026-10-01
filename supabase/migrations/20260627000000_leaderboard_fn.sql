@@ -8,14 +8,16 @@
 -- partition + order directly, so the scan is bounded no matter how the table
 -- grows.
 --
--- Ratings are world-readable (player_elo + profiles SELECT are open), so this is
--- plain SECURITY INVOKER — RLS still applies to the caller — and EXECUTE is
--- granted to anon/authenticated so guests see the board too. Deleted profiles
--- are excluded *before* ranking (inner join inside the window subquery), so a
+-- Ratings are world-readable, but pseudos and avatars live in the portal's
+-- `portal.profiles`, whose RLS only shows a user their own row (and friends').
+-- Hence SECURITY DEFINER: it exposes exactly two public identity fields per
+-- ranked player, nothing else of the portal. EXECUTE is granted to
+-- anon/authenticated so guests see the board too. Deleted game profiles are
+-- excluded *before* ranking (inner join inside the window subquery), so a
 -- dangling row never consumes a top-N slot. The (rating desc, user_id) tie-break
 -- makes the order deterministic instead of arbitrary on equal ratings.
 -- ============================================================
-create or replace function public.leaderboard(p_top_n integer default 50)
+create or replace function wildcard.leaderboard(p_top_n integer default 50)
 returns table (
   module_id    text,
   user_id      uuid,
@@ -28,7 +30,8 @@ returns table (
 )
 language sql
 stable
-set search_path = public
+security definer
+set search_path = wildcard
 as $$
   select
     ranked.module_id,
@@ -43,8 +46,8 @@ as $$
     select
       e.module_id,
       e.user_id,
-      p.username,
-      p.avatar_url,
+      pp.pseudo      as username,
+      pp.avatar_path as avatar_url,
       e.rating,
       e.games_played,
       e.wins,
@@ -52,11 +55,12 @@ as $$
         partition by e.module_id
         order by e.rating desc, e.user_id
       ) as position
-    from public.player_elo e
-    join public.profiles p on p.id = e.user_id
+    from wildcard.player_elo e
+    join wildcard.profiles p on p.id = e.user_id
+    left join portal.profiles pp on pp.id = e.user_id
   ) ranked
   where ranked.position <= p_top_n
   order by ranked.module_id, ranked.position;
 $$;
 
-grant execute on function public.leaderboard(integer) to anon, authenticated, service_role;
+grant execute on function wildcard.leaderboard(integer) to anon, authenticated, service_role;

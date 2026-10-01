@@ -7,23 +7,23 @@
 -- bonus. Unlike `increment_xp`, this creates a missing row instead of raising,
 -- so it is safe even before the profile's auto-seed trigger has run. Bots carry
 -- no profile and are filtered out by the caller.
-create or replace function public.award_game_xp(p_awards jsonb)
+create or replace function wildcard.award_game_xp(p_awards jsonb)
 returns void
 language plpgsql
-security definer set search_path = public
+security definer set search_path = wildcard
 as $$
 declare
   a jsonb;
 begin
   for a in select value from jsonb_array_elements(p_awards)
   loop
-    insert into public.player_xp (user_id, xp)
+    insert into wildcard.player_xp (user_id, xp)
     values (
       (a->>'user_id')::uuid,
       greatest(0, (a->>'amount')::int)
     )
     on conflict (user_id) do update
-    set xp         = public.player_xp.xp + greatest(0, (a->>'amount')::int),
+    set xp         = wildcard.player_xp.xp + greatest(0, (a->>'amount')::int),
         updated_at = now();
   end loop;
 end;

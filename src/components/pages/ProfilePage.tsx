@@ -1,36 +1,34 @@
-import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { DecoSuit } from "@/components/brand/DecoSuit";
 import { AvatarHero } from "@/components/profile/AvatarHero";
-import { LinkedAccounts } from "@/components/profile/LinkedAccounts";
 import {
     type EloRatingRow,
     ProfileEloCard,
 } from "@/components/profile/ProfileEloCard";
-import { ProfileForm } from "@/components/profile/ProfileForm";
 import { ProfileXPCard } from "@/components/profile/ProfileXPCard";
 import { Link } from "@/i18n/navigation";
+import { requireAuthUser } from "@/lib/auth/session";
+import { accountUrl } from "@/lib/auth/urls";
 import { getGameModule } from "@/lib/games";
 import { ecaNamesByModuleIds } from "@/lib/games/resolve";
+import { identityOf, PORTAL_AVATAR_BUCKET } from "@/lib/models/identities";
 import { createClient } from "@/lib/supabase/server";
 import { publicStorageUrl } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
 import { levelForXp } from "@/lib/xp/xp";
 
-type Profile = Database["public"]["Tables"]["profiles"]["Row"];
-type PlayerXP = Database["public"]["Tables"]["player_xp"]["Row"];
+type Profile = Database["wildcard"]["Tables"]["profiles"]["Row"];
+type PlayerXP = Database["wildcard"]["Tables"]["player_xp"]["Row"];
 
 export async function ProfilePage({ lang }: { lang: string }) {
     const t = await getTranslations("profile");
 
+    const user = await requireAuthUser(lang, `/${lang}/profile`);
     const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) redirect(`/${lang}/login`);
 
-    const [profileRes, xpRes, eloRes] = await Promise.all([
+    const [identity, profileRes, xpRes, eloRes] = await Promise.all([
+        identityOf(supabase, user.id),
         supabase.from("profiles").select("*").eq("id", user.id).single(),
         supabase.from("player_xp").select("*").eq("user_id", user.id).single(),
         supabase
@@ -60,16 +58,19 @@ export async function ProfilePage({ lang }: { lang: string }) {
         wins: row.wins,
     }));
 
-    const linkedProviders = (user.identities ?? []).map((i) => i.provider);
-
-    const memberSince = new Date(user.created_at).toLocaleDateString(
-        lang === "fr" ? "fr-FR" : "en-US",
-        { year: "numeric", month: "long" },
-    );
-
-    const avatarUrl = profile?.avatar_url
-        ? publicStorageUrl("avatars", profile.avatar_url)
+    // Game profile creation date — when the account first reached Wildcard.
+    const memberSince = profile?.created_at
+        ? new Date(profile.created_at).toLocaleDateString(
+              lang === "fr" ? "fr-FR" : "en-US",
+              { year: "numeric", month: "long" },
+          )
         : null;
+
+    const avatarUrl = identity.avatarPath
+        ? publicStorageUrl(PORTAL_AVATAR_BUCKET, identity.avatarPath)
+        : null;
+    // Pseudo, avatar and linked accounts are managed on the portal.
+    const manageUrl = accountUrl();
 
     return (
         <div className="min-h-screen px-4 xl:px-10 pt-6 md:pt-10 pb-16">
@@ -102,18 +103,16 @@ export async function ProfilePage({ lang }: { lang: string }) {
                         </div>
 
                         <div className="flex items-center gap-5 xl:gap-6">
-                            {profile && (
-                                <AvatarHero
-                                    profile={profile}
-                                    avatarUrl={avatarUrl}
-                                />
-                            )}
+                            <AvatarHero
+                                name={identity.name}
+                                avatarUrl={avatarUrl}
+                            />
                             <div className="flex-1 min-w-0">
                                 <h1
                                     className="font-display text-3xl xl:text-4xl truncate leading-tight"
                                     style={{ color: "var(--cream)" }}
                                 >
-                                    {profile?.username ?? "—"}
+                                    {identity.name}
                                 </h1>
                                 <div className="flex flex-wrap items-center gap-2 mt-2">
                                     <span
@@ -125,12 +124,14 @@ export async function ProfilePage({ lang }: { lang: string }) {
                                     >
                                         ♟ {t("level_short")} {level}
                                     </span>
-                                    <span
-                                        className="text-xs font-semibold"
-                                        style={{ color: "var(--muted)" }}
-                                    >
-                                        {t("member_since")} {memberSince}
-                                    </span>
+                                    {memberSince && (
+                                        <span
+                                            className="text-xs font-semibold"
+                                            style={{ color: "var(--muted)" }}
+                                        >
+                                            {t("member_since")} {memberSince}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -141,38 +142,36 @@ export async function ProfilePage({ lang }: { lang: string }) {
                     </div>
                 </div>
 
-                <div className="lg:grid lg:grid-cols-2 lg:gap-5 flex flex-col gap-5 lg:flex-none">
-                    <div className="panel-d p-6">
+                <div className="panel-d p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
                         <h2
-                            className="stamp mb-5"
+                            className="stamp mb-2"
                             style={{
                                 background: "var(--blue)",
                                 color: "var(--accent-ink)",
                             }}
                         >
-                            {t("edit_title")}
+                            {t("account_title")}
                         </h2>
-                        {profile && (
-                            <ProfileForm
-                                userId={user.id}
-                                initialUsername={profile.username}
-                                initialAvatarPath={profile.avatar_url ?? null}
-                            />
-                        )}
+                        <p
+                            className="text-sm font-semibold"
+                            style={{ color: "var(--muted)" }}
+                        >
+                            {manageUrl ? t("account_desc") : t("account_dev")}
+                        </p>
                     </div>
-
-                    <div className="panel-d p-6">
-                        <h2
-                            className="stamp mb-5"
+                    {manageUrl && (
+                        <a
+                            href={manageUrl}
+                            className="wc-btn px-4 py-2 text-sm shrink-0 text-center"
                             style={{
-                                background: "var(--blue)",
-                                color: "var(--accent-ink)",
+                                background: "var(--gold)",
+                                color: "var(--ink)",
                             }}
                         >
-                            {t("linked_accounts")}
-                        </h2>
-                        <LinkedAccounts linkedProviders={linkedProviders} />
-                    </div>
+                            {t("account_manage")}
+                        </a>
+                    )}
                 </div>
 
                 <ProfileEloCard ratings={ratings} />

@@ -8,9 +8,9 @@ import {
     type EcaValidationError,
     validateEcaDefinition,
 } from "@/lib/eca/validate";
-import { publicStorageUrl } from "@/lib/supabase/storage";
+import { ecaImagesBucket, publicStorageUrl } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
-import { usernamesByIds } from "./usernames";
+import { usernamesByIds } from "./identities";
 
 type Admin = SupabaseClient<Database>;
 
@@ -375,7 +375,7 @@ export async function updateEcaGame(
         definition = validated.definition;
     }
 
-    const update: Database["public"]["Tables"]["eca_games"]["Update"] = {
+    const update: Database["wildcard"]["Tables"]["eca_games"]["Update"] = {
         updated_at: new Date().toISOString(),
     };
     if (namePatch !== undefined) update.name = namePatch;
@@ -453,7 +453,7 @@ export async function listPublishedEcaGames(
             name: row.name,
             description: row.description,
             imageUrl: row.image_url
-                ? publicStorageUrl("eca-images", row.image_url)
+                ? publicStorageUrl(ecaImagesBucket(), row.image_url)
                 : null,
             ownerName: nameOf.get(row.owner_id) ?? "?",
             ruleCount: Array.isArray(def.rules) ? def.rules.length : 0,

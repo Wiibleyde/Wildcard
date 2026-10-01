@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getSupabaseSchema } from "@/lib/supabase/env";
 import { levelForXp } from "@/lib/xp/xp";
 
 export interface GameOverXpState {
@@ -53,7 +54,7 @@ export function useGameOverXp(userId: string, gained: number): GameOverXpState {
                 "postgres_changes",
                 {
                     event: "UPDATE",
-                    schema: "public",
+                    schema: getSupabaseSchema(),
                     table: "player_xp",
                     filter: `user_id=eq.${userId}`,
                 },

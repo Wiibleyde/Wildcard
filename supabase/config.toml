@@ -1,9 +1,14 @@
+# Local Supabase (Supabase CLI) — `bun run dev:up`.
+# Mirrors the shared wiibleyde.dev stack where it matters: Postgres 17, the
+# `wildcard` schema exposed to PostgREST, a `portal` look-alike (created by the
+# portal_stub migration) and seeded accounts (supabase/seed.sql).
 project_id = "wildcard"
 
 [api]
 enabled = true
 port = 54321
-schemas = ["public", "graphql_public"]
+# Without `wildcard` here every query fails with PGRST106 (schema not exposed).
+schemas = ["public", "graphql_public", "wildcard", "portal"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
@@ -13,7 +18,7 @@ enabled = false
 [db]
 port = 54322
 shadow_port = 54320
-major_version = 15
+major_version = 17
 
 [db.pooler]
 enabled = false
@@ -22,6 +27,10 @@ pool_mode = "transaction"
 default_pool_size = 20
 max_client_conn = 100
 
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
 [realtime]
 enabled = true
 
@@ -29,7 +38,6 @@ enabled = true
 enabled = true
 port = 54323
 api_url = "http://127.0.0.1"
-openai_api_key = "env(OPENAI_API_KEY)"
 
 [inbucket]
 enabled = true
@@ -39,13 +47,12 @@ port = 54324
 enabled = true
 file_size_limit = "50MiB"
 
+# Sign-in happens on the portal in prod. Locally there is no portal: accounts are
+# seeded with email/password and `bun run dev:login` mints the session cookie.
 [auth]
 enabled = true
-site_url = "http://127.0.0.1:3000"
-additional_redirect_urls = [
-  "http://127.0.0.1:3000/auth/callback",
-  "http://localhost:3000/auth/callback",
-]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/**", "http://127.0.0.1:3000/**"]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
@@ -64,32 +71,8 @@ max_frequency = "1s"
 enable_signup = false
 enable_confirmations = false
 
-[auth.external.google]
-enabled = false
-client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
-secret = "env(SUPABASE_AUTH_GOOGLE_SECRET)"
-redirect_uri = ""
-url = ""
-skip_nonce_check = false
-
-[auth.external.discord]
-enabled = false
-client_id = "env(SUPABASE_AUTH_DISCORD_CLIENT_ID)"
-secret = "env(SUPABASE_AUTH_DISCORD_SECRET)"
-redirect_uri = ""
-url = ""
-
-[auth.external.apple]
-enabled = false
-client_id = "env(SUPABASE_AUTH_APPLE_CLIENT_ID)"
-secret = "env(SUPABASE_AUTH_APPLE_SECRET)"
-redirect_uri = ""
-url = ""
-
 [edge_runtime]
-enabled = true
-policy = "oneshot"
-inspector_port = 8083
+enabled = false
 
 [analytics]
 enabled = false

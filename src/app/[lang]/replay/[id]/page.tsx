@@ -1,7 +1,8 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import type { Locale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 import { ReplayClient } from "@/components/game/ReplayClient";
+import { requireAuthUser } from "@/lib/auth/session";
 import { getReplay } from "@/lib/models/replay";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -14,11 +15,8 @@ export default async function Page({
     const { lang, id } = await params;
     setRequestLocale(lang);
 
+    const user = await requireAuthUser(lang, `/${lang}/replay/${id}`);
     const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) redirect(`/${lang}/login`);
 
     // Service-role re-derivation: secret state stays server-side; client gets only per-frame redacted views.
     const admin = createAdminClient();

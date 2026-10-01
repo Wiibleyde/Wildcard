@@ -16,7 +16,7 @@ const env = Object.fromEntries(
         .map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]),
 );
 const SB = env.SUPABASE_URL,
-    SERVICE = env.SUPABASE_SERVICE_ROLE_KEY;
+    SERVICE = env.SUPABASE_SECRET_KEY;
 const DEF = {
     version: 1,
     meta: { name: "Huit américain (démo)", minPlayers: 2, maxPlayers: 5 },
@@ -86,6 +86,7 @@ async function auth() {
     const session = await res.json();
     let captured = [];
     const sb = createServerClient(SB, env.SUPABASE_ANON_KEY, {
+        cookieEncoding: "raw",
         cookies: {
             getAll: () => [],
             setAll: (cs) => {
@@ -117,6 +118,7 @@ await fetch(`${SB}/rest/v1/eca_games`, {
         Authorization: `Bearer ${SERVICE}`,
         "Content-Type": "application/json",
         Prefer: "return=representation",
+        "Content-Profile": env.SUPABASE_SCHEMA || "wildcard",
     },
     body: JSON.stringify({
         owner_id: userId,

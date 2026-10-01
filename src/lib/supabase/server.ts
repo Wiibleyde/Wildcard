@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { getServerSupabaseEnv, getSupabaseStorageKey } from "./env";
+import { getServerSupabaseEnv, supabaseSharedOptions } from "./env";
 import type { Database } from "./types";
 
 export async function createClient() {
@@ -8,10 +8,9 @@ export async function createClient() {
     const { url, anonKey } = getServerSupabaseEnv();
 
     return createServerClient<Database>(url, anonKey, {
-        // Pin the cookie name to the public-URL host so it matches the browser
-        // client (server talks to `kong`, browser to `localhost`) — see
-        // getSupabaseStorageKey.
-        cookieOptions: { name: getSupabaseStorageKey() },
+        // Same cookie name/encoding/domain as the browser client and the portal
+        // (server talks to Kong directly, browser to the public URL) — see env.ts.
+        ...supabaseSharedOptions(),
         cookies: {
             getAll: () => cookieStore.getAll(),
             setAll: (cookiesToSet) => {

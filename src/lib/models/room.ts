@@ -9,7 +9,7 @@ import {
 import { recordGameStarted } from "@/lib/metrics/registry";
 import type { Database } from "@/lib/supabase/types";
 import { advanceBots } from "./game";
-import { usernamesByIds } from "./usernames";
+import { usernamesByIds } from "./identities";
 
 type Admin = SupabaseClient<Database>;
 

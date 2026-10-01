@@ -1,6 +1,7 @@
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { type AppRole, getUserRole, roleAtLeast } from "@/lib/auth/roles";
+import type { AuthUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 
@@ -12,14 +13,14 @@ import type { Database } from "@/lib/supabase/types";
  */
 export type AuthedRoute = {
     readonly ok: true;
-    readonly user: User;
+    readonly user: AuthUser;
     readonly supabase: SupabaseClient<Database>;
 };
 
 /**
  * Resolve the authenticated user, or a 401 response, for an API route. Replaces
- * the `createClient → auth.getUser → 401` block that every route handler
- * repeated verbatim:
+ * the `createClient → auth → 401` block that every route handler repeated
+ * verbatim:
  *
  * ```ts
  * const auth = await requireUser();
@@ -34,10 +35,10 @@ export async function requireUser(): Promise<
     AuthedRoute | { readonly ok: false; readonly response: NextResponse }
 > {
     const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    // Verified JWT claims (see getAuthUser) — no round trip to the auth server.
+    const { data } = await supabase.auth.getClaims();
+    const claims = data?.claims;
+    if (!claims?.sub) {
         return {
             ok: false,
             response: NextResponse.json(
@@ -46,6 +47,10 @@ export async function requireUser(): Promise<
             ),
         };
     }
+    const user: AuthUser = {
+        id: claims.sub,
+        email: typeof claims.email === "string" ? claims.email : null,
+    };
     return { ok: true, user, supabase };
 }
 

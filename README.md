@@ -2,7 +2,42 @@
 
 Plateforme de jeux de cartes multijoueur en ligne — projet de fin d'études Master.
 
-**Stack** : Next.js 16 · React 19 · TypeScript strict · Tailwind CSS · Supabase (PostgreSQL, Auth, Realtime, RLS)
+**Stack** : Next.js 16 · React 19 · TypeScript strict · Tailwind CSS · Supabase (PostgreSQL, Auth, Realtime, RLS) — sur l'infra mutualisée wiibleyde.dev
+
+---
+
+## Architecture — infra mutualisée wiibleyde.dev
+
+Wildcard ne tourne pas seul : il s'intègre à l'infrastructure partagée de
+**wiibleyde.dev** (serveur *rivendell*), au même titre que les autres apps
+(Kestion, …) :
+
+| Brique | Rôle pour Wildcard |
+|---|---|
+| **Supabase partagé** (`supabase.wiibleyde.dev`) | Postgres 17, Auth, PostgREST, Realtime, Storage — Wildcard a **son propre schéma** `wildcard` |
+| **Portal** (`auth.wiibleyde.dev`) | Connexion / inscription (email, Discord), compte, pseudo et avatar — **un seul compte pour toutes les apps** |
+| **Caddy + CrowdSec** | HTTPS et filtrage devant `wildcard.wiibleyde.dev` |
+| **Prometheus / Grafana / Umami** | Observabilité et analytics mutualisées |
+
+Choix défendables :
+
+- **Schéma dédié** plutôt que `public` : isolation stricte entre apps sur une
+  même base (tables, fonctions, triggers, buckets, policies préfixés
+  `wildcard`). Les migrations sont écrites avec le nom `wildcard` et réécrites
+  en `wildcard_dev` pour le jumeau de développement — même code, deux schémas.
+- **SSO par cookie partagé** : le portal écrit la session Supabase dans un
+  cookie `.wiibleyde.dev` (encodage brut). Wildcard le relit, le rafraîchit au
+  même format, et redirige vers `auth.wiibleyde.dev/login?next=…` les visiteurs
+  non connectés. Pas de page de login à maintenir.
+- **Identité au portal, jeu chez Wildcard** : `wildcard.profiles` ne porte que
+  l'ancre du joueur (XP, ELO, inventaire, salons…). Pseudo et avatar sont lus
+  dans `portal.profiles` via une seule fonction `security definer`
+  (`wildcard.player_identities`), la RLS du portal ne montrant à chacun que son
+  propre profil.
+- **Ouvert à tout compte du portal** : un trigger `on_auth_user_wildcard` crée
+  le profil de jeu de chaque nouveau compte (et un backfill ceux qui existaient).
+- **Identité vérifiée** : `auth.getClaims()` (JWT ES256 vérifié contre le JWKS),
+  jamais `getSession()`.
 
 ---
 
@@ -10,94 +45,57 @@ Plateforme de jeux de cartes multijoueur en ligne — projet de fin d'études Ma
 
 | Outil | Version minimale | Installation |
 |---|---|---|
-| Node.js | 20+ | [nodejs.org](https://nodejs.org) |
-| Bun | 1.0+ | `npm install -g bun` |
+| Bun | 1.4+ | [bun.sh](https://bun.sh) |
 | Docker | 24+ | [docker.com](https://www.docker.com) |
-| Supabase CLI | 2.0+ | `bun install -g supabase` |
+| Supabase CLI | 2.100+ | [supabase.com/docs/guides/cli](https://supabase.com/docs/guides/cli) |
 
 ---
 
-## Installation
+## Développement
+
+Trois niveaux, du plus isolé au plus réaliste :
+
+| Niveau | Commande | Ce qu'on teste |
+|---|---|---|
+| **Local** (Supabase CLI) | `bun run dev:up` + `bun run dev` | schéma, RLS, migrations, jeu complet — sans réseau |
+| **Supabase partagé**, schéma `wildcard_dev` | `bun run dev:shared` | vraie auth (ES256), vrais comptes, vraie RLS — depuis localhost |
+| **Déployé** | `wildcard.wiibleyde.dev` | tout, y compris le cookie partagé et le portal |
+
+### Local
 
 ```bash
-git clone <repo-url>
-cd wildcard
 bun install
+bun run dev:up                         # Supabase local (Postgres 17) + migrations
+cp .env.local.example .env.local       # coller les clés affichées par dev:up
+bun run dev                            # http://localhost:3000
 ```
 
----
+Pas de portal en local : une page **`/fr/dev-login`** (disponible uniquement
+sous `next dev`, 404 en production) connecte les comptes seedés en un clic :
 
-## Démarrage local
+| Compte | Mot de passe | Rôle | Pseudo |
+|---|---|---|---|
+| `dev@local.test` | `password123` | admin | `dev` |
+| `player@local.test` | `password123` | joueur | `player` |
 
-### 1 — Variables d'environnement
+Le pseudo vient d'un **faux schéma `portal`** créé par la migration
+`portal_stub` — uniquement quand aucun schéma `portal` n'existe (no-op sur
+l'infra partagée).
+
+`bun run dev:up --fresh` repart d'une base vide (migrations + seed).
+Studio local : http://localhost:54323.
+
+### Contre le Supabase partagé (`wildcard_dev`)
 
 ```bash
-# Base de données et stack Supabase (Docker Compose)
-cp .env.docker.example .env.docker
-# → Remplir JWT_SECRET, POSTGRES_PASSWORD, LOGFLARE_API_KEY
-
-# Application Next.js
-cp .env.local.example .env.local
-# → Remplir SUPABASE_URL et SUPABASE_ANON_KEY (lues au runtime)
-#   (valeurs disponibles après l'étape 2)
+cp .env.shared.example .env.shared     # clé publishable + secret du Supabase partagé
+bun run dev:shared                     # schéma wildcard_dev
 ```
 
-Générer les clés JWT :
-```bash
-# JWT_SECRET : chaîne aléatoire ≥ 32 caractères
-openssl rand -base64 32
-
-# ANON_KEY et SERVICE_ROLE_KEY : JWTs signés avec JWT_SECRET
-# → https://supabase.com/docs/guides/self-hosting/docker#generate-api-keys
-```
-
-### 2 — Démarrer la stack Supabase (Docker)
-
-```bash
-bun run db:start
-# → Lance : PostgreSQL, Auth, PostgREST, Realtime, Storage, Studio, Kong…
-```
-
-Services disponibles (profil minimal) :
-| Service | URL |
-|---|---|
-| API Supabase (Kong) | http://localhost:54321 |
-| Postgres | localhost:5432 |
-| Inbucket (emails) | http://localhost:54324 |
-
-Pour lancer avec Studio (dashboard) et Storage :
-```bash
-docker compose --env-file .env.docker --profile studio up -d
-# → ajoute Studio sur http://localhost:54323
-```
-
-### 3 — Appliquer les migrations
-
-```bash
-# Lier le projet local (première fois)
-supabase link --project-ref <ref>   # ou travailler uniquement en local
-
-# Appliquer les migrations sur la stack locale
-bun run db:push
-# ou réinitialiser complètement (+ seed)
-bun run db:reset
-```
-
-### 4 — Générer les types TypeScript
-
-**Obligatoire après chaque modification de schéma.**
-
-```bash
-bun run db:types
-# → supabase gen types typescript --local > src/lib/supabase/types.ts
-```
-
-### 5 — Lancer le serveur de développement
-
-```bash
-bun run dev
-# → http://localhost:3000  (redirige automatiquement vers /fr)
-```
+Le cookie du portal ne peut pas se poser sur `localhost` : connexion via
+`/fr/dev-login` avec un vrai compte email/mot de passe. Le schéma
+`wildcard_dev` se met à jour sur le serveur avec `bun run db:apply:shared`
+(cf. [`deploy/README.md`](deploy/README.md)).
 
 ---
 
@@ -105,17 +103,19 @@ bun run dev
 
 ```bash
 bun run dev               # Serveur Next.js (Turbopack)
+bun run dev:up            # Supabase local + migrations (--fresh : reset + seed)
+bun run dev:down          # Arrêter le Supabase local
+bun run dev:shared        # Next contre le schéma wildcard_dev partagé
 bun run build             # Build de production
 bun run lint              # Lint Biome
-bun run format            # Format Biome
+bun run typecheck         # tsc --noEmit
+bun run test              # Tests unitaires (Vitest)
+bun run test:rls          # Test d'intégration RLS (Supabase local requis)
 
-bun run db:start          # Démarrer la stack Docker Supabase
-bun run db:stop           # Arrêter la stack Docker
-bun run db:push           # Appliquer les migrations
-bun run db:reset          # Reset DB + migrations + seed
-bun run db:types          # Regénérer src/lib/supabase/types.ts
-bun run db:new-migration  # Créer une nouvelle migration
-#   ex : bun run db:new-migration -- add_game_state
+bun run db:new-migration -- <nom>   # Nouvelle migration
+bun run db:reset          # Reset local (migrations + seed)
+bun run db:types          # Types générés du schéma wildcard (à comparer à types.ts)
+bun run db:apply:shared   # Appliquer les migrations à wildcard_dev (sur le serveur)
 ```
 
 ---
@@ -125,83 +125,77 @@ bun run db:new-migration  # Créer une nouvelle migration
 ```
 wildcard/
 ├── src/
-│   ├── app/
-│   │   ├── [lang]/           # Toutes les pages (i18n)
-│   │   │   ├── layout.tsx
-│   │   │   └── page.tsx
-│   │   └── auth/callback/    # Callback OAuth (hors [lang])
-│   ├── dictionaries/
-│   │   ├── fr.json           # Traductions FR (source de vérité)
-│   │   └── en.json
+│   ├── app/[lang]/           # Toutes les pages (i18n) — dont dev-login (dev only)
+│   ├── dictionaries/         # fr.json (source de vérité) + en.json
 │   ├── lib/
-│   │   ├── i18n.ts           # getDictionary, Locale, Dictionary
-│   │   └── supabase/
-│   │       ├── client.ts     # Client navigateur
-│   │       ├── server.ts     # Client Server Components / API Routes
-│   │       ├── auth.ts       # signInWithOAuth (Discord/Google), signOut
-│   │       └── types.ts      # Types DB (auto-généré)
-│   └── proxy.ts              # Session refresh Supabase + redirect i18n
+│   │   ├── auth/             # session (getClaims), URLs du portal, rôles
+│   │   ├── models/identities.ts  # pseudo/avatar via le portal
+│   │   └── supabase/         # clients (schéma, cookie partagé), types
+│   └── proxy.ts              # Refresh de session + maintenance + i18n
 ├── supabase/
-│   ├── migrations/           # Migrations SQL versionnées
-│   ├── config.toml           # Config Supabase CLI
-│   ├── kong.yml              # Config API Gateway
-│   └── seed.sql              # Données de dev
-├── docker-compose.yml        # Stack Supabase complète
-├── .env.docker.example       # Variables Docker Compose
-└── .env.local.example        # Variables Next.js
+│   ├── migrations/           # Migrations SQL (schéma `wildcard`)
+│   ├── config.toml           # Supabase CLI (local)
+│   └── seed.sql              # Comptes de dev
+├── scripts/
+│   ├── migrate.sh            # Runner de migrations (prod / wildcard_dev)
+│   ├── docker-entrypoint.sh  # Migre puis démarre le serveur
+│   ├── apply-shared.sh       # Migrations → wildcard_dev (serveur)
+│   └── dev-up.sh             # Supabase local
+└── deploy/                   # Stack serveur (compose, Caddy, Prometheus, Grafana)
 ```
 
 ---
 
 ## Base de données
 
-### Schéma
+Toutes les tables vivent dans le schéma **`wildcard`**, RLS activée partout.
 
-| Table | Description |
+| Table | Rôle |
 |---|---|
-| `profiles` | Profil joueur lié à `auth.users` |
-
-### RLS (Row Level Security)
-
-- **`profiles`** : lecture publique, écriture/mise à jour par le propriétaire uniquement
-- Un trigger `on_auth_user_created` crée automatiquement un profil à l'inscription (compatible Discord, Google, email)
+| `profiles` | Ancre du joueur (1 ligne par compte) — identité au portal |
+| `user_roles` | Rôle global (`user` / `moderator` / `admin`), écrit par le service role |
+| `player_xp`, `player_elo`, `player_inventory`, `player_customizations` | Progression et cosmétiques |
+| `rooms`, `room_players`, `games`, `game_actions` | Salons et parties (méta publique, Realtime) |
+| `game_states` | État secret complet (mains, graine RNG) — **aucune policy**, service role uniquement |
+| `eca_games`, `persistent_replays`, `matchmaking_tickets`, `app_settings` | Studio, replays, matchmaking, maintenance |
 
 ### Créer une migration
 
 ```bash
-bun run db:new-migration -- <nom>
-# → crée supabase/migrations/<timestamp>_<nom>.sql
-# Éditer le fichier, puis appliquer :
-bun run db:migrate        # n'applique QUE les fichiers non encore appliqués
-bun run db:types          # regénérer les types TypeScript
+bun run db:new-migration -- <nom>     # supabase/migrations/<timestamp>_<nom>.sql
+bun run dev:up                        # l'applique au Supabase local
 ```
 
-#### Suivi des versions (`schema_migrations`)
+Règles :
 
-`bun run db:migrate` lance `supabase/migrate.sh` (service `db-migrate`). Chaque
-fichier est appliqué **au plus une fois** : la version (nom de fichier) est
-enregistrée dans `public.schema_migrations`. Re-lancer = no-op, plus de mur
-d'erreurs « already exists ».
+- Écrire avec le nom **`wildcard`** littéral, jamais `wildcard_dev` (le runner
+  refuse) ; préfixer par `wildcard` tout nom partagé entre apps (trigger sur
+  `auth.users`, bucket, policy sur `storage.objects`).
+- Les fonctions `security definer` fixent `search_path`.
+- Mettre à jour `src/lib/supabase/types.ts` (maintenu à la main pour typer
+  finement les colonnes jsonb) en le comparant à `bun run db:types`.
 
-- Chaque migration tourne dans **une transaction** (`ON_ERROR_STOP`) : une vraie
-  erreur SQL annule le fichier et **interrompt le run** (exit ≠ 0) — un échec
-  casse le déploiement au lieu d'être masqué.
-- **Bootstrap** : sur une base déjà au niveau HEAD mais sans historique (table
-  `profiles` présente, `schema_migrations` vide), tous les fichiers actuels sont
-  marqués appliqués **sans être rejoués** (baseline). Une base vierge applique
-  tout normalement.
+#### Runner de migrations (`scripts/migrate.sh`)
+
+En prod, l'**entrypoint du conteneur** applique les migrations avant de
+démarrer le serveur (rôle `supabase_admin`, seul autorisé à poser un trigger
+sur `auth.users` partagé). Chaque fichier est appliqué **au plus une fois**,
+consigné dans `<schéma>.schema_migrations`, dans **une transaction** avec son
+enregistrement et un **verrou consultatif** (deux conteneurs qui démarrent
+ensemble n'appliquent jamais deux fois le même fichier). Une erreur SQL fait
+échouer le démarrage : l'ancien conteneur continue de servir.
 
 ---
 
 ## Authentification
 
-Providers OAuth configurés : **Discord**, **Google**.
+Gérée par le **portal** (`auth.wiibleyde.dev`) : email/mot de passe et Discord.
 
-Activer un provider :
-1. Créer l'app dans la console du provider
-2. URL de redirection à enregistrer : `http://localhost:54321/auth/v1/callback` (local) ou `https://<ref>.supabase.co/auth/v1/callback` (prod)
-3. Renseigner `CLIENT_ID` et `SECRET` dans `.env.docker`
-4. Passer le flag `ENABLE_<PROVIDER>_SIGNUP=true` dans `.env.docker`
+- Visiteur non connecté sur une page protégée → `auth.wiibleyde.dev/login?next=<URL Wildcard>`
+  (le portal accepte tout `https://*.wiibleyde.dev`), retour connecté.
+- Pseudo, avatar, comptes liés : `auth.wiibleyde.dev/account` (lien depuis le profil).
+- Déconnexion : met fin à la session sur **toutes** les apps (cookie partagé).
+- Admin : `update wildcard.user_roles set role = 'admin' where user_id = (select id from auth.users where email = '…');`
 
 ---
 
@@ -221,10 +215,10 @@ Ajouter une clé de traduction :
 
 ## Monitoring & Analytics
 
-L'observabilité (Umami + Prometheus + Grafana) est **mutualisée** : elle tourne
-dans la stack edge séparée — cf. **[`deploy/README.md`](deploy/README.md)** —, pas
-dans ce dépôt (ce sont des briques génériques réutilisables). L'app garde deux
-points d'intégration : l'endpoint `/api/metrics` (Prometheus) et le tag Umami.
+L'observabilité (Umami + Prometheus + Grafana) est **mutualisée** sur l'infra
+wiibleyde.dev — cf. **[`deploy/README.md`](deploy/README.md)** —, pas dans ce
+dépôt. L'app garde deux points d'intégration : l'endpoint `/api/metrics`
+(Prometheus) et le tag Umami.
 
 ### Métriques Prometheus exposées (`/api/metrics`)
 
@@ -237,7 +231,7 @@ points d'intégration : l'endpoint `/api/metrics` (Prometheus) et le tag Umami.
 - `wildcard_game_duration_seconds{module}` — durée d'une partie (histogram) → **durée moyenne par jeu**
 - métriques Node/process (`wildcard_*` : CPU, heap, event-loop)
 
-> **Accès protégé** — définir `METRICS_TOKEN` (`.env.docker`) : la route exige
+> **Accès protégé** — définir `METRICS_TOKEN` : la route exige
 > alors un `Authorization: Bearer <token>`, que le Prometheus central présente
 > (même valeur des deux côtés — cf. [`deploy/README.md`](deploy/README.md)).
 > Laissé vide en dev local (pas de Prometheus), la route reste ouverte.
@@ -256,14 +250,15 @@ Les JSON vivent dans `deploy/grafana/dashboards/` ; le Grafana central les charg
 ### Activer le tag Umami dans l'app
 
 1. Ouvrir l'UI Umami central → créer un site « Wildcard » → copier son **Website ID**.
-2. Coller dans `.env.docker` (ou `.env.local` pour `next dev`) → `UMAMI_WEBSITE_ID`,
-   ajuster `UMAMI_URL` sur l'Umami central, redémarrer l'app.
+2. Le renseigner dans `UMAMI_WEBSITE_ID` (`.env` du serveur, ou `.env.local`
+   pour `next dev`), redémarrer l'app.
 
 Sans `UMAMI_WEBSITE_ID`, le tag ne se charge pas — aucun impact sur les runs
 locaux.
 
-> **Config publique au runtime** — `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `UMAMI_URL`
-> et `UMAMI_WEBSITE_ID` ne sont **pas** des `NEXT_PUBLIC_*` : elles sont lues
+> **Config publique au runtime** — `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+> `SUPABASE_SCHEMA`, `COOKIE_DOMAIN`, `APP_URL`, `PORTAL_URL`, `UMAMI_URL` et
+> `UMAMI_WEBSITE_ID` ne sont **pas** des `NEXT_PUBLIC_*` : elles sont lues
 > côté serveur à la requête et injectées au navigateur via `window.__PUBLIC_ENV__`
 > (`src/lib/public-env.ts`). Une seule image construite par la CI tourne dans
 > n'importe quel environnement — aucune valeur figée au build, donc aucun rebuild
@@ -271,272 +266,46 @@ locaux.
 
 > **RGPD** : Umami est cookieless et ne stocke aucune donnée personnelle (IP +
 > user-agent hachés par jour → visiteur anonyme), donc pas de bannière de
-> consentement. Toutes les données restent dans notre propre Postgres (`umami-db`).
+> consentement. Toutes les données restent dans le Postgres de l'Umami auto-hébergé.
 
 ---
 
-## Déploiement — On-Premise (tout Docker)
+## Déploiement
 
-L'application Next.js et la stack Supabase tournent dans le même `docker compose`.
-Un seul serveur, un seul `docker compose up`.
-
-### Prérequis serveur
-
-| Ressource | Minimum |
-|---|---|
-| CPU | 2 vCPU |
-| RAM | 4 Go |
-| Disque | 20 Go SSD |
-| OS | Ubuntu 22.04+ |
-| Ports ouverts | 22 (SSH), 80, 443 |
-
-> **Seuls 80/443 (Caddy central) et 22 (SSH) doivent être joignables de
-> l'extérieur.** Les ports internes publiés par compose — app `3000`, Kong
-> `54321/54322`, admin `54323` — ne doivent **pas** être exposés : le chemin
-> public passe par le réseau `edge` (cf. « Reverse proxy, TLS & durcissement »).
+Sur **rivendell**, comme les autres apps de l'infra : la stack vit dans
+`~/infra/services/wildcard/` (copie de [`deploy/compose.yml`](deploy/compose.yml)
++ `.env`), derrière le Caddy partagé. Mise en place pas à pas (schémas,
+PostgREST, Caddy, Prometheus, Grafana, Umami) : **[`deploy/README.md`](deploy/README.md)**.
 
 ```bash
-# Docker (si pas installé)
-curl -fsSL https://get.docker.com | sh && sudo usermod -aG docker $USER
-```
-
-### 1 — Cloner et configurer
-
-```bash
-git clone <repo-url> /opt/wildcard
-cd /opt/wildcard
-cp .env.docker.example .env.docker
-```
-
-Remplir `.env.docker` — variables critiques :
-
-```bash
-# Secrets (générer avec : openssl rand -hex 32)
-POSTGRES_PASSWORD=<secret>
-JWT_SECRET=<secret-32-chars-min>
-SECRET_KEY_BASE=<secret>
-
-# ANON_KEY et SERVICE_ROLE_KEY : JWTs HS256 signés avec JWT_SECRET
-# Générer sur : https://supabase.com/docs/guides/self-hosting/docker#generate-api-keys
-ANON_KEY=<jwt-anon>
-SERVICE_ROLE_KEY=<jwt-service-role>
-
-# URLs publiques (domaine ou IP du serveur)
-SITE_URL=https://wildcard.example.com
-API_EXTERNAL_URL=https://api.wildcard.example.com
-SUPABASE_PUBLIC_URL=https://api.wildcard.example.com
-ADDITIONAL_REDIRECT_URLS=https://wildcard.example.com/auth/callback
-```
-
-### 2 — Lancer toute la stack
-
-```bash
-docker compose --env-file .env.docker up -d --build
-```
-
-Ce que fait ce seul `up` :
-1. Build l'image Next.js (aucune config publique figée — lue au runtime via l'env du conteneur)
-2. Démarre PostgreSQL, Auth, REST, Realtime, Kong, Inbucket
-3. Applique les migrations (`db-migrate` one-shot)
-4. Lance l'app Next.js
-
-Vérifier :
-```bash
-docker compose --env-file .env.docker ps
-# → tous les services : Up (healthy)
-```
-
-### 3 — Reverse proxy, TLS & durcissement (stack edge)
-
-Le point d'entrée HTTPS (**Caddy** + certificats Let's Encrypt automatiques),
-l'IPS (**CrowdSec**) et l'observabilité tournent dans une **stack edge
-mutualisée, déployée séparément** — voir **[`deploy/README.md`](deploy/README.md)**
-pour son compose complet et sa config. Ce dépôt n'en embarque que les fragments
-propres à Wildcard (`deploy/caddy/`, `deploy/prometheus/`, `deploy/grafana/`).
-
-Wildcard s'y branche via un **réseau Docker externe partagé**, `edge` :
-
-```bash
-docker network create edge          # une fois par serveur
-```
-
-`docker-compose.prod.yml` attache `app` et `kong` à `edge` avec les alias
-`wildcard-app` / `wildcard-kong`, que le Caddy central proxifie **sans publier de
-port hôte**. Le même override rebinde les ports internes en `127.0.0.1` :
-
-```yaml
-# docker-compose.prod.yml (extrait) — !override REMPLACE la liste ports ; sans
-# lui, Compose FUSIONNE et le mapping 0.0.0.0 subsisterait (trou de sécu).
-services:
-  app:
-    ports: !override
-      - "127.0.0.1:3000:3000"
-    networks:
-      default: {}
-      edge: { aliases: [wildcard-app] }
-```
-
-Lancer la prod (override empilé sur le fichier de base) :
-
-```bash
-docker network create edge          # si pas déjà fait
-docker compose --env-file .env.docker \
-  -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-```
-
-> **Recommandé — override implicite.** Sur le serveur de prod, ajouter à
-> `.env.docker` la ligne `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml`.
-> Compose la lit nativement : **toutes** les commandes (dont `scripts/deploy.sh`)
-> chargent l'override + le réseau `edge` sans `-f`. Sans ça, un `deploy.sh` qui
-> recrée `app` republie le port sur `0.0.0.0` et **rouvre le trou**.
-
-#### Durcissement réseau (pare-feu)
-
-Seuls **80/443** (Caddy central) et **22** (SSH) sont ouverts sur l'extérieur.
-Les ports internes de Wildcard restent en loopback — le chemin public passe par
-`edge`, pas par l'hôte.
-
-> ⚠️ **Piège Docker + ufw** : Docker insère ses règles iptables **avant** celles
-> d'ufw. Un `ufw deny 3000` ne bloque donc **pas** un port publié par Docker →
-> toujours rebinder en `127.0.0.1` plutôt que compter sur le pare-feu seul.
-
-```bash
-sudo ufw default deny incoming
-sudo ufw default allow outgoing
-sudo ufw allow 22/tcp    # SSH
-sudo ufw allow 80/tcp    # Caddy central — redirige vers 443
-sudo ufw allow 443/tcp   # Caddy central — HTTPS
-sudo ufw enable
-```
-
-Les UI d'admin (Studio `54323`, Grafana / Umami côté edge) restent en loopback :
-y accéder via un **tunnel SSH** (`ssh -L 54327:localhost:54327 serveur`) plutôt
-qu'en les exposant.
-
-### 4 — OAuth en production
-
-URL de redirection à enregistrer dans chaque console provider :
-
-```
-https://api.wildcard.example.com/auth/v1/callback
-```
-
-| Provider | Console |
-|---|---|
-| Discord | discord.com/developers |
-| Google | console.cloud.google.com/apis/credentials |
-
-Activer dans `.env.docker` puis redémarrer auth :
-
-```bash
-# Dans .env.docker :
-ENABLE_DISCORD_SIGNUP=true
-SUPABASE_AUTH_DISCORD_CLIENT_ID=<id>
-SUPABASE_AUTH_DISCORD_SECRET=<secret>
-
-docker compose --env-file .env.docker restart auth
-```
-
-### 5 — Nouvelles migrations
-
-```bash
-# Créer la migration
-bun run db:new-migration -- <nom>
-# Éditer supabase/migrations/<timestamp>_<nom>.sql
-
-# Appliquer en prod — le runner versionné n'applique que les fichiers nouveaux.
-docker compose --env-file .env.docker run --rm db-migrate
-```
-
-> En CD, `scripts/deploy.sh` lance déjà cette étape à chaque déploiement
-> (cf. *Déploiement continu*). Un fichier déjà appliqué est ignoré.
-
-### 6 — Mise à jour de l'application
-
-```bash
-cd /opt/wildcard
-git pull
-docker compose --env-file .env.docker up -d --build app
-# → rebuild uniquement le container Next.js, services Supabase non touchés
-```
-
-### Surveillance
-
-```bash
-docker compose --env-file .env.docker ps                    # état
-docker compose --env-file .env.docker logs -f app           # logs app
-docker compose --env-file .env.docker logs -f auth          # logs auth
-docker compose --env-file .env.docker restart <service>     # redémarrer un service
-```
-
-### Reset complet (⚠️ supprime toutes les données)
-
-```bash
-docker compose --env-file .env.docker down -v
-docker compose --env-file .env.docker up -d --build
+cd ~/infra/services/wildcard
+docker compose pull && docker compose up -d     # migrations appliquées au démarrage
+WILDCARD_TAG=sha-<commit> docker compose up -d  # rollback sur un commit précis
 ```
 
 ---
 
 ## Intégration & déploiement continus (CI/CD)
 
-Deux workflows GitHub Actions, séparés par responsabilité :
-
 | Workflow | Fichier | Déclencheur | Rôle |
 |---|---|---|---|
 | **CI** | `.github/workflows/ci.yml` | push `main`, toute PR | lint (Biome) · tests (Vitest) · build Next |
 | **CD** | `.github/workflows/cd.yml` | CI vert sur `main` · tag `v*` · manuel | build + push image GHCR · déploiement (optionnel) |
 
-### Principe — *build once, deploy by pull*
+**Build once, deploy by pull** : l'image ne contient aucune config publique
+(tout est lu au runtime), donc un **seul artefact** `ghcr.io/wiibleyde/wildcard`
+(tags `latest`, `sha-<commit>`, semver sur tag `v*`) tourne partout.
 
-L'image est **sans config publique** : `SUPABASE_URL`, `ANON_KEY`, `UMAMI_*` sont
-lues au **runtime** depuis l'env du conteneur (cf. `Dockerfile`). Un **seul
-artefact** tourne donc dans n'importe quel environnement. La pipeline le build
-une fois, le publie sur **GHCR**, et le serveur le récupère par `docker pull` —
-aucune reconstruction côté serveur.
+Le job `deploy` est **dormant** tant que la variable `DEPLOY_ENABLED` n'est pas
+à `true`. Pour l'activer (**GitHub → Settings → Secrets and variables → Actions**) :
 
-1. **CI** valide le commit (lint + test + build).
-2. À CI vert sur `main`, **CD** build l'image et la pousse sur
-   `ghcr.io/wiibleyde/wildcard` (tags `latest` + `sha-<commit>`). Les tags Git
-   `v1.2.3` produisent en plus une image semver immuable.
-3. Le job `deploy` se connecte en SSH au serveur, `pull` la nouvelle image,
-   applique les migrations et redémarre le conteneur app (`scripts/deploy.sh`).
+| Type | Nom | Valeur |
+|---|---|---|
+| Variable | `DEPLOY_ENABLED` | `true` |
+| Secret | `DEPLOY_HOST` | `rivendell` (IP / domaine) |
+| Secret | `DEPLOY_USER` | utilisateur SSH |
+| Secret | `DEPLOY_SSH_KEY` | clé privée SSH (sans passphrase) |
+| Secret | `DEPLOY_PATH` | `/home/wiibleyde/infra/services/wildcard` |
 
-> **État actuel : pas de serveur.** Le job `deploy` est **dormant** (gardé par la
-> variable `DEPLOY_ENABLED`). Sans serveur, CD se contente de **builder et
-> publier l'image** à chaque merge sur `main` — déjà fonctionnel et vérifiable
-> dans l'onglet *Packages* du dépôt.
-
-### Activer le déploiement (quand le serveur existe)
-
-1. **Préparer le serveur** une fois (cf. *Déploiement — On-Premise* ci-dessus) :
-   cloner dans `/opt/wildcard`, remplir `.env.docker`, `up -d --build` initial.
-2. Dans `.env.docker` du serveur, pointer l'image publiée :
-   ```bash
-   APP_IMAGE=ghcr.io/wiibleyde/wildcard:latest
-   ```
-3. Dans **GitHub → Settings → Secrets and variables → Actions** :
-
-   | Type | Nom | Valeur |
-   |---|---|---|
-   | Variable | `DEPLOY_ENABLED` | `true` |
-   | Secret | `DEPLOY_HOST` | IP / domaine du serveur |
-   | Secret | `DEPLOY_USER` | utilisateur SSH |
-   | Secret | `DEPLOY_SSH_KEY` | clé privée SSH (sans passphrase) |
-   | Secret | `DEPLOY_PATH` | `/opt/wildcard` |
-
-   `GITHUB_TOKEN` (auto) sert à `docker login ghcr.io` côté serveur — aucun PAT à
-   gérer. (Alternative : se logger une fois sur le serveur avec un PAT et retirer
-   la ligne `docker login` du workflow.)
-
-À partir de là, chaque merge sur `main` (CI vert) déploie tout seul.
-
-### Déploiement / rollback manuel
-
-Sur le serveur, `scripts/deploy.sh` fait le pull + migrations + restart :
-
-```bash
-cd /opt/wildcard && git pull
-./scripts/deploy.sh                 # déploie APP_IMAGE (ex. :latest)
-./scripts/deploy.sh sha-<commit>    # rollback sur un commit précis
-```
+Le job se connecte en SSH, `docker compose pull && up -d` : le nouveau conteneur
+migre le schéma puis démarre.

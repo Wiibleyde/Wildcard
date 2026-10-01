@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { Locale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 import { EcaEditor } from "@/components/studio/EcaEditor";
+import { requireAuthUser } from "@/lib/auth/session";
 import { validateEcaDefinition } from "@/lib/eca/validate";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,11 +14,8 @@ export default async function Page({
     const { lang, id } = await params;
     setRequestLocale(lang);
 
+    const user = await requireAuthUser(lang, `/${lang}/studio/${id}`);
     const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) redirect(`/${lang}/login`);
 
     // RLS client: the select policy already hides other people's drafts; the
     // explicit owner check on top keeps published-but-foreign games out of

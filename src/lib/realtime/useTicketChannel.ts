@@ -6,6 +6,7 @@ import {
     type RealtimeStatus,
     useRealtimeSync,
 } from "@/lib/realtime/useRealtimeSync";
+import { getSupabaseSchema } from "@/lib/supabase/env";
 
 /**
  * Subscribe to the caller's own matchmaking ticket. RLS exposes only this one
@@ -23,7 +24,7 @@ export function useTicketChannel(
                 "postgres_changes",
                 {
                     event: "*",
-                    schema: "public",
+                    schema: getSupabaseSchema(),
                     table: "matchmaking_tickets",
                     filter: `user_id=eq.${userId}`,
                 },

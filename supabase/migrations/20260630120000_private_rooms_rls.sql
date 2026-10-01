@@ -16,15 +16,15 @@
 --     room id they were never invited to is now denied.
 -- ============================================================
 
-drop policy "rooms are viewable by authenticated users" on public.rooms;
+drop policy "rooms are viewable by authenticated users" on wildcard.rooms;
 
 create policy "rooms are viewable by members or when public"
-  on public.rooms for select
+  on wildcard.rooms for select
   using (
     visibility = 'public'
     or auth.uid() in (
       select rp.user_id
-      from public.room_players rp
+      from wildcard.room_players rp
       where rp.room_id = rooms.id
     )
   );

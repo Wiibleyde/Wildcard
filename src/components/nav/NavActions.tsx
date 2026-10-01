@@ -43,7 +43,7 @@ export function NavActions({ variant, shown = true }: Props) {
 
     async function handleSignOut() {
         await signOut();
-        router.push(`/${lang}/login`);
+        router.push(`/${lang}`);
         router.refresh();
     }
 

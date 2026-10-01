@@ -10,18 +10,18 @@
 -- in-code RLS that already redacts every private hand (see AGENTS.md).
 -- ============================================================
 
-alter table public.room_players
+alter table wildcard.room_players
   add column role text not null default 'player'
     check (role in ('player', 'spectator'));
 
 -- Spectators occupy no seat.
-alter table public.room_players
+alter table wildcard.room_players
   alter column seat drop not null;
 
 -- Seat uniqueness applies to players only; spectators carry a null seat.
-alter table public.room_players
+alter table wildcard.room_players
   drop constraint if exists room_players_room_id_seat_key;
 
 create unique index room_players_seat_unique
-  on public.room_players (room_id, seat)
+  on wildcard.room_players (room_id, seat)
   where role = 'player';

@@ -8,8 +8,8 @@
 -- the state are bots so the server knows whose turns to auto-play.
 -- ============================================================
 
-alter table public.rooms
+alter table wildcard.rooms
   add column bot_count int not null default 0 check (bot_count >= 0);
 
-alter table public.games
+alter table wildcard.games
   add column bot_ids uuid[] not null default '{}';

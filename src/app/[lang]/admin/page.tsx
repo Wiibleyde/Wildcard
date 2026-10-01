@@ -5,6 +5,7 @@ import { MaintenanceControl } from "@/components/admin/MaintenanceControl";
 import { OngoingGamesPanel } from "@/components/admin/OngoingGamesPanel";
 import { GameButton } from "@/components/ui/GameButton";
 import { getUserRole, roleAtLeast } from "@/lib/auth/roles";
+import { requireAuthUser } from "@/lib/auth/session";
 import { listOngoingGames } from "@/lib/models/admin";
 import { getAppSettings } from "@/lib/models/settings";
 import { createClient } from "@/lib/supabase/server";
@@ -17,11 +18,8 @@ export default async function AdminPage({
     const { lang } = await params;
     setRequestLocale(lang);
 
+    const user = await requireAuthUser(lang, `/${lang}/admin`);
     const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) redirect(`/${lang}/login`);
 
     // In-app gate only; API writes re-check the role server-side (defense in depth).
     const role = await getUserRole(supabase, user.id);

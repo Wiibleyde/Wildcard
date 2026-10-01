@@ -1,0 +1,51 @@
+# Wildcard — stack applicative sur rivendell.
+#
+# À copier dans ~/infra/services/wildcard/compose.yml (avec un .env à côté, cf.
+# deploy/.env.example). Même modèle que Kestion : l'image GHCR, aucune port
+# publié, les migrations appliquées par l'entrypoint au démarrage.
+#
+#   docker compose pull && docker compose up -d
+name: wildcard
+
+networks:
+  # Caddy (wildcard.wiibleyde.dev → wildcard:3000).
+  front:
+    external: true
+  # Supabase partagé : Kong (appels serveur) + Postgres (migrations).
+  supabase:
+    external: true
+  # Prometheus scrape /api/metrics.
+  monitoring:
+    external: true
+
+services:
+  wildcard:
+    image: ghcr.io/wiibleyde/wildcard:${WILDCARD_TAG:-latest}
+    container_name: wildcard
+    restart: unless-stopped
+    environment:
+      # ── Public (relayé au navigateur via window.__PUBLIC_ENV__) ──
+      SUPABASE_URL: https://supabase.wiibleyde.dev
+      SUPABASE_ANON_KEY: ${SUPABASE_PUBLISHABLE_KEY:?SUPABASE_PUBLISHABLE_KEY is required}
+      SUPABASE_SCHEMA: wildcard
+      COOKIE_DOMAIN: .wiibleyde.dev
+      APP_URL: https://wildcard.wiibleyde.dev
+      PORTAL_URL: https://auth.wiibleyde.dev
+      UMAMI_URL: https://umami.wiibleyde.dev
+      UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID:-}
+      # ── Serveur uniquement ──
+      # Appels serveur en direct sur le réseau supabase (pas via Caddy).
+      SUPABASE_INTERNAL_URL: http://supabase-kong:8000
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:?SUPABASE_SECRET_KEY is required}
+      METRICS_TOKEN: ${METRICS_TOKEN:?METRICS_TOKEN is required}
+      # DSN supabase_admin : seul rôle autorisé à créer le schéma et le trigger
+      # sur auth.users. Lu par l'entrypoint (scripts/migrate.sh) uniquement.
+      WILDCARD_DATABASE_URL: ${WILDCARD_DATABASE_URL:?WILDCARD_DATABASE_URL is required}
+      WILDCARD_MIGRATE: ${WILDCARD_MIGRATE:-run}
+    networks: [front, supabase, monitoring]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/fr"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

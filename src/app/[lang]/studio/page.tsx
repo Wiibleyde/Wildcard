@@ -1,12 +1,12 @@
-import { redirect } from "next/navigation";
 import type { Locale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import {
     type StudioGameSummary,
     StudioHub,
 } from "@/components/studio/StudioHub";
+import { requireAuthUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { publicStorageUrl } from "@/lib/supabase/storage";
+import { ecaImagesBucket, publicStorageUrl } from "@/lib/supabase/storage";
 
 export default async function Page({
     params,
@@ -17,11 +17,8 @@ export default async function Page({
     setRequestLocale(lang);
     const t = await getTranslations("studio");
 
+    const user = await requireAuthUser(lang, `/${lang}/studio`);
     const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) redirect(`/${lang}/login`);
 
     // RLS client on purpose: the own-row select policy scopes this query —
     // database-level defense-in-depth under the API's ownership checks.
@@ -42,7 +39,7 @@ export default async function Page({
             ? row.definition.rules.length
             : 0,
         imageUrl: row.image_url
-            ? publicStorageUrl("eca-images", row.image_url)
+            ? publicStorageUrl(ecaImagesBucket(), row.image_url)
             : null,
         updatedAt: row.updated_at,
     }));

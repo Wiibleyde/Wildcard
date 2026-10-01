@@ -71,6 +71,15 @@ export function GameButton({
     // A disabled "link" must not be navigable or focusable — fall through to
     // the disabled <button> branch instead of rendering an <a aria-disabled>.
     if ("href" in rest && rest.href !== undefined && !disabled) {
+        // Off-site targets (the portal) are plain anchors: the i18n Link is for
+        // in-app routes only.
+        if (/^https?:\/\//.test(rest.href)) {
+            return (
+                <a href={rest.href} className={baseClass} style={style}>
+                    {children}
+                </a>
+            );
+        }
         return (
             <Link href={rest.href} className={baseClass} style={style}>
                 {children}

@@ -11,7 +11,7 @@ import { AppShell } from "@/components/nav/AppShell";
 import { GuestNav } from "@/components/nav/GuestNav";
 import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 import { routing } from "@/i18n/routing";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/auth/session";
 
 // Body face — Hanken Grotesk: readable, slightly geometric, holds up at small
 // sizes against the chunky display face.
@@ -60,10 +60,7 @@ export default async function RootLayout({
 
     const messages = await getMessages();
 
-    const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getAuthUser();
 
     return (
         <html

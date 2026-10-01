@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 
 /**
  * Shared neobrutalism form-control skin for the Studio editor — the
- * ProfileForm / MatchHistoryClient input pattern, on cream panels (hence the
+ * MatchHistoryClient input pattern, on cream panels (hence the
  * deeper cream2 fill for contrast).
  */
 

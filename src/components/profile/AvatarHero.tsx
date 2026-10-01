@@ -1,16 +1,14 @@
 import Image from "next/image";
-import type { Database } from "@/lib/supabase/types";
-
-type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
 type Props = {
-    profile: Profile;
+    /** Display name (portal pseudo or fallback) — alt text and initial. */
+    name: string;
     avatarUrl: string | null;
 };
 
 // Neobrutalism hero avatar — flat disc, thick ink ring, chunky Lilita initial.
-export function AvatarHero({ profile, avatarUrl }: Props) {
-    const initial = profile.username?.[0]?.toUpperCase() ?? "?";
+export function AvatarHero({ name, avatarUrl }: Props) {
+    const initial = name[0]?.toUpperCase() ?? "?";
     return (
         <div
             className="relative w-20 h-20 shrink-0 overflow-hidden rounded-full"
@@ -22,7 +20,7 @@ export function AvatarHero({ profile, avatarUrl }: Props) {
             {avatarUrl ? (
                 <Image
                     src={avatarUrl}
-                    alt={profile.username}
+                    alt={name}
                     fill
                     sizes="80px"
                     className="object-cover"

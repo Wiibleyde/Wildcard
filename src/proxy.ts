@@ -4,7 +4,7 @@ import createMiddleware from "next-intl/middleware";
 import { getAppSettings } from "@/lib/models/settings";
 import {
     getServerSupabaseEnv,
-    getSupabaseStorageKey,
+    supabaseSharedOptions,
 } from "@/lib/supabase/env";
 import type { Database } from "@/lib/supabase/types";
 import { routing } from "./i18n/routing";
@@ -15,10 +15,11 @@ type PendingCookie = { name: string; value: string; options: CookieOptions };
 
 /**
  * Paths that stay reachable during maintenance: the maintenance page itself
- * (no rewrite loop) and login (so an admin who is signed out can get in and
- * lift it). Matched anywhere in the path so the locale prefix is irrelevant.
+ * (no rewrite loop) and the dev login page. In prod, sign-in happens on the
+ * portal, outside this app, so a signed-out admin is never blocked from it.
+ * Matched anywhere in the path so the locale prefix is irrelevant.
  */
-const MAINTENANCE_ALLOW = ["/maintenance", "/login"];
+const MAINTENANCE_ALLOW = ["/maintenance", "/dev-login"];
 
 function localeFromPath(pathname: string): string {
     const seg = pathname.split("/")[1];
@@ -32,8 +33,8 @@ export async function proxy(request: NextRequest) {
 
     const { url, anonKey } = getServerSupabaseEnv();
     const supabase = createServerClient<Database>(url, anonKey, {
-        // Same cookie name as the browser/server clients (see getSupabaseStorageKey).
-        cookieOptions: { name: getSupabaseStorageKey() },
+        // Same cookie name/encoding/domain as every client and the portal (env.ts).
+        ...supabaseSharedOptions(),
         cookies: {
             getAll: () => request.cookies.getAll(),
             setAll: (cookiesToSet) => {
@@ -44,9 +45,11 @@ export async function proxy(request: NextRequest) {
             },
         },
     });
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+    // Must run right after creating the client: it refreshes an expired session
+    // (writing the new cookie via setAll) and verifies the JWT signature. Any
+    // await in between risks acting on a stale session.
+    const { data: claimsData } = await supabase.auth.getClaims();
+    const userId = claimsData?.claims?.sub ?? null;
 
     /** Carry the refreshed session cookies onto whatever response we return. */
     const withCookies = (response: NextResponse) => {
@@ -67,11 +70,11 @@ export async function proxy(request: NextRequest) {
         !MAINTENANCE_ALLOW.some((p) => pathname.includes(p))
     ) {
         let isAdmin = false;
-        if (user) {
+        if (userId) {
             const { data } = await supabase
                 .from("user_roles")
                 .select("role")
-                .eq("user_id", user.id)
+                .eq("user_id", userId)
                 .maybeSingle();
             isAdmin = data?.role === "admin";
         }
@@ -87,6 +90,6 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-    // Excludes: _next internals, API routes, OAuth callback, static files
-    matcher: ["/((?!_next|api|auth/callback|favicon\\.ico|.*\\..*).*)"],
+    // Excludes: _next internals, API routes, static files
+    matcher: ["/((?!_next|api|favicon\\.ico|.*\\..*).*)"],
 };

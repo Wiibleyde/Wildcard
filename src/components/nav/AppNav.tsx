@@ -1,7 +1,8 @@
-import type { User } from "@supabase/supabase-js";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getUserRole, roleAtLeast } from "@/lib/auth/roles";
+import type { AuthUser } from "@/lib/auth/session";
+import { identityOf, PORTAL_AVATAR_BUCKET } from "@/lib/models/identities";
 import { createClient } from "@/lib/supabase/server";
 import { publicStorageUrl } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
@@ -12,14 +13,13 @@ import { NavAvatar } from "./NavAvatar";
 import { NavLinks } from "./NavLinks";
 import { SidebarDesktop } from "./SidebarDesktop";
 
-type Profile = Database["public"]["Tables"]["profiles"]["Row"];
-type PlayerXP = Database["public"]["Tables"]["player_xp"]["Row"];
+type PlayerXP = Database["wildcard"]["Tables"]["player_xp"]["Row"];
 
-export async function AppNav({ user }: { user: User }) {
+export async function AppNav({ user }: { user: AuthUser }) {
     const supabase = await createClient();
 
-    const [profileRes, xpRes, role] = await Promise.all([
-        supabase.from("profiles").select("*").eq("id", user.id).single(),
+    const [identity, xpRes, role] = await Promise.all([
+        identityOf(supabase, user.id),
         supabase.from("player_xp").select("xp").eq("user_id", user.id).single(),
         getUserRole(supabase, user.id),
     ]);
@@ -28,16 +28,19 @@ export async function AppNav({ user }: { user: User }) {
     const t = await getTranslations("navigation");
     const tProfile = await getTranslations("profile");
 
-    const profile = profileRes.data as Profile | null;
     const xpRow = xpRes.data as Pick<PlayerXP, "xp"> | null;
     const xp = xpRow?.xp ?? 0;
     const level = levelForXp(xp);
 
-    const avatarUrl = profile?.avatar_url
-        ? publicStorageUrl("avatars", profile.avatar_url)
+    const avatarUrl = identity.avatarPath
+        ? publicStorageUrl(PORTAL_AVATAR_BUCKET, identity.avatarPath)
         : null;
 
-    const initial = profile?.username?.[0]?.toUpperCase() ?? "?";
+    const initial = identity.name[0]?.toUpperCase() ?? "?";
+    const profile = {
+        username: identity.name,
+        avatar_url: identity.avatarPath,
+    };
 
     return (
         <>
@@ -68,7 +71,7 @@ export async function AppNav({ user }: { user: User }) {
                             <NavAvatar
                                 avatarUrl={avatarUrl}
                                 initial={initial}
-                                username={profile?.username ?? null}
+                                username={identity.name}
                                 sizePx={32}
                                 initialClassName="text-xs"
                             />

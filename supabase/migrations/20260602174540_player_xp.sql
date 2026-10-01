@@ -1,8 +1,8 @@
 -- ============================================================
 -- Player XP
 -- ============================================================
-create table public.player_xp (
-  user_id     uuid primary key references public.profiles(id) on delete cascade,
+create table wildcard.player_xp (
+  user_id     uuid primary key references wildcard.profiles(id) on delete cascade,
   xp          integer not null default 0 check (xp >= 0),
   updated_at  timestamptz default now()
 );
@@ -10,56 +10,56 @@ create table public.player_xp (
 -- ============================================================
 -- Row Level Security
 -- ============================================================
-alter table public.player_xp enable row level security;
+alter table wildcard.player_xp enable row level security;
 
 -- Anyone can read XP (leaderboard)
 create policy "player_xp are viewable by everyone"
-  on public.player_xp for select
+  on wildcard.player_xp for select
   using (true);
 
 -- Only service role can mutate XP — no direct client writes
 create policy "only service role can insert player_xp"
-  on public.player_xp for insert
+  on wildcard.player_xp for insert
   with check (auth.role() = 'service_role');
 
 create policy "only service role can update player_xp"
-  on public.player_xp for update
+  on wildcard.player_xp for update
   using (auth.role() = 'service_role');
 
 -- ============================================================
 -- Realtime
 -- ============================================================
-alter table public.player_xp replica identity full;
+alter table wildcard.player_xp replica identity full;
 
-alter publication supabase_realtime add table public.player_xp;
+alter publication supabase_realtime add table wildcard.player_xp;
 
 -- ============================================================
 -- Auto-create XP row when profile is created
 -- ============================================================
-create or replace function public.handle_new_profile()
+create or replace function wildcard.handle_new_profile()
 returns trigger
 language plpgsql
-security definer set search_path = public
+security definer set search_path = wildcard
 as $$
 begin
-  insert into public.player_xp (user_id) values (new.id);
+  insert into wildcard.player_xp (user_id) values (new.id);
   return new;
 end;
 $$;
 
 create trigger on_profile_created
-  after insert on public.profiles
-  for each row execute procedure public.handle_new_profile();
+  after insert on wildcard.profiles
+  for each row execute procedure wildcard.handle_new_profile();
 
 -- ============================================================
 -- XP helpers (security definer — bypass RLS, server-side only)
 -- ============================================================
 
 -- Increment XP. Returns new xp value.
-create or replace function public.increment_xp(p_user_id uuid, p_amount integer)
+create or replace function wildcard.increment_xp(p_user_id uuid, p_amount integer)
 returns integer
 language plpgsql
-security definer set search_path = public
+security definer set search_path = wildcard
 as $$
 declare
   new_xp integer;
@@ -68,7 +68,7 @@ begin
     raise exception 'p_amount must be positive (got %)', p_amount;
   end if;
 
-  update public.player_xp
+  update wildcard.player_xp
   set xp = xp + p_amount,
       updated_at = now()
   where user_id = p_user_id
@@ -83,10 +83,10 @@ end;
 $$;
 
 -- Decrement XP, floored at 0. Returns new xp value.
-create or replace function public.decrement_xp(p_user_id uuid, p_amount integer)
+create or replace function wildcard.decrement_xp(p_user_id uuid, p_amount integer)
 returns integer
 language plpgsql
-security definer set search_path = public
+security definer set search_path = wildcard
 as $$
 declare
   new_xp integer;
@@ -95,7 +95,7 @@ begin
     raise exception 'p_amount must be positive (got %)', p_amount;
   end if;
 
-  update public.player_xp
+  update wildcard.player_xp
   set xp = greatest(0, xp - p_amount),
       updated_at = now()
   where user_id = p_user_id
