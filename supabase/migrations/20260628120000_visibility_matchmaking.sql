@@ -19,13 +19,13 @@
 -- ============================================================
 
 -- --- Room visibility -----------------------------------------------------
-alter table public.rooms
+alter table wildcard.rooms
   add column visibility text not null default 'private'
     check (visibility in ('public', 'private'));
 
 -- --- Matchmaking queue ---------------------------------------------------
-create table public.matchmaking_tickets (
-  user_id     uuid primary key references public.profiles(id) on delete cascade,
+create table wildcard.matchmaking_tickets (
+  user_id     uuid primary key references wildcard.profiles(id) on delete cascade,
   module_id   text not null,
   -- NULL while searching; set to the matched room's id when paired. The PK on
   -- user_id means a player can hold at most one ticket (queue for one game).
@@ -43,20 +43,20 @@ create table public.matchmaking_tickets (
 -- The waiting pool the matcher scans: oldest-first within a game. Partial index
 -- keeps it to just the still-searching rows.
 create index matchmaking_waiting_idx
-  on public.matchmaking_tickets (module_id, created_at)
+  on wildcard.matchmaking_tickets (module_id, created_at)
   where room_id is null;
 
-alter table public.matchmaking_tickets enable row level security;
+alter table wildcard.matchmaking_tickets enable row level security;
 
 -- A player may read only their own ticket — enough for Realtime to push the
 -- "you've been matched" update to them, and nothing about anyone else's queue.
 create policy "own ticket is viewable"
-  on public.matchmaking_tickets for select
+  on wildcard.matchmaking_tickets for select
   using (auth.uid() = user_id);
 
 -- All writes are server-only (matcher + enqueue/leave run as service_role).
 create policy "only service role writes tickets"
-  on public.matchmaking_tickets for all
+  on wildcard.matchmaking_tickets for all
   using (auth.role() = 'service_role')
   with check (auth.role() = 'service_role');
 
@@ -68,7 +68,7 @@ create policy "only service role writes tickets"
 -- user_id) row per claimed player (host first), or nothing when fewer than
 -- p_min are ready — in which case no ticket is touched and everyone keeps
 -- waiting.
-create or replace function public.match_make(
+create or replace function wildcard.match_make(
   p_module_id text,
   p_min int,
   p_max int
@@ -76,7 +76,7 @@ create or replace function public.match_make(
 returns table (room_id uuid, user_id uuid)
 language plpgsql
 security definer
-set search_path = public
+set search_path = wildcard
 as $$
 declare
   v_room uuid := gen_random_uuid();
@@ -105,7 +105,7 @@ begin
 end;
 $$;
 
-revoke all on function public.match_make(text, int, int) from public;
+revoke all on function wildcard.match_make(text, int, int) from public;
 
 -- --- Realtime publication ------------------------------------------------
 -- Mirror the idempotent pattern from 20260618000000: full row image so UPDATE
@@ -118,15 +118,15 @@ begin
     create publication supabase_realtime;
   end if;
 
-  execute 'alter table public.matchmaking_tickets replica identity full';
+  execute 'alter table wildcard.matchmaking_tickets replica identity full';
 
   if not exists (
     select 1 from pg_publication_tables
     where pubname = 'supabase_realtime'
-      and schemaname = 'public'
+      and schemaname = 'wildcard'
       and tablename = 'matchmaking_tickets'
   ) then
-    execute 'alter publication supabase_realtime add table public.matchmaking_tickets';
+    execute 'alter publication supabase_realtime add table wildcard.matchmaking_tickets';
   end if;
 end
 $$;

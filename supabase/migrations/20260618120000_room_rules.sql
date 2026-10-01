@@ -13,5 +13,5 @@
 -- (see setRules in src/lib/models/room.ts).
 -- ============================================================
 
-alter table public.rooms
+alter table wildcard.rooms
   add column rules jsonb not null default '{}'::jsonb;

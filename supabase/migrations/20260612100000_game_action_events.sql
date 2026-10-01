@@ -12,5 +12,5 @@
 -- game_actions table is readable by any authenticated user (audit/replay),
 -- so this column inherits that exposure deliberately.
 
-alter table public.game_actions
+alter table wildcard.game_actions
   add column events jsonb not null default '[]'::jsonb;

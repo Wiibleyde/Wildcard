@@ -1,87 +1,54 @@
 -- ============================================================
 -- Profiles
 -- ============================================================
-create table public.profiles (
+-- Game-side profile: one row per account, the anchor every per-player table
+-- (xp, elo, inventory, rooms…) references. Identity — pseudo and avatar — is NOT
+-- stored here: it belongs to the portal (`portal.profiles`) and is read through
+-- `wildcard.player_identities` (see the shared_auth migration).
+create table wildcard.profiles (
   id          uuid primary key references auth.users(id) on delete cascade,
-  username    text unique not null,
-  avatar_url  text,
   created_at  timestamptz default now()
 );
 
 -- ============================================================
 -- Row Level Security
 -- ============================================================
-alter table public.profiles enable row level security;
+alter table wildcard.profiles enable row level security;
 
--- Anyone can read profiles (leaderboard, chat, lobby)
+-- Anyone can read profiles (leaderboard, chat, lobby). There is nothing to
+-- write from a client: rows come from the sign-up trigger only.
 create policy "profiles are viewable by everyone"
-  on public.profiles for select
+  on wildcard.profiles for select
   using (true);
-
--- Users can only insert their own profile
-create policy "users can insert their own profile"
-  on public.profiles for insert
-  with check (auth.uid() = id);
-
--- Users can only update their own profile
-create policy "users can update their own profile"
-  on public.profiles for update
-  using (auth.uid() = id);
 
 -- ============================================================
 -- Realtime
 -- ============================================================
-alter table public.profiles replica identity full;
+alter table wildcard.profiles replica identity full;
 
-alter publication supabase_realtime add table public.profiles;
+alter publication supabase_realtime add table wildcard.profiles;
 
 -- ============================================================
--- Auto-create profile on sign-up (Discord / Google / email)
--- Username derived from OAuth metadata with uniqueness enforcement
+-- Auto-create the game profile on sign-up
 -- ============================================================
-create or replace function public.handle_new_user()
+-- Every account of the shared auth gets a Wildcard profile: the game is open to
+-- any portal user, no per-project claim required. The trigger name carries the
+-- schema name so `wildcard` and `wildcard_dev` each own their own trigger on
+-- the shared auth.users.
+create or replace function wildcard.handle_new_user()
 returns trigger
 language plpgsql
-security definer set search_path = public
+security definer set search_path = wildcard
 as $$
-declare
-  base_username text;
-  final_username text;
-  counter       int := 0;
 begin
-  -- Discord sends user_name, Google sends name
-  base_username := coalesce(
-    new.raw_user_meta_data->>'user_name',
-    new.raw_user_meta_data->>'name',
-    split_part(coalesce(new.email, ''), '@', 1),
-    'joueur'
-  );
-
-  -- Sanitize: lowercase, non-alphanumeric → underscore, max 20 chars
-  base_username := lower(regexp_replace(base_username, '[^a-z0-9_]', '_', 'g'));
-  base_username := substr(base_username, 1, 20);
-  -- Remove leading/trailing underscores
-  base_username := trim(both '_' from base_username);
-  -- Fallback if empty after sanitization
-  if base_username = '' then
-    base_username := 'joueur';
-  end if;
-
-  final_username := base_username;
-
-  -- Ensure uniqueness
-  while exists (select 1 from public.profiles where username = final_username) loop
-    counter := counter + 1;
-    final_username := base_username || '_' || counter;
-  end loop;
-
-  insert into public.profiles (id, username)
-  values (new.id, final_username);
-
+  insert into wildcard.profiles (id) values (new.id) on conflict (id) do nothing;
   return new;
 end;
 $$;
 
-create trigger on_auth_user_created
+grant execute on function wildcard.handle_new_user() to supabase_auth_admin;
+
+drop trigger if exists on_auth_user_wildcard on auth.users;
+create trigger on_auth_user_wildcard
   after insert on auth.users
-  for each row execute procedure public.handle_new_user();
+  for each row execute function wildcard.handle_new_user();

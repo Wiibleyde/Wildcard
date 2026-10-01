@@ -13,34 +13,34 @@
 -- working with the column defaults.
 -- ============================================================
 
-create or replace function public.can_equip_deck_style(p_style_id text)
+create or replace function wildcard.can_equip_deck_style(p_style_id text)
 returns boolean
 language sql
 stable
-set search_path = public
+set search_path = wildcard
 as $$
   select exists (
-    select 1 from public.deck_styles
+    select 1 from wildcard.deck_styles
     where id = p_style_id and tier = 'common'
   ) or exists (
-    select 1 from public.player_inventory
+    select 1 from wildcard.player_inventory
     where user_id = auth.uid()
       and item_type = 'deck_style'
       and item_id = p_style_id
   );
 $$;
 
-create or replace function public.can_equip_board_style(p_style_id text)
+create or replace function wildcard.can_equip_board_style(p_style_id text)
 returns boolean
 language sql
 stable
-set search_path = public
+set search_path = wildcard
 as $$
   select exists (
-    select 1 from public.board_styles
+    select 1 from wildcard.board_styles
     where id = p_style_id and tier = 'common'
   ) or exists (
-    select 1 from public.player_inventory
+    select 1 from wildcard.player_inventory
     where user_id = auth.uid()
       and item_type = 'board_style'
       and item_id = p_style_id
@@ -48,23 +48,23 @@ as $$
 $$;
 
 drop policy "users can insert their own customizations"
-  on public.player_customizations;
+  on wildcard.player_customizations;
 drop policy "users can update their own customizations"
-  on public.player_customizations;
+  on wildcard.player_customizations;
 
 create policy "users can insert their own customizations"
-  on public.player_customizations for insert
+  on wildcard.player_customizations for insert
   with check (
     auth.uid() = user_id
-    and public.can_equip_deck_style(deck_style_id)
-    and public.can_equip_board_style(board_style_id)
+    and wildcard.can_equip_deck_style(deck_style_id)
+    and wildcard.can_equip_board_style(board_style_id)
   );
 
 create policy "users can update their own customizations"
-  on public.player_customizations for update
+  on wildcard.player_customizations for update
   using (auth.uid() = user_id)
   with check (
     auth.uid() = user_id
-    and public.can_equip_deck_style(deck_style_id)
-    and public.can_equip_board_style(board_style_id)
+    and wildcard.can_equip_deck_style(deck_style_id)
+    and wildcard.can_equip_board_style(board_style_id)
   );

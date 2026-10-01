@@ -16,21 +16,21 @@ create extension if not exists pg_cron;
 
 -- The sweep filters on age, so index the column it scans.
 create index if not exists game_actions_created_at_idx
-  on public.game_actions (created_at);
+  on wildcard.game_actions (created_at);
 
 -- Single source of truth for the retention rule — callable by the cron job and
 -- by hand. SECURITY DEFINER so the cron role can delete regardless of RLS.
-create or replace function public.prune_expired_game_actions()
+create or replace function wildcard.prune_expired_game_actions()
 returns integer
 language plpgsql
 security definer
-set search_path = public
+set search_path = wildcard
 as $$
 declare
   removed integer;
 begin
-  delete from public.game_actions a
-  using public.games g
+  delete from wildcard.game_actions a
+  using wildcard.games g
   where a.game_id = g.id
     and g.is_over
     and a.created_at < now() - interval '15 days';
@@ -43,5 +43,5 @@ $$;
 select cron.schedule(
   'prune-game-actions',
   '17 3 * * *',
-  $$select public.prune_expired_game_actions();$$
+  $$select wildcard.prune_expired_game_actions();$$
 );

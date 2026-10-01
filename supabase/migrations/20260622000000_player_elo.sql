@@ -4,8 +4,8 @@
 -- One row per (player, game). A player's Belote rating is distinct from their
 -- Président rating, so the table is keyed by the pair. Rows are created lazily
 -- on the first rated game for that module (no per-profile seed trigger).
-create table public.player_elo (
-  user_id       uuid not null references public.profiles(id) on delete cascade,
+create table wildcard.player_elo (
+  user_id       uuid not null references wildcard.profiles(id) on delete cascade,
   module_id     text not null,
   rating        integer not null default 1000 check (rating >= 0),
   games_played  integer not null default 0 check (games_played >= 0),
@@ -15,34 +15,34 @@ create table public.player_elo (
 );
 
 create index player_elo_module_rating_idx
-  on public.player_elo (module_id, rating desc);
+  on wildcard.player_elo (module_id, rating desc);
 
 -- ============================================================
 -- Row Level Security
 -- ============================================================
-alter table public.player_elo enable row level security;
+alter table wildcard.player_elo enable row level security;
 
 -- Anyone can read ratings (leaderboards, profiles)
 create policy "player_elo are viewable by everyone"
-  on public.player_elo for select
+  on wildcard.player_elo for select
   using (true);
 
 -- Only the service role mutates ratings — never a direct client write. The ELO
 -- is derived server-side from the engine's outcome(); the browser cannot forge it.
 create policy "only service role can insert player_elo"
-  on public.player_elo for insert
+  on wildcard.player_elo for insert
   with check (auth.role() = 'service_role');
 
 create policy "only service role can update player_elo"
-  on public.player_elo for update
+  on wildcard.player_elo for update
   using (auth.role() = 'service_role');
 
 -- ============================================================
 -- Realtime
 -- ============================================================
-alter table public.player_elo replica identity full;
+alter table wildcard.player_elo replica identity full;
 
-alter publication supabase_realtime add table public.player_elo;
+alter publication supabase_realtime add table wildcard.player_elo;
 
 -- ============================================================
 -- Atomic post-game application (security definer — bypasses RLS)
@@ -53,17 +53,17 @@ alter publication supabase_realtime add table public.player_elo;
 -- *current* stored rating so concurrent games for the same player compose
 -- correctly. A missing row is created at the default 1000 base before the delta
 -- applies (1000 + delta), matching the base the caller assumed.
-create or replace function public.apply_elo_results(p_module_id text, p_results jsonb)
+create or replace function wildcard.apply_elo_results(p_module_id text, p_results jsonb)
 returns void
 language plpgsql
-security definer set search_path = public
+security definer set search_path = wildcard
 as $$
 declare
   r jsonb;
 begin
   for r in select value from jsonb_array_elements(p_results)
   loop
-    insert into public.player_elo (user_id, module_id, rating, games_played, wins)
+    insert into wildcard.player_elo (user_id, module_id, rating, games_played, wins)
     values (
       (r->>'user_id')::uuid,
       p_module_id,
@@ -72,9 +72,9 @@ begin
       case when (r->>'won')::boolean then 1 else 0 end
     )
     on conflict (user_id, module_id) do update
-    set rating       = greatest(0, public.player_elo.rating + (r->>'delta')::int),
-        games_played = public.player_elo.games_played + 1,
-        wins         = public.player_elo.wins
+    set rating       = greatest(0, wildcard.player_elo.rating + (r->>'delta')::int),
+        games_played = wildcard.player_elo.games_played + 1,
+        wins         = wildcard.player_elo.wins
                        + (case when (r->>'won')::boolean then 1 else 0 end),
         updated_at   = now();
   end loop;
