@@ -58,13 +58,14 @@ export function TileShell({ selected, onClick, previewHref, children }: Props) {
             <button
                 type="button"
                 onClick={onClick}
+                aria-pressed={selected}
                 className="w-full flex flex-col items-center gap-2 p-3 pb-8 cursor-pointer"
             >
                 {children}
                 {selected && (
                     <span
-                        role="img"
-                        aria-label={t("selected")}
+                        // aria-pressed already announces the state; the check is visual.
+                        aria-hidden="true"
                         title={t("selected")}
                         className="stamp absolute top-1.5 left-1.5"
                         style={{

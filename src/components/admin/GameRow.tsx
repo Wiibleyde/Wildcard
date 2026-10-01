@@ -19,7 +19,8 @@ function relativeTime(locale: string, iso: string, now: number): string {
 type Props = {
     game: OngoingGame;
     canEnd: boolean;
-    now: number;
+    /** Client clock; `null` until mounted (relative time is client-only). */
+    now: number | null;
     endingId: string | null;
     onEnd: (game: OngoingGame) => void;
 };
@@ -67,17 +68,21 @@ export function GameRow({ game: g, canEnd, now, endingId, onEnd }: Props) {
                         {g.botCount > 0 &&
                             ` · ${t("bots_count", { count: g.botCount })}`}
                     </span>
-                    {g.currentPlayerName && (
+                    {(g.currentPlayerName || g.currentIsBot) && (
                         <span>
                             {t("current_turn")}:{" "}
                             <span style={{ color: "var(--ink)" }}>
-                                {g.currentPlayerName}
+                                {g.currentIsBot
+                                    ? t("bot_turn")
+                                    : g.currentPlayerName}
                             </span>
                         </span>
                     )}
-                    <span style={{ color: "#5a5340" }}>
-                        {relativeTime(locale, g.startedAt, now)}
-                    </span>
+                    {now !== null && (
+                        <span style={{ color: "#5a5340" }}>
+                            {relativeTime(locale, g.startedAt, now)}
+                        </span>
+                    )}
                 </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">

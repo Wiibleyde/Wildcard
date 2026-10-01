@@ -5,24 +5,30 @@ import gsap from "gsap";
 import { useTranslations } from "next-intl";
 import { useRef } from "react";
 import { useGameOverXp } from "@/hooks/game/useGameOverXp";
-import { PARTICIPATION_XP, WIN_XP, xpProgress } from "@/lib/xp/xp";
+import { tweenCount, writeOwnedText } from "@/lib/gsap/textTween";
+import { xpProgress } from "@/lib/xp/xp";
 
 gsap.registerPlugin(useGSAP);
 
 /**
- * End-of-game XP reward. Shown only to a participant (the caller gates on the
- * viewer being in the rankings). The amount is derived locally from whether the
- * viewer won — the same constants the server awards — while the running total
- * is resolved authoritatively in {@link useGameOverXp}.
+ * End-of-game XP reward. Shown only to a participant who earned XP (the caller
+ * gates on `end.xpGained > 0`). `gained` comes from the server payload — the
+ * same rule `settleGame` applied (no XP for an unplayed or winnerless game) —
+ * while the running total is resolved authoritatively in {@link useGameOverXp}.
  *
  * Animation (GSAP): the panel rises in, the gained badge pops, the XP counter
  * tallies up from the pre-game total, and the bar fills to the new progress —
  * wrapping through 100% with a gold flash when the player levels up.
  */
-export function GameOverXp({ userId, won }: { userId: string; won: boolean }) {
+export function GameOverXp({
+    userId,
+    gained,
+}: {
+    userId: string;
+    gained: number;
+}) {
     "use no memo";
     const t = useTranslations("game");
-    const gained = PARTICIPATION_XP + (won ? WIN_XP : 0);
     const xp = useGameOverXp(userId, gained);
 
     const containerRef = useRef<HTMLDivElement>(null);
@@ -38,6 +44,8 @@ export function GameOverXp({ userId, won }: { userId: string; won: boolean }) {
             const beforePct = xpProgress(xp.before) * 100;
             const afterPct = xpProgress(xp.after) * 100;
             const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+            // A re-run (resolved total changed) restarts from the pre-game level.
+            writeOwnedText(levelRef.current, String(xp.levelBefore));
 
             tl.from(containerRef.current, {
                 y: 14,
@@ -52,16 +60,16 @@ export function GameOverXp({ userId, won }: { userId: string; won: boolean }) {
                 "-=0.1",
             );
 
-            // Count the total up from the pre-game value.
-            tl.fromTo(
+            // Count the total up from the pre-game value. A proxy is tweened
+            // and written into React's own Text node: animating `textContent`
+            // would replace that node, leaving React committing to a detached
+            // one (stale numbers on the next render).
+            tweenCount(
+                tl,
                 numRef.current,
-                { textContent: xp.before },
-                {
-                    textContent: xp.after,
-                    duration: 1,
-                    snap: { textContent: 1 },
-                    ease: "power1.out",
-                },
+                xp.before,
+                xp.after,
+                { duration: 1, ease: "power1.out" },
                 "<",
             );
 
@@ -74,9 +82,7 @@ export function GameOverXp({ userId, won }: { userId: string; won: boolean }) {
                     "<",
                 );
                 tl.add(() => {
-                    if (levelRef.current) {
-                        levelRef.current.textContent = String(xp.levelAfter);
-                    }
+                    writeOwnedText(levelRef.current, String(xp.levelAfter));
                 });
                 tl.set(barRef.current, { width: "0%" });
                 tl.to(barRef.current, {
@@ -100,7 +106,9 @@ export function GameOverXp({ userId, won }: { userId: string; won: boolean }) {
                 tl.fromTo(
                     levelRef.current,
                     { scale: 1.6, color: "#ffc23d" },
-                    { scale: 1, color: "#9b6cf2", duration: 0.6 },
+                    // clearProps: hand the colour back to the badge's CSS
+                    // (accent ink on purple) instead of pinning a hex.
+                    { scale: 1, duration: 0.6, clearProps: "color" },
                     "<",
                 );
             } else {

@@ -1,7 +1,6 @@
 "use client";
 
 import { Card } from "@/components/card/Card";
-import type { BoardTheme } from "@/lib/board/types";
 import { getCardTheme } from "@/lib/card/themes";
 import { FACE_DOWN_CARD } from "@/lib/card/utils";
 import type { TableSeat } from "@/lib/games/table/types";
@@ -10,7 +9,6 @@ const SEAT_HAND_MAX = 8;
 
 interface TableSeatsProps {
     seats: readonly TableSeat[];
-    boardTheme: BoardTheme;
     deckStyleOf: (playerId: string) => string | undefined;
 }
 

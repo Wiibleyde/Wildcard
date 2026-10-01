@@ -1,6 +1,6 @@
 "use client";
 
-import type { BoardTheme } from "@/lib/board/types";
+import { useTranslations } from "next-intl";
 
 export interface GameLogLine {
     readonly id: string;
@@ -12,12 +12,10 @@ interface GameLogProps {
     emptyText: string;
     /** Newest first. */
     lines: readonly GameLogLine[];
-    /** Kept for the caller contract; the rail panel now uses the fixed
-     * neobrutalism `.panel-d` chrome rather than the felt surface. */
-    boardTheme: BoardTheme;
 }
 
 export function GameLog({ title, emptyText, lines }: GameLogProps) {
+    const t = useTranslations("game");
     return (
         <aside
             className="panel-d flex h-44 flex-col overflow-hidden p-3 lg:h-auto lg:min-h-0 lg:w-60 lg:flex-3 lg:self-stretch xl:w-72 xl:p-4 2xl:w-80"
@@ -34,7 +32,7 @@ export function GameLog({ title, emptyText, lines }: GameLogProps) {
                         color: "var(--ink)",
                     }}
                 >
-                    LOG
+                    {t("log_stamp")}
                 </span>
             </div>
             <ol className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1 text-xs xl:text-sm">

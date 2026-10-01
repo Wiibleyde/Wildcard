@@ -1,8 +1,14 @@
 "use client";
 
-import type { CSSProperties, Ref } from "react";
+import { useTranslations } from "next-intl";
+import {
+    type CSSProperties,
+    type MouseEvent,
+    type Ref,
+    useCallback,
+} from "react";
 import { freeTheme } from "@/lib/card/themes/free";
-import type { CardDescriptor, CardTheme } from "@/lib/card/types";
+import type { CardDescriptor, CardTheme, Rank, Suit } from "@/lib/card/types";
 import { CardBack } from "./CardBack";
 import { FoolContent, JokerContent } from "./SpecialCards";
 import { SuitedContent } from "./SuitedCard";
@@ -44,6 +50,53 @@ function CardFaceContent({
     return <JokerContent variant={card.variant} theme={theme} />;
 }
 
+const FACE_RANK_KEY: Partial<
+    Record<Rank, "rank_A" | "rank_J" | "rank_C" | "rank_Q" | "rank_K">
+> = { A: "rank_A", J: "rank_J", C: "rank_C", Q: "rank_Q", K: "rank_K" };
+
+const SUIT_KEY: Record<
+    Suit,
+    "suit_spades" | "suit_hearts" | "suit_diamonds" | "suit_clubs"
+> = {
+    spades: "suit_spades",
+    hearts: "suit_hearts",
+    diamonds: "suit_diamonds",
+    clubs: "suit_clubs",
+};
+
+/**
+ * Localised accessible name for a card ("10 de pique", "Dame de cœur",
+ * "Atout 21", "Carte face cachée") — the visual pips/indices read as noise to
+ * a screen reader, and a face-down card would otherwise be an empty button.
+ */
+export function useCardLabel(): (
+    card: CardDescriptor,
+    faceDown?: boolean,
+) => string {
+    const t = useTranslations("card");
+    return useCallback(
+        (card: CardDescriptor, faceDown = false) => {
+            if (faceDown) return t("face_down");
+            switch (card.type) {
+                case "suited": {
+                    const faceKey = FACE_RANK_KEY[card.rank];
+                    return t("suited", {
+                        rank: faceKey ? t(faceKey) : card.rank,
+                        suit: t(SUIT_KEY[card.suit]),
+                    });
+                }
+                case "trump":
+                    return t("trump", { index: card.index });
+                case "fool":
+                    return t("fool");
+                default:
+                    return t("joker");
+            }
+        },
+        [t],
+    );
+}
+
 export interface CardProps {
     card: CardDescriptor;
     theme?: CardTheme;
@@ -51,7 +104,9 @@ export interface CardProps {
     selected?: boolean;
     /** Strip CSS transitions/transforms whenever GSAP (or D&D) drives position. */
     disableTransitions?: boolean;
-    onClick?: () => void;
+    onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
+    /** Toggle state for a selectable card (`aria-pressed`). */
+    pressed?: boolean;
     className?: string;
     /** Required for GSAP targets. */
     ref?: Ref<HTMLElement>;
@@ -64,9 +119,12 @@ export function Card({
     selected = false,
     disableTransitions = false,
     onClick,
+    pressed,
     className = "",
     ref,
 }: CardProps) {
+    const labelOf = useCardLabel();
+    const label = labelOf(card, faceDown);
     const base: CSSProperties = {
         aspectRatio: "5 / 7",
         containerType: "inline-size",
@@ -114,6 +172,8 @@ export function Card({
                 className={cls}
                 style={style}
                 data-card-effect={faceDown ? undefined : cardEffectsAttr(theme)}
+                aria-label={label}
+                aria-pressed={pressed}
                 onClick={onClick}
             >
                 {content}
@@ -127,6 +187,8 @@ export function Card({
             className={cls}
             style={style}
             data-card-effect={faceDown ? undefined : cardEffectsAttr(theme)}
+            role="img"
+            aria-label={label}
         >
             {content}
         </div>

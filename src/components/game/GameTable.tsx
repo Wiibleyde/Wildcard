@@ -1,8 +1,16 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type ReactNode, useCallback, useMemo } from "react";
-import { Card } from "@/components/card/Card";
+import {
+    type ReactNode,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
+import { Card, useCardLabel } from "@/components/card/Card";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useTableCardAnimations } from "@/hooks/game/useTableCardAnimations";
 import { CLONE_OFFSET, useTableDrag } from "@/hooks/game/useTableDrag";
 import { buildSurfaceStyle } from "@/lib/board/styles";
@@ -12,6 +20,7 @@ import type { CardTheme } from "@/lib/card/types";
 import type { GameAction } from "@/lib/engine/types";
 import type {
     AnyGameTableConfig,
+    TableCardItem,
     TableContext,
     TableData,
     TableText,
@@ -24,6 +33,9 @@ import { GameLog, type GameLogLine } from "./GameLog";
 import { TableControls } from "./TableControls";
 import { TableSeats } from "./TableSeats";
 import { TableZone, type ZoneContext } from "./TableZone";
+
+/** Max pointer travel (px) between down and up still counted as a tap. */
+const TAP_SLOP = 6;
 
 interface GameTableProps {
     table: AnyGameTableConfig;
@@ -54,9 +66,12 @@ export function GameTable({
     chat,
 }: GameTableProps) {
     const t = useTranslations("game");
+    const labelOf = useCardLabel();
+    // Game tables build their keys at runtime (`TableText` takes a string);
+    // narrow to the namespace's key union at this single boundary.
+    type GameKey = Parameters<typeof t>[0];
     const text: TableText = useCallback(
-        // biome-ignore lint/suspicious/noExplicitAny: dynamic i18n key lookup
-        (key, values) => t(key as any, values as any),
+        (key, values) => t(key as GameKey, values),
         [t],
     );
 
@@ -88,19 +103,25 @@ export function GameTable({
     const logLines: GameLogLine[] | null = useMemo(
         () =>
             table.logLine
-                ? [...payload.log].reverse().flatMap((entry) =>
-                      entry.events.flatMap((event, eventIndex) => {
-                          const line = table.logLine?.(event, ctx);
-                          return line
-                              ? [
-                                    {
-                                        id: `${entry.seq}.${eventIndex}`,
-                                        text: line,
-                                    },
-                                ]
-                              : [];
-                      }),
-                  )
+                ? // Newest first — across entries AND within one entry, so a
+                  // step's last event ("game over") sits on top of its group.
+                  [...payload.log]
+                      .reverse()
+                      .flatMap((entry) =>
+                          entry.events
+                              .flatMap((event, eventIndex) => {
+                                  const line = table.logLine?.(event, ctx);
+                                  return line
+                                      ? [
+                                            {
+                                                id: `${entry.seq}.${eventIndex}`,
+                                                text: line,
+                                            },
+                                        ]
+                                      : [];
+                              })
+                              .reverse(),
+                      )
                 : null,
         [table, payload.log, ctx],
     );
@@ -136,6 +157,72 @@ export function GameTable({
         boundsRef: rootRef,
     });
 
+    // Click-to-move: pick a draggable card up (tap, Enter/Space), then press a
+    // highlighted destination. The same legal `dropTargets` as a drag, so it
+    // is a pointer-free path to every move (keyboard, screen reader, touch).
+    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const selection = useMemo(() => {
+        if (selectedId === null || pending) return null;
+        for (const zone of data.zones) {
+            const item = zone.cards.find((c) => c.id === selectedId);
+            if (item?.dropTargets?.length) {
+                return { id: item.id, card: item, targets: item.dropTargets };
+            }
+        }
+        return null; // the card moved / is no longer movable
+    }, [selectedId, pending, data]);
+
+    const toggleSelect = useCallback((item: TableCardItem) => {
+        setSelectedId((prev) => (prev === item.id ? null : item.id));
+    }, []);
+    const moveSelected = useCallback(
+        (action: GameAction) => {
+            setSelectedId(null);
+            onAction(action);
+        },
+        [onAction],
+    );
+
+    const hasSelection = selection !== null;
+    useEffect(() => {
+        if (!hasSelection) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") setSelectedId(null);
+        };
+        document.addEventListener("keydown", onKey);
+        return () => document.removeEventListener("keydown", onKey);
+    }, [hasSelection]);
+
+    // A drag that never moved is a tap → toggle the pick-up. Detected here
+    // (not via the card's click) because the source card hides the moment the
+    // drag starts, so the browser's click lands on whatever is underneath.
+    const tapRef = useRef<{ item: TableCardItem; x: number; y: number } | null>(
+        null,
+    );
+    const beginDragOrTap = useCallback(
+        (item: TableCardItem, x: number, y: number, rect: DOMRect) => {
+            tapRef.current = { item, x, y };
+            beginDrag(item, x, y, rect);
+        },
+        [beginDrag],
+    );
+    useEffect(() => {
+        const end = (e: PointerEvent) => {
+            const tap = tapRef.current;
+            tapRef.current = null;
+            if (!tap || e.type !== "pointerup") return;
+            if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) <= TAP_SLOP) {
+                toggleSelect(tap.item);
+            }
+        };
+        window.addEventListener("pointerup", end);
+        window.addEventListener("pointercancel", end);
+        return () => {
+            window.removeEventListener("pointerup", end);
+            window.removeEventListener("pointercancel", end);
+        };
+    }, [toggleSelect]);
+
     const zoneCtx: ZoneContext = useMemo(
         () => ({
             boardTheme,
@@ -145,7 +232,10 @@ export function GameTable({
             onAction,
             onIllegal,
             dragging,
-            beginDrag,
+            beginDrag: beginDragOrTap,
+            selection,
+            toggleSelect,
+            moveSelected,
         }),
         [
             boardTheme,
@@ -155,7 +245,10 @@ export function GameTable({
             onAction,
             onIllegal,
             dragging,
-            beginDrag,
+            beginDragOrTap,
+            selection,
+            toggleSelect,
+            moveSelected,
         ],
     );
 
@@ -191,6 +284,26 @@ export function GameTable({
 
     const hasHand = bottom.length > 0;
 
+    // Irreversible controls (`confirm`, e.g. solitaire resign) go through a
+    // confirmation step, like leaving a game in progress.
+    const confirm = useConfirm();
+    const onControl = useCallback(
+        async (action: GameAction) => {
+            const control = controls.find((c) => c.action === action);
+            if (control?.confirm) {
+                const ok = await confirm({
+                    title: control.label,
+                    message: t("danger_confirm"),
+                    confirmLabel: control.label ?? t("play"),
+                    variant: "red",
+                });
+                if (!ok) return;
+            }
+            onAction(action);
+        },
+        [controls, confirm, onAction, t],
+    );
+
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 lg:max-w-none">
             <TurnBanner
@@ -201,7 +314,7 @@ export function GameTable({
             <div className="flex flex-col gap-3 lg:flex-row">
                 <div
                     ref={rootRef}
-                    className="relative flex min-h-[60vh] flex-1 flex-col gap-3 overflow-hidden p-3 sm:gap-4 sm:p-4 lg:h-[78vh] lg:min-h-0 xl:p-6"
+                    className="relative flex min-h-[60vh] flex-1 flex-col gap-3 overflow-hidden p-3 sm:gap-4 sm:p-4 lg:h-[70vh] lg:min-h-0 xl:p-6"
                     style={{
                         ...buildSurfaceStyle(boardTheme),
                         borderRadius: "clamp(1.125rem, 3vw, 2rem)",
@@ -210,6 +323,18 @@ export function GameTable({
                             "inset 0 0 0 3px rgba(0,0,0,0.35), inset 0 0 90px rgba(0,0,0,0.4), 0 10px 0 var(--ink)",
                     }}
                 >
+                    {/* Announces the click-to-move pick-up for screen readers. */}
+                    <output aria-live="polite" className="sr-only">
+                        {selection
+                            ? t("card_selected", {
+                                  card: labelOf(
+                                      selection.card.card,
+                                      selection.card.faceDown,
+                                  ),
+                              })
+                            : ""}
+                    </output>
+
                     {/* felt monogram watermark */}
                     <span
                         aria-hidden
@@ -227,7 +352,6 @@ export function GameTable({
                         <div className="relative z-10 shrink-0">
                             <TableSeats
                                 seats={data.seats}
-                                boardTheme={boardTheme}
                                 deckStyleOf={(playerId) =>
                                     styleOf.get(playerId)
                                 }
@@ -271,7 +395,7 @@ export function GameTable({
                                 controls={controls}
                                 deckTheme={deckTheme}
                                 pending={pending}
-                                onAction={onAction}
+                                onAction={onControl}
                             />
                         </div>
                     )}
@@ -279,6 +403,7 @@ export function GameTable({
                     {payload.isOver && (
                         <GameOverOverlay
                             outcome={payload.outcome}
+                            end={payload.end}
                             players={payload.players}
                             currentUserId={currentUserId}
                             titleOf={
@@ -293,13 +418,12 @@ export function GameTable({
                 </div>
 
                 {(logLines || chat) && (
-                    <div className="flex flex-col gap-3 lg:h-[78vh] lg:self-start">
+                    <div className="flex flex-col gap-3 lg:h-[70vh] lg:self-start">
                         {logLines && (
                             <GameLog
                                 title={t("log_title")}
                                 emptyText={t("log_empty")}
                                 lines={logLines}
-                                boardTheme={boardTheme}
                             />
                         )}
                         {chat}

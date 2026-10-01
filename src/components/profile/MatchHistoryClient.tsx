@@ -1,6 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
+import { useSyncExternalStore } from "react";
 import { GameButton } from "@/components/ui/GameButton";
 import { useFilteredHistory } from "@/hooks/profile/useFilteredHistory";
 import { useGamePinning } from "@/hooks/profile/useGamePinning";
@@ -18,6 +19,17 @@ const fieldStyle = {
     color: "var(--ink)",
 } as const;
 
+const noopSubscribe = () => () => {};
+
+/** `false` on the server and during hydration, `true` once mounted. */
+function useHydrated(): boolean {
+    return useSyncExternalStore(
+        noopSubscribe,
+        () => true,
+        () => false,
+    );
+}
+
 export function MatchHistoryClient({ entries }: Props) {
     const t = useTranslations("history");
     const locale = useLocale();
@@ -25,10 +37,19 @@ export function MatchHistoryClient({ entries }: Props) {
     const filter = useFilteredHistory(entries);
     const pinning = useGamePinning(entries);
 
+    // SSR + hydration render in UTC (deterministic on both sides, no
+    // mismatch); after mount, switch to the viewer's zone so the dates agree
+    // with the local-day from/to filters.
+    const hydrated = useHydrated();
     function formatDate(iso: string) {
         return new Date(iso).toLocaleDateString(
             locale === "fr" ? "fr-FR" : "en-US",
-            { day: "numeric", month: "short", year: "numeric" },
+            {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+                timeZone: hydrated ? undefined : "UTC",
+            },
         );
     }
 

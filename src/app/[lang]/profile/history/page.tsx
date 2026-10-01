@@ -5,7 +5,6 @@ import { Link } from "@/i18n/navigation";
 import { requireAuthUser } from "@/lib/auth/session";
 import { getMatchHistory } from "@/lib/models/history";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 
 export default async function Page({
     params,
@@ -17,7 +16,6 @@ export default async function Page({
     const t = await getTranslations("history");
 
     const user = await requireAuthUser(lang, `/${lang}/profile/history`);
-    const _supabase = await createClient();
 
     // Service-role read: participation lives in RLS-denied engine state; only the public-safe projection reaches the page.
     const admin = createAdminClient();

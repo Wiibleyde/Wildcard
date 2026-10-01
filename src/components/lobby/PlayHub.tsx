@@ -14,6 +14,26 @@ import {
 import { GameCard } from "./GameCard";
 import { MatchmakingOverlay } from "./MatchmakingOverlay";
 
+/** Matchmaking error code (API `error` field) → `lobby` dictionary key. */
+function matchmakingErrorKey(
+    code: string,
+):
+    | "error_rate_limited"
+    | "error_maintenance"
+    | "error_payload_too_large"
+    | "error_generic" {
+    switch (code) {
+        case "rate_limited":
+            return "error_rate_limited";
+        case "maintenance":
+            return "error_maintenance";
+        case "payload_too_large":
+            return "error_payload_too_large";
+        default:
+            return "error_generic";
+    }
+}
+
 interface Props {
     readonly userId: string;
     readonly games: PlayGame[];
@@ -37,7 +57,7 @@ export function PlayHub({ userId, games }: Props) {
         state.phase === "searching" || state.phase === "matched";
     const errorText =
         state.phase === "error"
-            ? t("error_generic")
+            ? t(matchmakingErrorKey(state.code))
             : roomError
               ? roomError
               : null;
@@ -81,6 +101,8 @@ export function PlayHub({ userId, games }: Props) {
                         value={code}
                         onChange={(e) => setCode(e.target.value.toUpperCase())}
                         placeholder={t("code_placeholder")}
+                        aria-label={t("code_label")}
+                        autoComplete="off"
                         maxLength={5}
                         className="min-w-0 flex-1 rounded-xl px-4 py-3 text-center outline-none lg:w-44"
                         style={{
@@ -142,7 +164,7 @@ export function PlayHub({ userId, games }: Props) {
                             style={{ background: "var(--bg-line)" }}
                         />
                     </div>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                         {section.games.map((g) => {
                             const { categoryLabel, description, meta } =
                                 gameLabels(g, tg);

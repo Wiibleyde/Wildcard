@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { GameButton } from "@/components/ui/GameButton";
 import type { GameOutcome } from "@/lib/engine/types";
 import type { GamePlayer } from "@/lib/models/game";
+import type { GameEndInfo } from "@/lib/models/gameEnd";
 import { GameOverXp } from "./GameOverXp";
 
 export function nameOf(
@@ -45,13 +46,44 @@ export function TurnBanner({
     );
 }
 
+/**
+ * Headline of the game-over overlay. `end` (persisted end reason) decides
+ * first — an out-of-band end never reaches a terminal state, so the outcome
+ * alone cannot tell a forfeit from an admin abort; `end === null` (a replay
+ * frame) falls back to the outcome.
+ */
+function gameOverTitle(
+    t: ReturnType<typeof useTranslations<"game">>,
+    outcome: GameOutcome | null,
+    end: GameEndInfo | null,
+    players: readonly GamePlayer[],
+    currentUserId: string,
+    won: boolean,
+): string {
+    if (end?.reason === "forfeit") {
+        if (end.forfeitedBy === currentUserId) return t("you_forfeited");
+        const name = nameOf(players, end.forfeitedBy);
+        return won ? t("forfeit_win", { name }) : t("forfeit_by", { name });
+    }
+    if (end?.reason === "abandoned") return t("game_abandoned");
+    // No outcome ⇒ force-ended by an admin (or a legacy out-of-band end).
+    if (!outcome || end?.reason === "admin") return t("game_aborted");
+    // A finished game without a winner (a resigned solo game).
+    if (outcome.winners.length === 0) return t("game_no_winner");
+    if (won) return t("you_win");
+    return t("winner", { name: nameOf(players, outcome.winners[0] ?? null) });
+}
+
 export function GameOverOverlay({
     outcome,
+    end,
     players,
     currentUserId,
     titleOf,
 }: {
     outcome: GameOutcome | null;
+    /** How the game ended; `null` on a replay frame (no settlement shown). */
+    end: GameEndInfo | null;
     players: readonly GamePlayer[];
     currentUserId: string;
     titleOf?: (rank: number, total: number) => string | null;
@@ -78,14 +110,7 @@ export function GameOverOverlay({
                 className="font-display text-4xl xl:text-5xl"
                 style={{ color: won ? "var(--green)" : "var(--gold)" }}
             >
-                {/* No outcome ⇒ the game was force-ended by an admin (no winner). */}
-                {!outcome
-                    ? t("game_aborted")
-                    : won
-                      ? t("you_win")
-                      : t("winner", {
-                            name: nameOf(players, outcome.winners[0] ?? null),
-                        })}
+                {gameOverTitle(t, outcome, end, players, currentUserId, won)}
             </h2>
 
             {outcome && outcome.rankings.length > 0 && (
@@ -147,11 +172,12 @@ export function GameOverOverlay({
                 </ol>
             )}
 
-            {/* XP reward — only for a seated participant (in the rankings), not
-                spectators or admin-aborted games. */}
-            {outcome?.rankings.some((r) => r.playerId === currentUserId) && (
-                <GameOverXp userId={currentUserId} won={won} />
-            )}
+            {/* XP reward — the amount the server settled for this viewer
+                (none for spectators, the forfeiter, admin/reaper closes, or an
+                unplayed / winnerless game). */}
+            {end?.xpGained ? (
+                <GameOverXp userId={currentUserId} gained={end.xpGained} />
+            ) : null}
 
             <GameButton href="/lobby" className="mt-2">
                 {t("back_to_lobby")}

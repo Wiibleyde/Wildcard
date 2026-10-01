@@ -1,20 +1,11 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { signOut } from "@/lib/supabase/auth";
+import { useSignOut } from "@/hooks/auth/useSignOut";
 
 export function SignOutButton() {
     const t = useTranslations("profile");
-    const params = useParams();
-    const lang = (params?.lang as string) ?? "fr";
-    const router = useRouter();
-
-    async function handleSignOut() {
-        await signOut();
-        router.push(`/${lang}`);
-        router.refresh();
-    }
+    const handleSignOut = useSignOut();
 
     return (
         <button

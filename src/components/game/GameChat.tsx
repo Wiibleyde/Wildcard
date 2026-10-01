@@ -1,11 +1,10 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type SyntheticEvent, useState } from "react";
+import { type SyntheticEvent, useId, useState } from "react";
 import { GameButton } from "@/components/ui/GameButton";
 import { useAutoScroll } from "@/hooks/game/useAutoScroll";
 import { useTransientNotice } from "@/hooks/game/useTransientNotice";
-import type { BoardTheme } from "@/lib/board/types";
 import type { GamePlayer } from "@/lib/models/game";
 import { MAX_CHAT_LENGTH, useGameChat } from "@/lib/realtime/useGameChat";
 import { nameOf } from "./GameChrome";
@@ -17,9 +16,6 @@ interface GameChatProps {
      * spectators (absent from `players`) still show a name, not "?". */
     currentUserName: string;
     players: readonly GamePlayer[];
-    /** Kept for the caller contract; the rail panel now uses the fixed
-     * neobrutalism `.panel-d` chrome rather than the felt surface. */
-    boardTheme: BoardTheme;
     /** Game finished — stops persisting and wipes the reload cache. */
     isOver: boolean;
 }
@@ -44,6 +40,7 @@ export function GameChat({
         "rate_limited" | "disconnected"
     >();
     const listRef = useAutoScroll<HTMLOListElement>(messages);
+    const noticeId = useId();
 
     const onSubmit = (e: SyntheticEvent) => {
         e.preventDefault();
@@ -75,7 +72,7 @@ export function GameChat({
                         color: "var(--accent-ink)",
                     }}
                 >
-                    CHAT
+                    {t("badge")}
                 </span>
             </div>
 
@@ -123,8 +120,10 @@ export function GameChat({
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     maxLength={MAX_CHAT_LENGTH}
-                    placeholder={notice ? t(notice) : t("placeholder")}
+                    placeholder={t("placeholder")}
                     aria-label={t("placeholder")}
+                    aria-invalid={notice !== null}
+                    aria-describedby={noticeId}
                     className="min-w-0 flex-1 rounded-wc-icon border-nb bg-wc-cream px-3 py-2 text-xs text-wc-ink outline-none placeholder:text-wc-ink/50 xl:text-sm"
                     style={{
                         borderColor: notice ? "var(--red)" : "var(--ink)",
@@ -140,6 +139,17 @@ export function GameChat({
                     {t("send")}
                 </GameButton>
             </form>
+            {/* Always mounted (live region) with a reserved line, so the
+                notice is announced and visible even while the draft is kept,
+                without the panel jumping. */}
+            <output
+                id={noticeId}
+                aria-live="polite"
+                className="mt-1 block h-4 truncate text-wc-label font-bold xl:text-xs"
+                style={{ color: "var(--red)" }}
+            >
+                {notice ? t(notice) : ""}
+            </output>
         </section>
     );
 }

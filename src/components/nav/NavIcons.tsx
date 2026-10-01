@@ -24,14 +24,6 @@ export function TrophyIcon() {
     );
 }
 
-export function ShopIcon() {
-    return (
-        <IconSvg>
-            <path d="M4 7h16l-1 13H5L4 7zm3 0a5 5 0 0 1 10 0" />
-        </IconSvg>
-    );
-}
-
 export function ShieldIcon() {
     return (
         <IconSvg>

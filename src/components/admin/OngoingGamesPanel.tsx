@@ -29,6 +29,7 @@ export function OngoingGamesPanel({ games, canEnd }: Props) {
         refreshMs: REFRESH_MS,
     });
     const [endingId, setEndingId] = useState<string | null>(null);
+    const [endError, setEndError] = useState<string | null>(null);
 
     // Server re-checks the admin role and bumps the game version, so every open
     // client refetches and lands on the game-over screen.
@@ -42,11 +43,18 @@ export function OngoingGamesPanel({ games, canEnd }: Props) {
         if (!ok) return;
 
         setEndingId(game.gameId);
+        setEndError(null);
         try {
-            await fetch(`/api/admin/games/${game.gameId}/end`, {
+            const res = await fetch(`/api/admin/games/${game.gameId}/end`, {
                 method: "POST",
             });
+            if (!res.ok) {
+                setEndError(t("end_error", { game: game.moduleName }));
+                return;
+            }
             router.refresh();
+        } catch {
+            setEndError(t("end_error", { game: game.moduleName }));
         } finally {
             setEndingId(null);
         }
@@ -78,6 +86,16 @@ export function OngoingGamesPanel({ games, canEnd }: Props) {
                     {t("refresh")}
                 </GameButton>
             </div>
+
+            {endError && (
+                <p
+                    role="alert"
+                    className="text-sm font-bold"
+                    style={{ color: "var(--red)" }}
+                >
+                    {endError}
+                </p>
+            )}
 
             {games.length === 0 ? (
                 <p

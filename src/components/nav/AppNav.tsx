@@ -25,7 +25,6 @@ export async function AppNav({ user }: { user: AuthUser }) {
     ]);
     const canModerate = roleAtLeast(role, "moderator");
 
-    const t = await getTranslations("navigation");
     const tProfile = await getTranslations("profile");
 
     const xpRow = xpRes.data as Pick<PlayerXP, "xp"> | null;
@@ -49,7 +48,6 @@ export async function AppNav({ user }: { user: AuthUser }) {
                 avatarUrl={avatarUrl}
                 level={level}
                 initial={initial}
-                coins={t("coins")}
                 levelShort={tProfile("level_short")}
                 canModerate={canModerate}
             />

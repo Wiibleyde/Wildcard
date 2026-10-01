@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ReconnectingBanner } from "@/components/realtime/ReconnectingBanner";
 import { useRoomRefresh } from "@/hooks/lobby/useRoomRefresh";
 import { useRouter } from "@/i18n/navigation";
@@ -63,6 +63,7 @@ export function RoomClient({
         conn,
         refresh,
         closedRef,
+        mutatingRef,
     } = useRoomRefresh({
         roomId,
         code,
@@ -87,94 +88,182 @@ export function RoomClient({
     const isSpectator = role === "spectator";
     const roomFull = total >= maxPlayers;
 
-    async function setBots(next: number) {
-        const clamped = Math.max(0, Math.min(next, maxPlayers - seats.length));
-        setBotCount(clamped); // optimistic; Realtime reconciles
-        await fetch(`/api/rooms/${code}/bots`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ count: clamped }),
-        });
+    // Host setting mutations in flight — gates the +/- and toggles so a second
+    // click can't race the first, and holds off poll overwrites meanwhile.
+    const [settingsBusy, setSettingsBusy] = useState(false);
+    const copiedTimer = useRef<number | null>(null);
+    useEffect(
+        () => () => {
+            if (copiedTimer.current !== null) clearTimeout(copiedTimer.current);
+        },
+        [],
+    );
+
+    /** Optimistic host mutation: apply, POST, roll back on refusal, reconcile. */
+    async function mutateSetting(
+        apply: () => () => void,
+        request: () => Promise<Response>,
+    ) {
+        if (settingsBusy) return;
+        setSettingsBusy(true);
+        setError(null);
+        mutatingRef.current += 1;
+        const rollback = apply();
+        try {
+            const res = await request();
+            if (!res.ok) {
+                rollback();
+                setError(apiErrorLabel(await errorCodeOf(res)));
+            }
+        } catch {
+            rollback();
+            setError(t("error_generic"));
+        } finally {
+            mutatingRef.current -= 1;
+            setSettingsBusy(false);
+        }
+        await refresh().catch(() => {});
     }
 
-    async function setRule(key: string, value: boolean) {
+    function setBots(next: number) {
+        const clamped = Math.max(0, Math.min(next, maxPlayers - seats.length));
+        if (clamped === botCount) return;
+        const previous = botCount;
+        return mutateSetting(
+            () => {
+                setBotCount(clamped);
+                return () => setBotCount(previous);
+            },
+            () =>
+                fetch(`/api/rooms/${code}/bots`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ count: clamped }),
+                }),
+        );
+    }
+
+    function setRule(key: string, value: boolean) {
         // Resolve locally so a dependency flip shows instantly; server re-resolves.
+        const previous = rules;
         const next = resolveRuleToggles(ruleToggles, {
             ...rules,
             [key]: value,
         });
-        setRules(next); // optimistic; Realtime reconciles
-        await fetch(`/api/rooms/${code}/rules`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ rules: next }),
-        });
+        return mutateSetting(
+            () => {
+                setRules(next);
+                return () => setRules(previous);
+            },
+            () =>
+                fetch(`/api/rooms/${code}/rules`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ rules: next }),
+                }),
+        );
+    }
+
+    /** Platform-wide refusals any mutating room route can answer with. */
+    function apiErrorLabel(errorCode: unknown): string {
+        if (errorCode === "rate_limited") return t("error_rate_limited");
+        if (errorCode === "maintenance") return t("error_maintenance");
+        if (errorCode === "room_full") return t("error_room_full");
+        return t("error_generic");
     }
 
     function startErrorLabel(errorCode: unknown): string {
         if (errorCode === "not_host") return t("error_not_host");
         if (errorCode === "not_enough_players") return t("error_not_enough");
         if (errorCode === "already_started") return t("error_already_started");
-        return t("error_generic");
+        return apiErrorLabel(errorCode);
+    }
+
+    async function errorCodeOf(res: Response): Promise<unknown> {
+        const data = (await res.json().catch(() => ({}))) as {
+            error?: unknown;
+        };
+        return data.error;
     }
 
     async function start() {
         setBusy(true);
         setError(null);
-        const res = await fetch(`/api/rooms/${code}/start`, { method: "POST" });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
+        try {
+            const res = await fetch(`/api/rooms/${code}/start`, {
+                method: "POST",
+            });
+            const data = (await res.json().catch(() => ({}))) as {
+                error?: string;
+                gameId?: string;
+            };
+            if (!res.ok || !data.gameId) {
+                setError(startErrorLabel(data.error));
+                setBusy(false);
+                return;
+            }
+            // Stay busy while navigating so Start can't be pressed twice.
+            router.push(`/game/${data.gameId}`);
+        } catch {
+            setError(t("error_generic"));
             setBusy(false);
-            setError(startErrorLabel(data.error));
-            return;
         }
-        router.push(`/game/${data.gameId}`);
     }
 
     async function leave() {
         setBusy(true);
         setError(null);
-        const res = await fetch(`/api/rooms/${code}/leave`, { method: "POST" });
-        if (!res.ok) {
-            setBusy(false);
+        try {
+            const res = await fetch(`/api/rooms/${code}/leave`, {
+                method: "POST",
+            });
+            if (!res.ok) {
+                setError(apiErrorLabel(await errorCodeOf(res)));
+                setBusy(false);
+                return;
+            }
+            closedRef.current = true;
+            router.push("/lobby");
+        } catch {
             setError(t("error_generic"));
-            return;
+            setBusy(false);
         }
-        closedRef.current = true;
-        router.push("/lobby");
     }
 
     async function toggleRole() {
         const next: Role = role === "spectator" ? "player" : "spectator";
         setBusy(true);
         setError(null);
-        const res = await fetch(`/api/rooms/${code}/role`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ role: next }),
-        });
-        if (!res.ok) {
-            const data = await res.json().catch(() => ({}));
-            setError(
-                data.error === "room_full"
-                    ? t("error_room_full")
-                    : t("error_generic"),
-            );
+        try {
+            const res = await fetch(`/api/rooms/${code}/role`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ role: next }),
+            });
+            if (!res.ok) {
+                setError(apiErrorLabel(await errorCodeOf(res)));
+                return;
+            }
+            setRole(next); // optimistic button state
+            // Reconcile now: postgres_changes can be silent on self-hosted
+            // stacks, leaving you in the wrong column until the next poll.
+            await refresh();
+        } catch {
+            setError(t("error_generic"));
+        } finally {
             setBusy(false);
-            return;
         }
-        setRole(next); // optimistic button state
-        // Reconcile now: postgres_changes can be silent on self-hosted stacks,
-        // leaving you in the wrong column until the next safety poll.
-        await refresh();
-        setBusy(false);
     }
 
     async function copyCode() {
         try {
             await navigator.clipboard.writeText(code);
             setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
+            if (copiedTimer.current !== null) clearTimeout(copiedTimer.current);
+            copiedTimer.current = window.setTimeout(() => {
+                setCopied(false);
+                copiedTimer.current = null;
+            }, 1500);
         } catch {
             // Clipboard unavailable (insecure context / denied) — code stays selectable by hand.
         }
@@ -265,7 +354,7 @@ export function RoomClient({
                                         : false
                                 }
                                 isHost={isHost}
-                                busy={busy}
+                                busy={busy || settingsBusy}
                                 onToggle={(value) => setRule(toggle.key, value)}
                             />
                         ))}

@@ -1,7 +1,8 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
-import { Card } from "@/components/card/Card";
+import { Card, useCardLabel } from "@/components/card/Card";
 import { BoardPill } from "@/components/ui/BoardPill";
 import type { DragState } from "@/hooks/game/useTableDrag";
 import { buildZoneStyle } from "@/lib/board/styles";
@@ -37,6 +38,18 @@ export interface ZoneContext {
         clientY: number,
         rect: DOMRect,
     ) => void;
+    /**
+     * Click-to-move path (keyboard, screen reader, tap): the picked-up card
+     * and its legal destinations, or `null`. Mirrors a drag without a pointer.
+     */
+    selection: {
+        readonly id: string;
+        readonly targets: NonNullable<TableCardItem["dropTargets"]>;
+    } | null;
+    /** Pick up / put back a draggable card (keyboard activation). */
+    toggleSelect: (item: TableCardItem) => void;
+    /** Drop the picked-up card on a destination. */
+    moveSelected: (action: GameAction) => void;
 }
 
 export interface TableZoneProps {
@@ -46,19 +59,40 @@ export interface TableZoneProps {
 }
 
 export function TableZone({ instance, template, ctx }: TableZoneProps) {
+    const t = useTranslations("game");
+    const labelOf = useCardLabel();
     // `data-zone-key` lets the drag controller hit-test the pointer against this element.
     const isDropTarget =
-        ctx.dragging?.targets.some((t) => t.zoneKey === instance.key) ?? false;
+        ctx.dragging?.targets.some((d) => d.zoneKey === instance.key) ?? false;
+    const moveTarget =
+        ctx.selection?.targets.find((d) => d.zoneKey === instance.key) ?? null;
 
     const zoneAction = instance.action;
     const onZoneClick =
         zoneAction && !ctx.pending ? () => ctx.onAction(zoneAction) : undefined;
+    // A pile with no clickable card of its own (the stock) gets a real button
+    // layered over it — keyboard-reachable and named. If its cards are
+    // interactive themselves, keep the pointer-only wrapper click so the
+    // overlay doesn't swallow them.
+    const cardsInteractive = instance.cards.some(
+        (c) =>
+            c.action !== undefined ||
+            c.illegal === true ||
+            (c.dropTargets?.length ?? 0) > 0,
+    );
+    const zoneButton = onZoneClick !== undefined && !cardsInteractive;
+
+    const top = instance.cards.at(-1);
+    const zoneLabel = top
+        ? labelOf(top.card, top.faceDown)
+        : (instance.caption ?? instance.emptyHint ?? instance.key);
+    const highlighted = isDropTarget || moveTarget !== null;
 
     return (
-        // biome-ignore lint/a11y/noStaticElementInteractions: pile click affordance — a zone with no single card to click (the stock pile draws/recycles); a mobile path is tracked separately.
-        // biome-ignore lint/a11y/useKeyWithClickEvents: pile click affordance — keyboard play is served by the per-card actions; a dedicated a11y path is tracked separately.
+        // biome-ignore lint/a11y/noStaticElementInteractions: pointer shortcut only when the pile's own cards are interactive — otherwise the overlay <button> below carries the action for keyboard/AT.
+        // biome-ignore lint/a11y/useKeyWithClickEvents: see above — the keyboard path is the per-card buttons or the zone overlay button.
         <div
-            className={`flex flex-col items-center gap-1.5 ${
+            className={`relative flex flex-col items-center gap-1.5 ${
                 template.fill
                     ? "min-w-0 max-w-32 flex-1 lg:h-full lg:min-h-0"
                     : ""
@@ -70,7 +104,7 @@ export function TableZone({ instance, template, ctx }: TableZoneProps) {
             data-zone-key={instance.key}
             style={{
                 cursor: onZoneClick ? "pointer" : undefined,
-                ...(isDropTarget
+                ...(highlighted
                     ? {
                           outline: `2px dashed ${ctx.boardTheme.accentColor}`,
                           outlineOffset: 4,
@@ -78,7 +112,7 @@ export function TableZone({ instance, template, ctx }: TableZoneProps) {
                       }
                     : null),
             }}
-            onClick={onZoneClick}
+            onClick={zoneButton || moveTarget ? undefined : onZoneClick}
         >
             {instance.badge && (
                 <BoardPill theme={ctx.boardTheme} tone="accent">
@@ -106,6 +140,30 @@ export function TableZone({ instance, template, ctx }: TableZoneProps) {
                 >
                     {instance.caption}
                 </span>
+            )}
+            {moveTarget ? (
+                <button
+                    type="button"
+                    className="absolute inset-0 z-20 cursor-pointer rounded-xl focus-visible:outline-3 focus-visible:outline-offset-2"
+                    style={{ outlineColor: ctx.boardTheme.accentColor }}
+                    aria-label={t("move_here", { target: zoneLabel })}
+                    onClick={() => ctx.moveSelected(moveTarget.action)}
+                />
+            ) : (
+                zoneButton && (
+                    <button
+                        type="button"
+                        className="absolute inset-0 z-20 cursor-pointer rounded-xl focus-visible:outline-3 focus-visible:outline-offset-2"
+                        style={{ outlineColor: ctx.boardTheme.accentColor }}
+                        aria-label={t("zone_activate", {
+                            label:
+                                instance.cards.length === 0
+                                    ? (instance.emptyHint ?? zoneLabel)
+                                    : (instance.caption ?? zoneLabel),
+                        })}
+                        onClick={onZoneClick}
+                    />
+                )
             )}
         </div>
     );
@@ -200,16 +258,22 @@ export function ZoneCard({
 
     const draggable = !ctx.pending && (dropTargets?.length ?? 0) > 0;
     const isHidden = ctx.dragging?.hiddenIds.includes(item.id) ?? false;
+    const isSelected = ctx.selection?.id === item.id;
 
-    // Draggable cards keep single-click free for grabbing; `action` is their double-click auto-move.
-    const onClick =
-        ctx.pending || draggable
-            ? undefined
-            : action !== undefined
-              ? () => ctx.onAction(action)
-              : item.illegal
-                ? () => ctx.onIllegal?.()
-                : undefined;
+    // Draggable cards keep the pointer for grabbing (a tap picks them up via
+    // the table's tap detector, double-click auto-moves). Keyboard activation
+    // (`detail === 0`: Enter/Space) picks them up for the click-to-move path.
+    const onClick = ctx.pending
+        ? undefined
+        : draggable
+          ? (e: { detail: number }) => {
+                if (e.detail === 0) ctx.toggleSelect(item);
+            }
+          : action !== undefined
+            ? () => ctx.onAction(action)
+            : item.illegal
+              ? () => ctx.onIllegal?.()
+              : undefined;
     const onDoubleClick =
         draggable && action !== undefined
             ? () => ctx.onAction(action)
@@ -229,7 +293,7 @@ export function ZoneCard({
         : undefined;
 
     return (
-        // biome-ignore lint/a11y/noStaticElementInteractions: pointer drag source — draggable cards expose a double-click auto-move for non-pointer play; a mobile path is tracked separately.
+        // biome-ignore lint/a11y/noStaticElementInteractions: pointer drag source — the inner card <button> carries the keyboard/AT path (pick up, then a destination button).
         <div
             ref={ctx.registerCard(item.id)}
             className={`${width} will-change-transform`}
@@ -238,6 +302,13 @@ export function ZoneCard({
                 visibility: isHidden ? "hidden" : undefined,
                 touchAction: draggable ? "none" : undefined,
                 cursor: draggable ? "grab" : undefined,
+                ...(isSelected
+                    ? {
+                          outline: `3px solid ${ctx.boardTheme.accentColor}`,
+                          outlineOffset: 2,
+                          borderRadius: 8,
+                      }
+                    : null),
             }}
             onPointerDown={onPointerDown}
             onDoubleClick={onDoubleClick}
@@ -248,6 +319,7 @@ export function ZoneCard({
                 theme={ctx.themeFor(item.ownerId)}
                 disableTransitions={template.arrangement !== "fan"}
                 onClick={onClick}
+                pressed={draggable ? isSelected : undefined}
             />
         </div>
     );
