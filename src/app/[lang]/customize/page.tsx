@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
 import type { Locale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 import { CustomizePage } from "@/components/pages/CustomizePage";
+import { requireAuthUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function Page({
@@ -11,11 +11,8 @@ export default async function Page({
 }) {
     const { lang } = await params;
     setRequestLocale(lang);
+    const user = await requireAuthUser(lang, `/${lang}/customize`);
     const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) redirect(`/${lang}/login`);
 
     const [customizationRes, inventoryRes] = await Promise.all([
         supabase

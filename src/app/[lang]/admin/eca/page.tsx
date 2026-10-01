@@ -7,10 +7,11 @@ import {
 } from "@/components/admin/EcaGamesAdminPanel";
 import { GameButton } from "@/components/ui/GameButton";
 import { getUserRole, roleAtLeast } from "@/lib/auth/roles";
+import { requireAuthUser } from "@/lib/auth/session";
 import { listAllEcaGames } from "@/lib/models/adminStudio";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { publicStorageUrl } from "@/lib/supabase/storage";
+import { ecaImagesBucket, publicStorageUrl } from "@/lib/supabase/storage";
 
 export default async function AdminEcaPage({
     params,
@@ -20,11 +21,8 @@ export default async function AdminEcaPage({
     const { lang } = await params;
     setRequestLocale(lang);
 
+    const user = await requireAuthUser(lang, `/${lang}/admin/eca`);
     const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) redirect(`/${lang}/login`);
 
     // In-app gate only; the moderation API re-checks the admin role server-side.
     const role = await getUserRole(supabase, user.id);
@@ -45,7 +43,7 @@ export default async function AdminEcaPage({
         description: g.description,
         status: g.status,
         imageUrl: g.imageUrl
-            ? publicStorageUrl("eca-images", g.imageUrl)
+            ? publicStorageUrl(ecaImagesBucket(), g.imageUrl)
             : null,
         updatedAt: g.updatedAt,
     }));

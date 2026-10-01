@@ -1,5 +1,6 @@
 import { gameCatalog, getGameModule } from "@/lib/games";
 import { ecaNamesByModuleIds } from "@/lib/games/resolve";
+import { fallbackName } from "@/lib/models/identities";
 import type { createClient } from "@/lib/supabase/server";
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -57,7 +58,7 @@ export async function getLeaderboard(
         byModule.set(row.module_id, list);
         list.push({
             userId: row.user_id,
-            username: row.username,
+            username: row.username ?? fallbackName(row.user_id),
             avatarPath: row.avatar_url,
             rating: row.rating,
             gamesPlayed: row.games_played,

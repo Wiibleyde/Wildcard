@@ -1,8 +1,8 @@
-import { redirect } from "next/navigation";
 import type { Locale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { CommunityGames } from "@/components/lobby/CommunityGames";
 import { PlayHub } from "@/components/lobby/PlayHub";
+import { requireAuthUser } from "@/lib/auth/session";
 import { buildPlayCatalog } from "@/lib/games/catalog";
 import { listPublishedEcaGames } from "@/lib/models/studio";
 import { createClient } from "@/lib/supabase/server";
@@ -16,11 +16,8 @@ export default async function Page({
     setRequestLocale(lang);
     const t = await getTranslations("lobby");
 
+    const user = await requireAuthUser(lang, `/${lang}/lobby`);
     const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) redirect(`/${lang}/login`);
 
     const games = buildPlayCatalog();
     // Published creator games — RLS exposes published rows to any signed-in user.

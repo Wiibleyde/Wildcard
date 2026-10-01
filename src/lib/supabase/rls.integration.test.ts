@@ -12,21 +12,23 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  * bypasses RLS) reads it. See `supabase/migrations/20260606120000_games.sql`.
  *
  * Integration test: it needs a live Supabase stack. It is **skipped** unless
- * SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY are set, so the
+ * SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SECRET_KEY are set, so the
  * default `vitest run` (and CI) stays a pure unit run. To run it locally:
  *
- *   supabase start            # or `bun run up`
- *   bun run db:migrate
- *   SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=... \
- *     bunx vitest run src/lib/supabase/rls.integration.test.ts
+ *   bun run dev:up            # local Supabase (CLI), migrations applied
+ *   bun run test:rls          # loads .env.local
+ *
+ * SUPABASE_SCHEMA selects the schema (default `wildcard`).
  */
 
 const url = process.env.SUPABASE_URL;
 const anonKey = process.env.SUPABASE_ANON_KEY;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const serviceKey = process.env.SUPABASE_SECRET_KEY;
+const schema = process.env.SUPABASE_SCHEMA || "wildcard";
 const CONFIGURED = Boolean(url && anonKey && serviceKey);
 
 const clientOpts = {
+    db: { schema },
     auth: { autoRefreshToken: false, persistSession: false },
 } as const;
 
@@ -42,11 +44,11 @@ describe.skipIf(!CONFIGURED)(
         const SERVICE_KEY = serviceKey as string;
 
         // biome-ignore lint/suspicious/noExplicitAny: PostgREST rows are untyped here (no generated Database type imported for a raw test client).
-        let admin: SupabaseClient<any>;
+        let admin: SupabaseClient<any, any, any>;
         // biome-ignore lint/suspicious/noExplicitAny: same — anonymous key, no session.
-        let anon: SupabaseClient<any>;
+        let anon: SupabaseClient<any, any, any>;
         // biome-ignore lint/suspicious/noExplicitAny: same — signed-in as `player`.
-        let player: SupabaseClient<any>;
+        let player: SupabaseClient<any, any, any>;
 
         let playerId = "";
         let opponentId = "";
@@ -63,7 +65,7 @@ describe.skipIf(!CONFIGURED)(
             admin = createClient(SUPABASE_URL, SERVICE_KEY, clientOpts);
             anon = createClient(SUPABASE_URL, ANON_KEY, clientOpts);
 
-            // Two players. Sign-up trigger `on_auth_user_created` auto-creates the
+            // Two players. Sign-up trigger `on_auth_user_wildcard` auto-creates the
             // matching `profiles` row, so `host_id` FKs resolve.
             const email = (n: number) => `rls-test-${STAMP}-${n}@example.test`;
             const password = "rls-test-password-123!";

@@ -2,10 +2,10 @@ import { createClient } from "@/lib/supabase/client";
 import { createClient as createServerSupabase } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 
-export type DeckStyle = Database["public"]["Tables"]["deck_styles"]["Row"];
-export type BoardStyle = Database["public"]["Tables"]["board_styles"]["Row"];
+export type DeckStyle = Database["wildcard"]["Tables"]["deck_styles"]["Row"];
+export type BoardStyle = Database["wildcard"]["Tables"]["board_styles"]["Row"];
 export type PlayerCustomization =
-    Database["public"]["Tables"]["player_customizations"]["Row"];
+    Database["wildcard"]["Tables"]["player_customizations"]["Row"];
 
 // ── Client-side READ helpers ──────────────────────────────────────────────────
 //

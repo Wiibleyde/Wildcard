@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { LeaderboardBoard } from "@/components/leaderboard/LeaderboardBoard";
+import { getAuthUser } from "@/lib/auth/session";
 import { getLeaderboard } from "@/lib/models/leaderboard";
 import { createClient } from "@/lib/supabase/server";
 
@@ -12,12 +13,10 @@ export async function LeaderboardPage() {
     const t = await getTranslations("leaderboard");
 
     const supabase = await createClient();
-    const [
-        {
-            data: { user },
-        },
-        games,
-    ] = await Promise.all([supabase.auth.getUser(), getLeaderboard(supabase)]);
+    const [user, games] = await Promise.all([
+        getAuthUser(),
+        getLeaderboard(supabase),
+    ]);
 
     return (
         <div className="min-h-screen px-4 xl:px-10 pt-6 md:pt-10 pb-16">

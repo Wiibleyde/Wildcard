@@ -45,7 +45,6 @@
         "studio": "Studio",
         "coins": "jetons",
         "login": "Connexion",
-        "register": "S'inscrire",
         "logout": "Déconnexion",
         "profile": "Mon profil",
         "admin": "Admin"
@@ -58,18 +57,6 @@
         "saved": "Enregistré !",
         "cancel": "Annuler",
         "confirm": "Confirmer"
-    },
-    "auth": {
-        "login": {
-            "title": "Connexion",
-            "subtitle": "Connecte-toi pour rejoindre la partie",
-            "with_google": "Continuer avec Google",
-            "with_discord": "Continuer avec Discord",
-            "divider": "ou",
-            "no_account": "Pas encore de compte ?",
-            "already_account": "Déjà un compte ?",
-            "sign_in": "Se connecter"
-        }
     },
     "customize": {
         "title": "Personnalisation",
@@ -98,30 +85,21 @@
     },
     "profile": {
         "title": "Mon profil",
-        "username_label": "Nom d'utilisateur",
-        "username_placeholder": "Choisis un pseudo",
-        "avatar_label": "Photo de profil",
-        "avatar_upload": "Choisir une image",
-        "avatar_uploading": "Envoi en cours...",
-        "linked_accounts": "Comptes liés",
-        "link": "Lier",
-        "linked": "Lié",
         "member_since": "Membre depuis",
-        "error_username_empty": "Le nom d'utilisateur ne peut pas être vide",
-        "error_username_taken": "Ce nom d'utilisateur est déjà pris",
-        "error_avatar": "Erreur lors de l'envoi de l'image",
-        "success": "Profil mis à jour",
         "sign_out": "Se déconnecter",
         "xp_title": "Expérience",
         "level_short": "Niv.",
         "xp_to_next": "XP vers le niveau suivant",
-        "edit_title": "Modifier le profil",
         "history": "Historique des parties",
         "history_desc": "Consulter vos parties passées et leurs résultats",
         "ratings_title": "Classement ELO",
         "ratings_empty": "Aucune partie classée pour l'instant",
         "ratings_played": "parties",
-        "ratings_wins": "V"
+        "ratings_wins": "V",
+        "account_title": "Compte",
+        "account_desc": "Ton pseudo, ton avatar et tes comptes liés se gèrent sur ton compte wiibleyde.dev, partagé entre toutes les apps.",
+        "account_manage": "Gérer mon compte",
+        "account_dev": "Dev local : pas de portal, l'identité vient des comptes seedés."
     },
     "leaderboard": {
         "title": "Classement",

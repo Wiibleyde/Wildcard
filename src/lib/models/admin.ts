@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { GAMES } from "@/lib/games";
 import type { Database } from "@/lib/supabase/types";
-import { usernamesByIds } from "./usernames";
+import { usernamesByIds } from "./identities";
 
 export type OngoingGame = {
     gameId: string;

@@ -6,6 +6,7 @@ import {
     type RealtimeStatus,
     useRealtimeSync,
 } from "@/lib/realtime/useRealtimeSync";
+import { getSupabaseSchema } from "@/lib/supabase/env";
 
 /**
  * Subscribe to a lobby: seat changes (`room_players`) and room status changes
@@ -28,7 +29,7 @@ export function useRoomChannel(
                     "postgres_changes",
                     {
                         event: "*",
-                        schema: "public",
+                        schema: getSupabaseSchema(),
                         table: "room_players",
                         filter: `room_id=eq.${roomId}`,
                     },
@@ -38,7 +39,7 @@ export function useRoomChannel(
                     "postgres_changes",
                     {
                         event: "UPDATE",
-                        schema: "public",
+                        schema: getSupabaseSchema(),
                         table: "rooms",
                         filter: `id=eq.${roomId}`,
                     },

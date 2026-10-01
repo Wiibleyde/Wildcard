@@ -6,9 +6,10 @@ import {
     type SeatRow,
     type SpectatorRow,
 } from "@/components/lobby/RoomClient";
+import { requireAuthUser } from "@/lib/auth/session";
 import { resolveRuleToggles } from "@/lib/engine/types";
 import { resolveGameModule } from "@/lib/games/resolve";
-import { usernamesByIds } from "@/lib/models/usernames";
+import { usernamesByIds } from "@/lib/models/identities";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,11 +22,8 @@ export default async function Page({
     setRequestLocale(lang);
     const t = await getTranslations("room");
 
+    const user = await requireAuthUser(lang, `/${lang}/lobby/${code}`);
     const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) redirect(`/${lang}/login`);
 
     const normalized = code.toUpperCase();
     const { data: room } = await supabase

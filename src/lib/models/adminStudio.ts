@@ -4,8 +4,8 @@ import {
     validateEcaDefinition,
 } from "@/lib/eca/validate";
 import type { Database } from "@/lib/supabase/types";
+import { usernamesByIds } from "./identities";
 import type { EcaGameStatus, StudioErrorCode } from "./studio";
-import { usernamesByIds } from "./usernames";
 
 type Admin = SupabaseClient<Database>;
 

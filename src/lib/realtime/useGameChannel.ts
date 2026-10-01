@@ -6,6 +6,7 @@ import {
     type RealtimeStatus,
     useRealtimeSync,
 } from "@/lib/realtime/useRealtimeSync";
+import { getSupabaseSchema } from "@/lib/supabase/env";
 
 /**
  * Subscribe to a game's public meta row. Every applied action bumps
@@ -37,7 +38,7 @@ export function useGameChannel(
                 "postgres_changes",
                 {
                     event: "UPDATE",
-                    schema: "public",
+                    schema: getSupabaseSchema(),
                     table: "games",
                     filter: `id=eq.${gameId}`,
                 },

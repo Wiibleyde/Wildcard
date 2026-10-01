@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { NavAvatar } from "@/components/nav/NavAvatar";
+import { PORTAL_AVATAR_BUCKET } from "@/lib/models/identities";
 import type { LeaderboardGame } from "@/lib/models/leaderboard";
 import { publicStorageUrl } from "@/lib/supabase/storage";
 
@@ -77,7 +78,7 @@ export async function LeaderboardBoard({
                                 const isViewer = entry.userId === viewerId;
                                 const avatarUrl = entry.avatarPath
                                     ? publicStorageUrl(
-                                          "avatars",
+                                          PORTAL_AVATAR_BUCKET,
                                           entry.avatarPath,
                                       )
                                     : null;

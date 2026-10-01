@@ -4,10 +4,9 @@ import { useTranslations } from "next-intl";
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import { createClient } from "@/lib/supabase/client";
+import { ecaImagesBucket } from "@/lib/supabase/storage";
 
 export type GameImageStatus = "idle" | "uploading" | "saved" | "error";
-
-const BUCKET = "eca-images";
 
 function buildImageUrl(
     supabase: ReturnType<typeof createClient>,
@@ -15,13 +14,15 @@ function buildImageUrl(
     bust?: number,
 ): string | null {
     if (!path) return null;
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+    const { data } = supabase.storage
+        .from(ecaImagesBucket())
+        .getPublicUrl(path);
     return bust ? `${data.publicUrl}?t=${bust}` : data.publicUrl;
 }
 
 /**
  * Cover-image upload for a studio game — the same shape as
- * {@link import("@/hooks/profile/useAvatarUpload").useAvatarUpload}: the file
+ * the former avatar upload hook: the file
  * goes straight to the public `eca-images` bucket from the browser (RLS keys
  * the write to `${ownerId}/…`), then the returned path is persisted through
  * the studio PATCH API. `gameId` names the object so re-uploads upsert in
@@ -81,7 +82,7 @@ export function useGameImageUpload(
         const path = `${ownerId}/${gameId}.${ext}`;
 
         const { error: uploadError } = await supabase.storage
-            .from(BUCKET)
+            .from(ecaImagesBucket())
             .upload(path, file, { upsert: true });
 
         if (uploadError) {

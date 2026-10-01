@@ -15,12 +15,25 @@ const nextConfig: NextConfig = {
     serverExternalPackages: ["prom-client"],
     images: {
         dangerouslyAllowSVG: true,
+        // Storage of the shared Supabase (portal avatars, ECA covers) and of the
+        // local CLI stack.
         remotePatterns: [
+            {
+                protocol: "https",
+                hostname: "supabase.wiibleyde.dev",
+                pathname: "/storage/v1/**",
+            },
+            {
+                protocol: "http",
+                hostname: "127.0.0.1",
+                port: "54321",
+                pathname: "/storage/v1/**",
+            },
             {
                 protocol: "http",
                 hostname: "localhost",
                 port: "54321",
-                pathname: "/**",
+                pathname: "/storage/v1/**",
             },
         ],
         ...(process.env.NODE_ENV === "development" && { unoptimized: true }),

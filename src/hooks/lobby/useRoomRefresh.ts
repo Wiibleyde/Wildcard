@@ -6,7 +6,7 @@ import type {
 } from "@/components/lobby/room/types";
 import { useRouter } from "@/i18n/navigation";
 import { type GameRuleToggle, resolveRuleToggles } from "@/lib/engine/types";
-import { usernamesByIds } from "@/lib/models/usernames";
+import { usernamesByIds } from "@/lib/models/identities";
 import { useRoomChannel } from "@/lib/realtime/useRoomChannel";
 import { createClient } from "@/lib/supabase/client";
 

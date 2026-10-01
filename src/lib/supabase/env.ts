@@ -27,7 +27,7 @@ export function getSupabaseEnv(): { url: string; anonKey: string } {
  * browser's view: `localhost` is the host that maps Kong's port. Inside the app
  * container `localhost` is the container itself, so that URL is unreachable
  * ("ConnectionRefused"). `SUPABASE_INTERNAL_URL` points at the gateway on the
- * compose network instead (`http://kong:8000`). It falls back to the public URL
+ * Docker network instead (`http://supabase-kong:8000`). It falls back to the public URL
  * for local `next dev`, where `localhost` really is the host running Supabase.
  */
 export function getServerSupabaseEnv(): { url: string; anonKey: string } {
@@ -53,16 +53,53 @@ export function getSupabaseStorageKey(): string {
 }
 
 /**
- * Returns the server-only service-role key, throwing early if missing.
+ * Schema every query targets. Typed as the literal of the generated `Database`
+ * so `wildcard_dev` (same structure, dev twin on the shared stack) still type-
+ * checks. Defaults to `wildcard`.
+ */
+export function getSupabaseSchema(): "wildcard" {
+    return (publicEnv().SUPABASE_SCHEMA || "wildcard") as "wildcard";
+}
+
+/**
+ * Options shared by the browser, server and proxy clients so they agree on the
+ * session cookie the portal (auth.wiibleyde.dev) writes for the whole domain:
+ *
+ * - `name` — pinned to the public-URL host (see {@link getSupabaseStorageKey}),
+ *   `sb-supabase-auth-token` in prod, the same name the portal uses.
+ * - `cookieEncoding: "raw"` — the portal stores the session as plain URL-encoded
+ *   JSON and parses it as such. The default (`base64-…`) would make the first
+ *   token refresh here rewrite the cookie in a format the portal cannot read,
+ *   breaking the session on every *.wiibleyde.dev app at once.
+ * - `domain` — `.wiibleyde.dev` in prod so the refreshed cookie replaces the
+ *   portal's one; unset on localhost (the browser would drop it).
+ */
+export function supabaseSharedOptions() {
+    const { COOKIE_DOMAIN: domain } = publicEnv();
+    return {
+        db: { schema: getSupabaseSchema() },
+        cookieEncoding: "raw" as const,
+        cookieOptions: {
+            name: getSupabaseStorageKey(),
+            path: "/",
+            sameSite: "lax" as const,
+            ...(domain ? { domain, secure: true } : {}),
+        },
+    };
+}
+
+/**
+ * Returns the server-only secret key (`sb_secret_…`, service role), throwing
+ * early if missing.
  *
  * This key bypasses RLS and must never reach the browser — it is read only
  * from server code (API routes / server models) via {@link createAdminClient}.
  */
 export function getServiceRoleKey(): string {
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const key = process.env.SUPABASE_SECRET_KEY;
     if (!key) {
         throw new Error(
-            "SUPABASE_SERVICE_ROLE_KEY must be set (server-only — see .env.local)",
+            "SUPABASE_SECRET_KEY must be set (server-only — see .env.local)",
         );
     }
     return key;

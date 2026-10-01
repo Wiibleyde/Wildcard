@@ -1,8 +1,10 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import type { Locale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 import { GamePlayClient } from "@/components/game/GamePlayClient";
+import { requireAuthUser } from "@/lib/auth/session";
 import { getGameClientState } from "@/lib/models/game";
+import { identityOf } from "@/lib/models/identities";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -14,29 +16,22 @@ export default async function Page({
     const { lang, id } = await params;
     setRequestLocale(lang);
 
+    const user = await requireAuthUser(lang, `/${lang}/game/${id}`);
     const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) redirect(`/${lang}/login`);
 
     // Service-role read: secret state stays server-side; client gets only the redacted view().
     const admin = createAdminClient();
     const result = await getGameClientState(admin, id, user.id);
     if (!result.ok) notFound();
 
-    const [{ data: custom }, { data: profile }] = await Promise.all([
+    const [{ data: custom }, viewer] = await Promise.all([
         supabase
             .from("player_customizations")
             .select("deck_style_id, board_style_id")
             .eq("user_id", user.id)
             .maybeSingle(),
         // Viewer's own name — needed for chat even when they're a spectator (not a seated player).
-        supabase
-            .from("profiles")
-            .select("username")
-            .eq("id", user.id)
-            .maybeSingle(),
+        identityOf(supabase, user.id),
     ]);
 
     return (
@@ -44,7 +39,7 @@ export default async function Page({
             <GamePlayClient
                 initial={result.payload}
                 currentUserId={user.id}
-                currentUserName={profile?.username ?? "Joueur"}
+                currentUserName={viewer.name}
                 deckStyleId={custom?.deck_style_id ?? "free"}
                 boardStyleId={custom?.board_style_id ?? "green_felt"}
             />
