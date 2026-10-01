@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import { useApiMutation } from "@/hooks/useApiMutation";
+import { ecaCoverImagePath, ecaImageExtensionOf } from "@/lib/eca/id";
 import { createClient } from "@/lib/supabase/client";
 import { ecaImagesBucket } from "@/lib/supabase/storage";
 
@@ -26,7 +27,8 @@ function buildImageUrl(
  * goes straight to the public `eca-images` bucket from the browser (RLS keys
  * the write to `${ownerId}/…`), then the returned path is persisted through
  * the studio PATCH API. `gameId` names the object so re-uploads upsert in
- * place; the `bust` query param forces the `<img>` to reload after an upsert.
+ * place (a new extension is a new object — the server removes the old one);
+ * the `bust` query param forces the `<img>` to reload after an upsert.
  */
 export function useGameImageUpload(
     ownerId: string,
@@ -75,11 +77,18 @@ export function useGameImageUpload(
         const file = e.target.files?.[0];
         if (!file) return;
 
+        // The server only accepts the exact `<owner>/<game>.<ext>` cover path
+        // with an image extension — refuse anything else before uploading.
+        const ext = ecaImageExtensionOf(file.name);
+        if (ext === null) {
+            setError(t("image_error"));
+            setStatus("error");
+            return;
+        }
         setStatus("uploading");
         setError("");
 
-        const ext = file.name.split(".").pop() ?? "jpg";
-        const path = `${ownerId}/${gameId}.${ext}`;
+        const path = ecaCoverImagePath(ownerId, gameId, ext);
 
         const { error: uploadError } = await supabase.storage
             .from(ecaImagesBucket())

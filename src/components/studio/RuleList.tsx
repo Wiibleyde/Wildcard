@@ -50,6 +50,7 @@ export function RuleList({ rules, deckId, onChange }: Props) {
                     {t("editor_rules")}
                 </h2>
                 <p className="sub text-xs">{t("first_match_hint")}</p>
+                <p className="sub text-xs">{t("operands_hint")}</p>
             </div>
             {rules.map((rule, index) => (
                 <RuleCard

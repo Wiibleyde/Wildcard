@@ -20,6 +20,10 @@ export interface EcaRuleContext {
     readonly playedCard: CardDescriptor | null;
     /** Top of the discard pile — `null` while the pile is empty. */
     readonly topDiscard: CardDescriptor | null;
+    /**
+     * Actor's hand size as the rule is evaluated — for cardPlayed rules the
+     * played card is STILL in hand (legality is decided before it moves).
+     */
     readonly actorHandCount: number;
     readonly drawPileCount: number;
     readonly discardPileCount: number;

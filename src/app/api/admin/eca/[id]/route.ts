@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/api/auth";
+import { readJsonObject } from "@/lib/api/body";
+import { failureResponse } from "@/lib/api/respond";
 import {
     adminDeleteEcaGame,
     adminSetEcaStatus,
@@ -9,8 +11,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
  * Admin moderation of a single studio game — cross-owner, so admin-only
- * (moderators get the read-only dashboard). PATCH toggles `status`
- * (publish / unpublish, revalidated on publish); DELETE takes the game down.
+ * (moderators get the read-only dashboard). PATCH toggles `status`:
+ * unpublish is a take-down (moderation lock — the owner cannot re-publish),
+ * publish is a restore (lock cleared, definition revalidated); DELETE removes
+ * the game.
  * The owner-scoped studio API (`/api/studio/games/[id]`) is unaffected.
  */
 export async function PATCH(
@@ -21,9 +25,10 @@ export async function PATCH(
     const auth = await requireRole("admin");
     if (!auth.ok) return auth.response;
 
-    const body = (await request.json().catch(() => ({}))) as {
-        status?: unknown;
-    };
+    // `{ status }` only — the shared default cap is ample.
+    const parsed = await readJsonObject(request);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.body;
     if (body.status !== "draft" && body.status !== "published") {
         return NextResponse.json(
             { error: "invalid_input" },
@@ -34,12 +39,11 @@ export async function PATCH(
     const admin = createAdminClient();
     const result = await adminSetEcaStatus(admin, id, body.status);
     if (!result.ok) {
-        return NextResponse.json(
-            {
-                error: result.error,
-                ...(result.details && { details: result.details }),
-            },
-            { status: STUDIO_ERROR_STATUS[result.error] },
+        return failureResponse(
+            "admin.eca.status",
+            result,
+            STUDIO_ERROR_STATUS,
+            result.details && { details: result.details },
         );
     }
 
@@ -57,10 +61,7 @@ export async function DELETE(
     const admin = createAdminClient();
     const result = await adminDeleteEcaGame(admin, id);
     if (!result.ok) {
-        return NextResponse.json(
-            { error: result.error },
-            { status: STUDIO_ERROR_STATUS[result.error] },
-        );
+        return failureResponse("admin.eca.delete", result, STUDIO_ERROR_STATUS);
     }
 
     return NextResponse.json({ ok: true });

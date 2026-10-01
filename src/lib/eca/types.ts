@@ -31,6 +31,11 @@ export type EcaEventType = "cardPlayed" | "turnStarted";
  * A property of a card usable in conditions. `value` is the index of the
  * card's rank in the deck's rank list (ordered low → high) — the numeric
  * strength, comparable with `gt`/`lt`; `rank` and `suit` compare as strings.
+ *
+ * `value` is DECK-RELATIVE: the Ace is index 0 (the weakest card) in
+ * `french52` (`A, 2, …, K`) but index 7 (the strongest) in `french32`
+ * (`7, 8, 9, 10, J, Q, K, A`). The same "value > 5" rule therefore means
+ * different cards in each deck — the editor help says so.
  */
 export type EcaCardProp = "rank" | "suit" | "value";
 
@@ -42,6 +47,12 @@ export type EcaOperand =
       }
     | {
           readonly kind: "stat";
+          /**
+           * `actorHandCount` is read BEFORE the rule's effects: in a
+           * cardPlayed rule it still INCLUDES the card being played (a player
+           * laying their last card sees `1`, not `0`). In a turnStarted rule
+           * it is the hand of the player whose turn begins.
+           */
           readonly source:
               | "actorHandCount"
               | "drawPileCount"
@@ -82,7 +93,11 @@ export interface EcaRule {
     readonly event: EcaEventType;
     /** AND-combined; an empty list always matches. */
     readonly conditions: readonly EcaCondition[];
-    /** Applied in order when the rule fires (1..8). */
+    /**
+     * Applied in order when the rule fires (1..8). On write, a cardPlayed
+     * rule carries exactly one verdict (acceptCard XOR rejectCard), and a
+     * rejectCard stands alone (a refused play changes nothing).
+     */
     readonly effects: readonly EcaEffect[];
 }
 

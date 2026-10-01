@@ -23,7 +23,7 @@ export default async function Page({
     const { data } = await supabase
         .from("eca_games")
         .select(
-            "id, owner_id, name, description, status, image_url, definition",
+            "id, owner_id, name, description, status, image_url, definition, moderation_locked",
         )
         .eq("id", id)
         .maybeSingle();
@@ -44,6 +44,7 @@ export default async function Page({
                         name: data.name,
                         description: data.description,
                         status: data.status,
+                        moderationLocked: data.moderation_locked,
                         imageUrl: data.image_url,
                         definition: validated.definition,
                     }}

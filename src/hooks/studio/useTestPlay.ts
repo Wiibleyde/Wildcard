@@ -1,9 +1,10 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
-import type { CardDescriptor, Suit } from "@/lib/card/types";
+import { useMemo, useRef, useState } from "react";
+import type { CardDescriptor } from "@/lib/card/types";
 import { cardKey } from "@/lib/card/utils";
+import { describeEcaEvent, type EcaLogText } from "@/lib/eca/display";
 import { createEcaModule } from "@/lib/eca/module";
 import type {
     EcaAction,
@@ -11,9 +12,9 @@ import type {
     EcaState,
     EcaView,
 } from "@/lib/eca/types";
-import { validateEcaDefinition } from "@/lib/eca/validate";
+import { validateEcaDefinitionForWrite } from "@/lib/eca/validate";
 import { clientState, createGame, dispatch } from "@/lib/engine/runner";
-import type { GameEvent, GameModule, Player } from "@/lib/engine/types";
+import type { GameModule, Player } from "@/lib/engine/types";
 
 /**
  * State + logic for the Studio sandbox ({@link import("@/components/studio/TestPlay").TestPlay}):
@@ -23,32 +24,6 @@ import type { GameEvent, GameModule, Player } from "@/lib/engine/types";
  * view, so the projection layer is exercised too. No simulation shortcuts: if
  * it works here, it works in a match.
  */
-
-const SUIT_GLYPH: Record<Suit, string> = {
-    spades: "♠",
-    hearts: "♥",
-    diamonds: "♦",
-    clubs: "♣",
-};
-
-export function cardLabel(card: CardDescriptor): string {
-    return card.type === "suited"
-        ? `${card.rank}${SUIT_GLYPH[card.suit]}`
-        : "?";
-}
-
-export function isRedSuit(card: CardDescriptor): boolean {
-    return (
-        card.type === "suited" &&
-        (card.suit === "hearts" || card.suit === "diamonds")
-    );
-}
-
-function asCard(value: unknown): CardDescriptor | null {
-    if (typeof value !== "object" || value === null) return null;
-    const record = value as Record<string, unknown>;
-    return record.type === "suited" ? (value as CardDescriptor) : null;
-}
 
 export interface LogEntry {
     readonly id: number;
@@ -95,12 +70,23 @@ const REFUSAL_KEYS: Record<RefusalCode, RefusalKey> = {
 };
 
 function isRefusalCode(code: string): code is RefusalCode {
-    return code in REFUSAL_KEYS;
+    return Object.hasOwn(REFUSAL_KEYS, code);
 }
 
 export function useTestPlay(definition: EcaDefinition) {
     const t = useTranslations("studio");
+    // Dynamic `log_*` lookups (shared with the live table) need the loose shape.
+    const logText = useTranslations("studio") as unknown as EcaLogText;
     const [sandbox, setSandbox] = useState<Sandbox | null>(null);
+    // Latest sandbox, updated synchronously: two quick clicks must each apply
+    // to the state the previous one produced — the render-time `sandbox`
+    // closure would still hold the older state and silently drop a move.
+    const sandboxRef = useRef<Sandbox | null>(null);
+
+    function commit(next: Sandbox) {
+        sandboxRef.current = next;
+        setSandbox(next);
+    }
     const [refusal, setRefusal] = useState<RefusalCode | "generic" | null>(
         null,
     );
@@ -112,52 +98,10 @@ export function useTestPlay(definition: EcaDefinition) {
         return players.find((p) => p.id === id)?.name ?? "?";
     }
 
-    function describeEvent(
-        event: GameEvent,
-        players: readonly Player[],
-    ): string | null {
-        const payload = event.payload ?? {};
-        switch (event.type) {
-            case "cardPlayed": {
-                const card = asCard(payload.card);
-                return t("log_card_played", {
-                    name: playerName(players, payload.playerId),
-                    card: card ? cardLabel(card) : "?",
-                });
-            }
-            case "ruleFired":
-                return t("log_rule_fired", {
-                    rule:
-                        typeof payload.ruleName === "string"
-                            ? payload.ruleName
-                            : "?",
-                });
-            case "cardsDrawn":
-                return t("log_cards_drawn", {
-                    name: playerName(players, payload.playerId),
-                    count:
-                        typeof payload.count === "number" ? payload.count : 1,
-                });
-            case "directionReversed":
-                return t("log_direction_reversed");
-            case "playerSkipped":
-                return t("log_player_skipped", {
-                    name: playerName(players, payload.playerId),
-                });
-            case "turnAdvanced":
-                return t("log_turn_advanced", {
-                    name: playerName(players, payload.playerId),
-                });
-            case "gameEnded":
-                return t("log_game_ended");
-            default:
-                return null;
-        }
-    }
-
     function start() {
-        // Re-validate to strip editor-local keys and get a clean definition.
-        const validated = validateEcaDefinition(definition);
+        // Re-validate to strip editor-local keys and get a clean definition —
+        // with the write-time lints, the bar the editor already shows.
+        const validated = validateEcaDefinitionForWrite(definition);
         if (!validated.ok) return;
         const def = validated.definition;
         const players: Player[] = Array.from(
@@ -170,7 +114,7 @@ export function useTestPlay(definition: EcaDefinition) {
         );
         const module = createEcaModule(def, "eca:draft");
         const state = createGame(module, players);
-        setSandbox({
+        commit({
             module,
             players,
             state,
@@ -182,10 +126,11 @@ export function useTestPlay(definition: EcaDefinition) {
     }
 
     function act(action: EcaAction) {
-        if (!sandbox) return;
+        const current = sandboxRef.current;
+        if (!current) return;
         const result = dispatch(
-            sandbox.module,
-            sandbox.state,
+            current.module,
+            current.state,
             action,
             action.playerId,
         );
@@ -198,17 +143,19 @@ export function useTestPlay(definition: EcaDefinition) {
             return;
         }
         setRefusal(null);
-        let nextId = sandbox.nextId;
+        let nextId = current.nextId;
         const entries: LogEntry[] = [];
         for (const event of result.events) {
-            const text = describeEvent(event, sandbox.players);
+            const text = describeEcaEvent(event, logText, (id) =>
+                playerName(current.players, id),
+            );
             if (text !== null) entries.push({ id: nextId++, text });
         }
-        setSandbox({
-            ...sandbox,
+        commit({
+            ...current,
             state: result.state,
             // Newest first, capped so a long sandbox session stays light.
-            log: [...entries.reverse(), ...sandbox.log].slice(0, 100),
+            log: [...entries.reverse(), ...current.log].slice(0, 100),
             nextId,
         });
     }

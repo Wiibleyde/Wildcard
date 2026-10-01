@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { ecaModuleIdFor } from "@/lib/eca/id";
+import { ecaModuleIdFor, isEcaCoverImagePath, isUuid } from "@/lib/eca/id";
 import type { EcaDefinition } from "@/lib/eca/types";
 import {
     ECA_DESCRIPTION_MAX,
@@ -7,6 +7,7 @@ import {
     ECA_NAME_MIN,
     type EcaValidationError,
     validateEcaDefinition,
+    validateEcaDefinitionForWrite,
 } from "@/lib/eca/validate";
 import { ecaImagesBucket, publicStorageUrl } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
@@ -19,8 +20,10 @@ type Admin = SupabaseClient<Database>;
  * ECA definitions.
  *
  * Every write revalidates the untrusted definition JSON with
- * {@link validateEcaDefinition} before it touches the database (the DB CHECK
- * constraints only guard cheap scalar invariants). Ownership is enforced here
+ * {@link validateEcaDefinitionForWrite} before it touches the database (the
+ * DB CHECK constraints only guard cheap scalar invariants); reads use the
+ * tolerant {@link validateEcaDefinition} so rows saved before a write-time
+ * lint existed keep loading. Ownership is enforced here
  * from the authoritative row, never trusted from the request; the RLS
  * policies on `eca_games` are the second line of defense for reads. Rows the
  * requester cannot see (or mutate) come back `not_found`, never `forbidden`,
@@ -36,6 +39,7 @@ export type StudioErrorCode =
     | "invalid_definition"
     | "invalid_input"
     | "limit_reached"
+    | "moderation_locked"
     | "db_error";
 
 /** HTTP status for each studio error — keeps the route handlers thin. */
@@ -44,8 +48,16 @@ export const STUDIO_ERROR_STATUS: Record<StudioErrorCode, number> = {
     invalid_definition: 422,
     invalid_input: 400,
     limit_reached: 409,
+    moderation_locked: 423,
     db_error: 500,
 };
+
+/**
+ * Request-body cap for studio writes (routes read the body through
+ * `readJsonObject`). A maximal definition — 32 rules × 8 conditions/effects,
+ * capped ids and literals — serializes well under this.
+ */
+export const STUDIO_MAX_BODY_BYTES = 64 * 1024;
 
 /** Per-owner cap on studio games. Mirrors the DB trigger (`eca_games_cap`). */
 export const MAX_ECA_GAMES_PER_OWNER = 20;
@@ -64,6 +76,8 @@ export interface EcaGameSummary {
     readonly status: EcaGameStatus;
     /** Cover-image storage path in the public `eca-images` bucket, or null. */
     readonly imageUrl: string | null;
+    /** Taken down by an admin — the owner cannot re-publish until restored. */
+    readonly moderationLocked: boolean;
     readonly createdAt: string;
     readonly updatedAt: string;
 }
@@ -77,11 +91,13 @@ type Failure = {
     error: StudioErrorCode;
     /** Field-level validation errors — only set for `invalid_definition`. */
     details?: readonly EcaValidationError[];
+    /** Internal detail (DB/driver text) — logged on 5xx, never sent. */
+    message?: string;
 };
 type Result<T> = ({ ok: true } & T) | Failure;
 
 const SUMMARY_COLUMNS =
-    "id, owner_id, name, description, status, image_url, created_at, updated_at";
+    "id, owner_id, name, description, status, image_url, moderation_locked, created_at, updated_at";
 
 type SummaryRow = {
     id: string;
@@ -90,6 +106,7 @@ type SummaryRow = {
     description: string | null;
     status: EcaGameStatus;
     image_url: string | null;
+    moderation_locked: boolean;
     created_at: string;
     updated_at: string;
 };
@@ -102,6 +119,7 @@ function toSummary(row: SummaryRow): EcaGameSummary {
         description: row.description,
         status: row.status,
         imageUrl: row.image_url,
+        moderationLocked: row.moderation_locked,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -123,19 +141,41 @@ function isValidDescription(description: unknown): description is string {
 }
 
 /**
- * A cover-image patch is either `null` (clear it) or a storage path the caller
- * is entitled to: it must sit under the owner's own `${ownerId}/` folder — the
- * exact prefix the storage RLS policy allows them to write. Rejecting foreign
- * prefixes here stops a creator from pointing their game at an object outside
- * their folder, even though the bucket itself is world-readable.
+ * A cover-image patch is either `null` (clear it) or EXACTLY the game's own
+ * cover path `${ownerId}/${gameId}.<png|jpg|jpeg|webp|gif>` (see
+ * {@link isEcaCoverImagePath}). A prefix check is not enough —
+ * `${ownerId}/../victim/x.png` starts with the owner's folder — and an exact
+ * match also stops a creator from pointing one game at another's cover.
  */
-function isValidImagePath(value: unknown, ownerId: string): value is string {
+function isValidImagePath(
+    value: unknown,
+    ownerId: string,
+    gameId: string,
+): value is string {
     return (
         typeof value === "string" &&
-        value.length > 0 &&
         value.length <= ECA_IMAGE_PATH_MAX &&
-        value.startsWith(`${ownerId}/`)
+        isEcaCoverImagePath(value, ownerId, gameId)
     );
+}
+
+/**
+ * Best-effort removal of a game's previous cover object. Only a path in the
+ * exact cover format for this owner/game is ever removed (rows written before
+ * the exact-path check may hold anything — never delete on their say-so). A
+ * storage failure leaves an orphan object, never a failed request.
+ */
+async function removeCoverObject(
+    admin: Admin,
+    path: string | null,
+    ownerId: string,
+    gameId: string,
+): Promise<void> {
+    if (path === null || !isEcaCoverImagePath(path, ownerId, gameId)) return;
+    await admin.storage
+        .from(ecaImagesBucket())
+        .remove([path])
+        .catch(() => undefined);
 }
 
 /**
@@ -170,7 +210,9 @@ export async function listEcaGames(
         .select(SUMMARY_COLUMNS)
         .eq("owner_id", ownerId)
         .order("updated_at", { ascending: false });
-    if (error) return { ok: false, error: "db_error" };
+    if (error) {
+        return { ok: false, error: "db_error", message: error.message };
+    }
     return { ok: true, games: data.map(toSummary) };
 }
 
@@ -184,12 +226,15 @@ export async function getEcaGame(
     id: string,
     requesterId: string,
 ): Promise<Result<{ game: EcaGameRow }>> {
+    if (!isUuid(id)) return { ok: false, error: "not_found" };
     const { data, error } = await admin
         .from("eca_games")
         .select(`${SUMMARY_COLUMNS}, definition`)
         .eq("id", id)
         .maybeSingle();
-    if (error) return { ok: false, error: "db_error" };
+    if (error) {
+        return { ok: false, error: "db_error", message: error.message };
+    }
     if (!data) return { ok: false, error: "not_found" };
     // Rows the requester cannot see under the RLS select policy answer
     // `not_found` (not a distinct `forbidden`) so the endpoint never confirms
@@ -199,9 +244,16 @@ export async function getEcaGame(
     }
 
     // Stored definitions were validated on write; re-narrowing here (instead
-    // of casting the jsonb) keeps the invariant checked end to end.
+    // of casting the jsonb) keeps the invariant checked end to end. Tolerant
+    // read: a row saved before a write-time lint existed still loads.
     const validated = validateEcaDefinition(data.definition);
-    if (!validated.ok) return { ok: false, error: "db_error" };
+    if (!validated.ok) {
+        return {
+            ok: false,
+            error: "db_error",
+            message: "stored definition failed validation",
+        };
+    }
 
     return {
         ok: true,
@@ -236,7 +288,7 @@ export async function createEcaGame(
         description = body.description;
     }
 
-    const validated = validateEcaDefinition(body.definition);
+    const validated = validateEcaDefinitionForWrite(body.definition);
     if (!validated.ok) {
         return {
             ok: false,
@@ -252,7 +304,7 @@ export async function createEcaGame(
             owner_id: ownerId,
             name: body.name,
             description,
-            definition: definition as unknown as Record<string, unknown>,
+            definition: { ...definition },
         })
         .select("id")
         .single();
@@ -261,6 +313,7 @@ export async function createEcaGame(
         return {
             ok: false,
             error: error.code === "23514" ? "limit_reached" : "db_error",
+            message: error.message,
         };
     }
     return { ok: true, id: data.id };
@@ -273,6 +326,10 @@ export async function createEcaGame(
  * draft can never reach the published catalog. Name and description patches
  * are mirrored into the stored `definition.meta`, which is why they also
  * trigger a revalidation + rewrite of the definition.
+ *
+ * A game taken down by an admin (`moderation_locked`) stays editable — so
+ * the creator can fix it — but publishing it is refused with
+ * `moderation_locked` until an admin restores it.
  */
 export async function updateEcaGame(
     admin: Admin,
@@ -280,12 +337,17 @@ export async function updateEcaGame(
     ownerId: string,
     patch: unknown,
 ): Promise<{ ok: true } | Failure> {
+    if (!isUuid(id)) return { ok: false, error: "not_found" };
     const { data: row, error: fetchError } = await admin
         .from("eca_games")
-        .select("owner_id, name, description, definition, status")
+        .select(
+            "owner_id, name, description, definition, status, image_url, moderation_locked",
+        )
         .eq("id", id)
         .maybeSingle();
-    if (fetchError) return { ok: false, error: "db_error" };
+    if (fetchError) {
+        return { ok: false, error: "db_error", message: fetchError.message };
+    }
     if (!row) return { ok: false, error: "not_found" };
     // Foreign rows answer `not_found` (never `forbidden`) so a mutation can
     // confirm neither a draft's existence nor write access — same convention
@@ -336,11 +398,14 @@ export async function updateEcaGame(
         }
         statusPatch = body.status;
     }
+    if (statusPatch === "published" && row.moderation_locked) {
+        return { ok: false, error: "moderation_locked" };
+    }
     let imagePatch: string | null | undefined;
     if (body.image_url !== undefined) {
         if (
             body.image_url !== null &&
-            !isValidImagePath(body.image_url, ownerId)
+            !isValidImagePath(body.image_url, ownerId, id)
         ) {
             return { ok: false, error: "invalid_input" };
         }
@@ -362,7 +427,7 @@ export async function updateEcaGame(
         name !== row.name ||
         descriptionPatch !== undefined
     ) {
-        const validated = validateEcaDefinition(
+        const validated = validateEcaDefinitionForWrite(
             body.definition !== undefined ? body.definition : row.definition,
         );
         if (!validated.ok) {
@@ -385,15 +450,32 @@ export async function updateEcaGame(
     if (definition !== null) {
         // definition.meta mirrors the row name/description columns (single
         // source of truth) so the stored copies can never drift.
-        update.definition = withMeta(
-            definition,
-            name,
-            effectiveDescription,
-        ) as unknown as Record<string, unknown>;
+        update.definition = {
+            ...withMeta(definition, name, effectiveDescription),
+        };
     }
 
-    const { error } = await admin.from("eca_games").update(update).eq("id", id);
-    if (error) return { ok: false, error: "db_error" };
+    // Ownership re-asserted ON the write (not only by the read above), so
+    // the check and the mutation are one statement.
+    const { error } = await admin
+        .from("eca_games")
+        .update(update)
+        .eq("id", id)
+        .eq("owner_id", ownerId);
+    if (error) {
+        // check_violation on a publish = the moderation-lock CHECK: an admin
+        // took the game down between our read and this write.
+        if (error.code === "23514" && statusPatch === "published") {
+            return { ok: false, error: "moderation_locked" };
+        }
+        return { ok: false, error: "db_error", message: error.message };
+    }
+
+    // A new extension (or a cleared cover) leaves the previous object behind
+    // — remove it. Same path = upserted in place, nothing to clean.
+    if (imagePatch !== undefined && imagePatch !== row.image_url) {
+        await removeCoverObject(admin, row.image_url, ownerId, id);
+    }
     return { ok: true };
 }
 
@@ -440,48 +522,60 @@ export async function listPublishedEcaGames(
         data.map((row) => row.owner_id),
     );
 
-    return data.map((row) => {
-        // Published rows validate on write, but the column is jsonb — read the
-        // two card facts through a loose shape rather than trusting the type.
-        const def = row.definition as unknown as {
-            rules?: unknown;
-            meta?: { minPlayers?: number; maxPlayers?: number };
-        };
-        return {
-            id: row.id,
-            moduleId: ecaModuleIdFor(row.id),
-            name: row.name,
-            description: row.description,
-            imageUrl: row.image_url
-                ? publicStorageUrl(ecaImagesBucket(), row.image_url)
-                : null,
-            ownerName: nameOf.get(row.owner_id) ?? "?",
-            ruleCount: Array.isArray(def.rules) ? def.rules.length : 0,
-            minPlayers: def.meta?.minPlayers ?? 2,
-            maxPlayers: def.meta?.maxPlayers ?? 8,
-        };
+    // The column is jsonb: narrow it (tolerant read) instead of casting. A
+    // row that does not even parse could not be launched either
+    // (resolveLaunchableModule validates the same way) — leave it out.
+    return data.flatMap((row) => {
+        const validated = validateEcaDefinition(row.definition);
+        if (!validated.ok) return [];
+        const def = validated.definition;
+        return [
+            {
+                id: row.id,
+                moduleId: ecaModuleIdFor(row.id),
+                name: row.name,
+                description: row.description,
+                imageUrl: row.image_url
+                    ? publicStorageUrl(ecaImagesBucket(), row.image_url)
+                    : null,
+                ownerName: nameOf.get(row.owner_id) ?? "?",
+                ruleCount: def.rules.length,
+                minPlayers: def.meta.minPlayers,
+                maxPlayers: def.meta.maxPlayers,
+            },
+        ];
     });
 }
 
-/** Delete an owned game. */
+/** Delete an owned game, and its cover object. */
 export async function deleteEcaGame(
     admin: Admin,
     id: string,
     ownerId: string,
 ): Promise<{ ok: true } | Failure> {
+    if (!isUuid(id)) return { ok: false, error: "not_found" };
     const { data: row, error: fetchError } = await admin
         .from("eca_games")
-        .select("owner_id")
+        .select("owner_id, image_url")
         .eq("id", id)
         .maybeSingle();
-    if (fetchError) return { ok: false, error: "db_error" };
+    if (fetchError) {
+        return { ok: false, error: "db_error", message: fetchError.message };
+    }
     if (!row) return { ok: false, error: "not_found" };
     // Foreign rows answer `not_found` (never `forbidden`) so a mutation can
     // confirm neither a draft's existence nor write access — same convention
     // as replay.ts.
     if (row.owner_id !== ownerId) return { ok: false, error: "not_found" };
 
-    const { error } = await admin.from("eca_games").delete().eq("id", id);
-    if (error) return { ok: false, error: "db_error" };
+    const { error } = await admin
+        .from("eca_games")
+        .delete()
+        .eq("id", id)
+        .eq("owner_id", ownerId);
+    if (error) {
+        return { ok: false, error: "db_error", message: error.message };
+    }
+    await removeCoverObject(admin, row.image_url, ownerId, id);
     return { ok: true };
 }

@@ -4,7 +4,7 @@ import { cardKey } from "@/lib/card/utils";
 import { clientState, createGame, dispatch, replay } from "@/lib/engine/runner";
 import type { Player } from "@/lib/engine/types";
 import { CRAZY_EIGHTS_LIKE, MINIMAL_VALID } from "./fixtures";
-import { createEcaModule } from "./module";
+import { createEcaModule, ECA_TURN_LIMIT } from "./module";
 import type {
     EcaAction,
     EcaCondition,
@@ -12,7 +12,10 @@ import type {
     EcaRule,
     EcaState,
 } from "./types";
-import { validateEcaDefinition } from "./validate";
+import {
+    validateEcaDefinition,
+    validateEcaDefinitionForWrite,
+} from "./validate";
 
 const P3: Player[] = [
     { id: "a", name: "A", seat: 0 },
@@ -179,6 +182,8 @@ it("test definitions are valid ECA documents", () => {
         TURN_END,
     ]) {
         expect(validateEcaDefinition(def).ok).toBe(true);
+        // …and clear the write-time lints too (a creator could save them).
+        expect(validateEcaDefinitionForWrite(def).ok).toBe(true);
     }
 });
 
@@ -872,5 +877,203 @@ describe("eca determinism (replay through the runner)", () => {
         const replayed = replay(crazy, P3, seed, log, gameId);
         expect(replayed).toEqual(s);
         expect(crazy.outcome(replayed)).toEqual(crazy.outcome(s));
+    });
+});
+
+// ── Hardening: turn cap, forced passes, untrusted card payloads ──────────────
+
+/** Draw-on-turn-start + accept-anything + reshuffle: never converges. */
+const NEVER_ENDING: EcaDefinition = {
+    ...TURN_DRAW,
+    turn: { ...TURN_DRAW.turn, reshuffleDiscard: true },
+};
+
+/** Q replays; every turn start draws one — playAgain must not re-fire it. */
+const QUEEN_AGAIN_TURN_DRAW: EcaDefinition = {
+    ...MINIMAL_VALID,
+    rules: [
+        {
+            id: "queen-again",
+            name: "Dame — rejoue",
+            event: "cardPlayed",
+            conditions: [rankIs("Q")],
+            effects: [{ type: "acceptCard" }, { type: "playAgain" }],
+        },
+        acceptAll,
+        {
+            id: "turn-draw",
+            name: "Pioche d'office",
+            event: "turnStarted",
+            conditions: [],
+            effects: [{ type: "drawCards", target: "actor", count: 1 }],
+        },
+    ],
+};
+
+describe("eca turn limit", () => {
+    it("ends the game at ECA_TURN_LIMIT, ranking by fewest cards", () => {
+        const s = stateWith(
+            MINIMAL_VALID,
+            {
+                a: [card("7"), card("8")],
+                b: [card("9")],
+                c: [card("10"), card("J"), card("Q")],
+            },
+            { turn: ECA_TURN_LIMIT - 1 },
+        );
+        const res = step(minimal, s, play("a", card("7")));
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(res.state.turn).toBe(ECA_TURN_LIMIT);
+        expect(res.state.phase).toBe("done");
+        expect(res.state.currentPlayerId).toBeNull();
+        // a and b both hold one card after a's play — they share the win.
+        expect(res.state.winnerIds).toEqual(["a", "b"]);
+        expect(res.events).toContainEqual({
+            type: "gameEnded",
+            payload: { winnerIds: ["a", "b"] },
+        });
+    });
+
+    it("does not end a game one action below the cap", () => {
+        const s = stateWith(
+            MINIMAL_VALID,
+            { a: [card("7"), card("8")], b: [card("9")], c: [card("10")] },
+            { turn: ECA_TURN_LIMIT - 2 },
+        );
+        const res = step(minimal, s, play("a", card("7")));
+        expect(res.ok).toBe(true);
+        if (res.ok) expect(res.state.phase).toBe("playing");
+    });
+
+    it("a valid but never-converging definition still terminates", () => {
+        expect(validateEcaDefinitionForWrite(NEVER_ENDING).ok).toBe(true);
+        const module = createEcaModule(NEVER_ENDING, "eca:never-ending");
+        let s = createGame(module, P2, 11);
+        let actions = 0;
+        while (!module.isOver(s)) {
+            const actor = s.currentPlayerId;
+            if (actor === null) throw new Error("no current player");
+            const [first] = module.legalActions(s, actor);
+            s = ok(module, s, first);
+            actions++;
+            if (actions > ECA_TURN_LIMIT) throw new Error("cap not enforced");
+        }
+        expect(actions).toBe(ECA_TURN_LIMIT);
+        expect(s.turn).toBe(ECA_TURN_LIMIT);
+        expect(s.winnerIds.length).toBeGreaterThan(0);
+    });
+});
+
+describe("eca blocked game counts only forced passes", () => {
+    it("a tactical pass (a legal play was available) resets the streak", () => {
+        const module = createEcaModule(KINGS_ONLY, "eca:kings-tactical");
+        let s = stateWith(KINGS_ONLY, {
+            a: [card("K")],
+            b: [card("8")],
+            c: [card("9")],
+        });
+        // a could play the king but passes: not a forced pass.
+        s = ok(module, s, pass("a"));
+        expect(s.consecutivePasses).toBe(0);
+        s = ok(module, s, pass("b"));
+        expect(s.consecutivePasses).toBe(1);
+        s = ok(module, s, pass("c"));
+        expect(s.consecutivePasses).toBe(2);
+        // a passes tactically again — the cycle is broken, the game goes on.
+        s = ok(module, s, pass("a"));
+        expect(s.consecutivePasses).toBe(0);
+        expect(s.phase).toBe("playing");
+    });
+});
+
+describe("eca playCard trusts only the held card", () => {
+    it("refuses a malformed card payload", () => {
+        const s = stateWith(MINIMAL_VALID, {
+            a: [card("7")],
+            b: [card("8")],
+            c: [card("9")],
+        });
+        for (const bogus of [
+            null,
+            "s:spades:7",
+            { type: "suited", suit: "spades" },
+            { type: "suited", suit: "spades", rank: 7 },
+            { type: "suited", suit: "swords", rank: "7" },
+        ]) {
+            const res = step(minimal, s, {
+                type: "playCard",
+                playerId: "a",
+                card: bogus as unknown as CardDescriptor,
+            });
+            expect(res.ok).toBe(false);
+            if (!res.ok) expect(res.error.code).toBe("illegal_card");
+        }
+    });
+
+    it("stores the canonical held card, never the client object", () => {
+        const s = stateWith(MINIMAL_VALID, {
+            a: [card("7"), card("8")],
+            b: [card("9")],
+            c: [card("10")],
+        });
+        const tampered = { ...card("7"), injected: "x".repeat(1000) };
+        const res = step(minimal, s, play("a", tampered));
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        const top = res.state.discardPile[res.state.discardPile.length - 1];
+        expect(top).toEqual(card("7"));
+        expect(top).not.toHaveProperty("injected");
+        expect(res.events).toContainEqual({
+            type: "cardPlayed",
+            payload: { playerId: "a", card: card("7") },
+        });
+    });
+});
+
+describe("eca turn flow details", () => {
+    it("playAgain continues the same turn: turnStarted does not re-fire", () => {
+        const module = createEcaModule(QUEEN_AGAIN_TURN_DRAW, "eca:q-again");
+        const s = stateWith(
+            QUEEN_AGAIN_TURN_DRAW,
+            { a: [card("Q"), card("8")], b: [card("9")], c: [card("10")] },
+            { drawPile: [card("K", "hearts")] },
+        );
+        const res = step(module, s, play("a", card("Q")));
+        expect(res.ok).toBe(true);
+        if (!res.ok) return;
+        expect(res.state.currentPlayerId).toBe("a");
+        expect(res.state.hands.a).toEqual([card("8")]);
+        expect(res.events.some((e) => e.type === "cardsDrawn")).toBe(false);
+        expect(res.events).not.toContainEqual({
+            type: "ruleFired",
+            payload: { ruleId: "turn-draw", ruleName: "Pioche d'office" },
+        });
+    });
+
+    it("skips left over when the chain cap is hit are dropped, not carried", () => {
+        const module = createEcaModule(TURN_SKIP, "eca:turn-skip-carry");
+        const s = stateWith(TURN_SKIP, {
+            a: [card("7"), card("8")],
+            b: [card("9"), card("10")],
+            c: [card("J")],
+        });
+        const first = step(module, s, play("a", card("7")));
+        expect(first.ok).toBe(true);
+        if (!first.ok) return;
+        expect(first.state.pendingSkips).toBe(0);
+        // The next advancement starts clean: exactly one capped chain of
+        // players.length skips, no extra skip inherited from the last one.
+        const second = step(
+            module,
+            first.state,
+            play(first.state.currentPlayerId ?? "", card("9")),
+        );
+        expect(second.ok).toBe(true);
+        if (!second.ok) return;
+        expect(second.state.pendingSkips).toBe(0);
+        expect(
+            second.events.filter((e) => e.type === "playerSkipped"),
+        ).toHaveLength(P3.length);
     });
 });

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { CRAZY_EIGHTS_LIKE, MINIMAL_VALID } from "./fixtures";
 import type { EcaDefinition, EcaRule } from "./types";
-import { validateEcaDefinition } from "./validate";
+import {
+    validateEcaDefinition,
+    validateEcaDefinitionForWrite,
+} from "./validate";
 
 const base: EcaDefinition = MINIMAL_VALID;
 const baseRule: EcaRule = base.rules[0];
@@ -477,5 +480,278 @@ describe("validateEcaDefinition — win", () => {
             "invalid_win",
         );
         expect(errorsOf({ ...base, win: null })).toContain("invalid_win");
+    });
+});
+
+// ── Write-time lints ─────────────────────────────────────────────────────────
+
+/** Run the write validator on a broken input and return the error codes. */
+function writeErrorsOf(input: unknown): string[] {
+    const result = validateEcaDefinitionForWrite(input);
+    if (result.ok) throw new Error("expected write validation to fail");
+    return result.errors.map((e) => e.code);
+}
+
+const cardPlayed = (
+    id: string,
+    conditions: unknown[],
+    effects: unknown[],
+): Record<string, unknown> => ({
+    id,
+    name: "rule",
+    event: "cardPlayed",
+    conditions,
+    effects,
+});
+const ACCEPT = { type: "acceptCard" };
+const REJECT = { type: "rejectCard" };
+const playedRankEq = (value: unknown) => ({
+    lhs: { kind: "card", source: "playedCard", prop: "rank" },
+    op: "eq",
+    rhs: { kind: "literal", value },
+});
+
+describe("validateEcaDefinitionForWrite — acceptance", () => {
+    it("accepts the fixtures and rebuilds them identically", () => {
+        for (const fixture of [MINIMAL_VALID, CRAZY_EIGHTS_LIKE]) {
+            const result = validateEcaDefinitionForWrite(fixture);
+            expect(result.ok).toBe(true);
+            if (result.ok) expect(result.definition).toEqual(fixture);
+        }
+    });
+
+    it("never accepts what the structural validator refuses", () => {
+        expect(writeErrorsOf({ ...base, version: 2 })).toContain(
+            "invalid_version",
+        );
+    });
+
+    it("keeps the read path tolerant of lint-only problems", () => {
+        // A stored row saved before the lints existed must still load.
+        const legacy = withRules([cardPlayed("legacy", [], [ACCEPT, REJECT])]);
+        expect(validateEcaDefinition(legacy).ok).toBe(true);
+        expect(writeErrorsOf(legacy)).toContain("conflicting_verdict");
+    });
+});
+
+describe("validateEcaDefinitionForWrite — size caps", () => {
+    it("caps rule ids at 64 chars of a plain charset", () => {
+        const ok = withRules([cardPlayed("a".repeat(64), [], [ACCEPT])]);
+        expect(validateEcaDefinitionForWrite(ok).ok).toBe(true);
+        expect(
+            writeErrorsOf(
+                withRules([cardPlayed("a".repeat(65), [], [ACCEPT])]),
+            ),
+        ).toEqual(["invalid_rule_id"]);
+        // A multi-megabyte id is refused, not copied into every game state.
+        expect(
+            writeErrorsOf(
+                withRules([cardPlayed("x".repeat(5_000_000), [], [ACCEPT])]),
+            ),
+        ).toEqual(["invalid_rule_id"]);
+        expect(
+            writeErrorsOf(withRules([cardPlayed("bad id!", [], [ACCEPT])])),
+        ).toEqual(["invalid_rule_id"]);
+        // Editor ids are uuids.
+        expect(
+            validateEcaDefinitionForWrite(
+                withRules([
+                    cardPlayed(
+                        "3f2c1a9e-4b7d-4e2a-9c1f-0a1b2c3d4e5f",
+                        [],
+                        [ACCEPT],
+                    ),
+                ]),
+            ).ok,
+        ).toBe(true);
+    });
+
+    it("caps string literals at 16 chars", () => {
+        const long = {
+            lhs: { kind: "literal", value: "x".repeat(17) },
+            op: "eq",
+            rhs: { kind: "literal", value: "y" },
+        };
+        expect(
+            writeErrorsOf(withRules([cardPlayed("r", [long], [ACCEPT])])),
+        ).toEqual(["literal_too_long"]);
+    });
+});
+
+describe("validateEcaDefinitionForWrite — verdicts", () => {
+    it("missing_verdict: effects without accept/reject would be dropped", () => {
+        expect(
+            writeErrorsOf(
+                withRules([
+                    cardPlayed(
+                        "r",
+                        [playedRankEq("7")],
+                        [{ type: "skipNextPlayer" }],
+                    ),
+                    baseRule,
+                ]),
+            ),
+        ).toEqual(["missing_verdict"]);
+    });
+
+    it("conflicting_verdict: accept + reject, or a verdict twice", () => {
+        expect(
+            writeErrorsOf(withRules([cardPlayed("r", [], [REJECT, ACCEPT])])),
+        ).toEqual(["conflicting_verdict"]);
+        expect(
+            writeErrorsOf(withRules([cardPlayed("r", [], [ACCEPT, ACCEPT])])),
+        ).toEqual(["conflicting_verdict"]);
+    });
+
+    it("reject_with_effects: a refusal cannot carry effects", () => {
+        expect(
+            writeErrorsOf(
+                withRules([
+                    cardPlayed(
+                        "r",
+                        [playedRankEq("7")],
+                        [
+                            REJECT,
+                            { type: "drawCards", target: "actor", count: 2 },
+                        ],
+                    ),
+                    baseRule,
+                ]),
+            ),
+        ).toEqual(["reject_with_effects"]);
+    });
+
+    it("a lone rejectCard is fine", () => {
+        expect(
+            validateEcaDefinitionForWrite(
+                withRules([
+                    cardPlayed("r", [playedRankEq("7")], [REJECT]),
+                    baseRule,
+                ]),
+            ).ok,
+        ).toBe(true);
+    });
+
+    it("turnStarted rules need no verdict", () => {
+        expect(
+            validateEcaDefinitionForWrite(
+                withRules([
+                    baseRule,
+                    {
+                        id: "t",
+                        name: "t",
+                        event: "turnStarted",
+                        conditions: [],
+                        effects: [{ type: "skipNextPlayer" }],
+                    },
+                ]),
+            ).ok,
+        ).toBe(true);
+    });
+});
+
+describe("validateEcaDefinitionForWrite — literals vs the deck", () => {
+    const withDeck = (deckId: string, conditions: unknown[]): unknown => ({
+        ...base,
+        setup: { ...base.setup, deckId },
+        rules: [cardPlayed("r", conditions, [ACCEPT])],
+    });
+
+    it("rank literals must be ranks of the selected deck", () => {
+        // "2" exists in french52, not in french32 (7..A).
+        expect(
+            validateEcaDefinitionForWrite(
+                withDeck("french52", [playedRankEq("2")]),
+            ).ok,
+        ).toBe(true);
+        expect(
+            writeErrorsOf(withDeck("french32", [playedRankEq("2")])),
+        ).toEqual(["unknown_rank_literal"]);
+        expect(
+            writeErrorsOf(withDeck("french52", [playedRankEq("T")])),
+        ).toEqual(["unknown_rank_literal"]);
+        // The number 7 never equals the rank string "7".
+        expect(writeErrorsOf(withDeck("french52", [playedRankEq(7)]))).toEqual([
+            "unknown_rank_literal",
+        ]);
+    });
+
+    it("suit literals must be real suits, on either side", () => {
+        const suitIs = (value: unknown) => ({
+            lhs: { kind: "literal", value },
+            op: "eq",
+            rhs: { kind: "card", source: "topDiscard", prop: "suit" },
+        });
+        expect(
+            validateEcaDefinitionForWrite(
+                withDeck("french52", [suitIs("hearts")]),
+            ).ok,
+        ).toBe(true);
+        expect(writeErrorsOf(withDeck("french52", [suitIs("Hearts")]))).toEqual(
+            ["unknown_suit_literal"],
+        );
+    });
+
+    it("literals compared with numbers must be numbers", () => {
+        const handIs = (value: unknown) => ({
+            lhs: { kind: "stat", source: "actorHandCount" },
+            op: "eq",
+            rhs: { kind: "literal", value },
+        });
+        expect(
+            validateEcaDefinitionForWrite(withDeck("french52", [handIs(1)])).ok,
+        ).toBe(true);
+        expect(writeErrorsOf(withDeck("french52", [handIs("1")]))).toEqual([
+            "literal_not_numeric",
+        ]);
+    });
+
+    it("incompatible_operands: a rank never equals a suit or a number", () => {
+        const rankVsSuit = {
+            lhs: { kind: "card", source: "playedCard", prop: "rank" },
+            op: "eq",
+            rhs: { kind: "card", source: "topDiscard", prop: "suit" },
+        };
+        const rankVsValue = {
+            lhs: { kind: "card", source: "playedCard", prop: "rank" },
+            op: "neq",
+            rhs: { kind: "card", source: "topDiscard", prop: "value" },
+        };
+        expect(writeErrorsOf(withDeck("french52", [rankVsSuit]))).toEqual([
+            "incompatible_operands",
+        ]);
+        expect(writeErrorsOf(withDeck("french52", [rankVsValue]))).toEqual([
+            "incompatible_operands",
+        ]);
+    });
+});
+
+describe("validateEcaDefinitionForWrite — reachability", () => {
+    it("flags cardPlayed rules shadowed by an earlier catch-all", () => {
+        const result = validateEcaDefinitionForWrite(
+            withRules([
+                cardPlayed("no-cards", [], [REJECT]),
+                cardPlayed("sevens", [playedRankEq("7")], [ACCEPT]),
+            ]),
+        );
+        expect(result.ok).toBe(false);
+        if (result.ok) return;
+        expect(result.errors).toEqual([
+            expect.objectContaining({
+                path: "rules[1]",
+                code: "unreachable_rule",
+            }),
+        ]);
+    });
+
+    it("a catch-all LAST is the normal fallback", () => {
+        expect(
+            validateEcaDefinitionForWrite(
+                withRules([
+                    cardPlayed("sevens", [playedRankEq("7")], [REJECT]),
+                    baseRule,
+                ]),
+            ).ok,
+        ).toBe(true);
     });
 });

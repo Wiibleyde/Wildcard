@@ -25,7 +25,7 @@ export default async function Page({
     const { data } = await supabase
         .from("eca_games")
         .select(
-            "id, name, description, status, image_url, definition, updated_at",
+            "id, name, description, status, image_url, definition, updated_at, moderation_locked",
         )
         .eq("owner_id", user.id)
         .order("updated_at", { ascending: false });
@@ -35,6 +35,7 @@ export default async function Page({
         name: row.name,
         description: row.description,
         status: row.status,
+        moderationLocked: row.moderation_locked,
         ruleCount: Array.isArray(row.definition.rules)
             ? row.definition.rules.length
             : 0,
