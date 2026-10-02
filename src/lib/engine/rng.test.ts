@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-    createRng,
-    isLegacyRngState,
-    isRngState,
-    type RngState,
-    randomSeed,
-    type Sfc32State,
-} from "./rng";
+import { createRng, type RngState, randomSeed, type Sfc32State } from "./rng";
 
 const SEED: Sfc32State = "sfc32:0123456789abcdeffedcba9876543210";
 const deck52 = (): number[] => Array.from({ length: 52 }, (_, i) => i);
@@ -73,7 +66,7 @@ describe.each<[string, RngState, RngState]>([
 
         // The cursor is persisted inside the jsonb game state.
         const stored = JSON.parse(JSON.stringify({ s: original.state })).s;
-        expect(isRngState(stored)).toBe(true);
+        expect(stored).toEqual(original.state);
         const resumed = createRng(stored);
         const fresh = createRng(seed);
         fresh.next();
@@ -87,7 +80,6 @@ describe.each<[string, RngState, RngState]>([
         const r = createRng(seed);
         r.shuffle(deck52());
         expect(typeof r.state).toBe(typeof seed);
-        expect(isLegacyRngState(r.state)).toBe(typeof seed === "number");
     });
 });
 
@@ -157,7 +149,6 @@ describe("sfc32 — pinned reference outputs", () => {
             "x128:0123456789abcdeffedcba9876543210",
         ]) {
             expect(() => createRng(bad as Sfc32State)).toThrow(RangeError);
-            expect(isRngState(bad)).toBe(false);
         }
     });
 });
@@ -166,8 +157,6 @@ describe("randomSeed — 128 bits of entropy", () => {
     it("is a 128-bit sfc32 seed (32 hex chars = 128 bits)", () => {
         const seed = randomSeed();
         expect(seed).toMatch(/^sfc32:[0-9a-f]{32}$/);
-        expect(isRngState(seed)).toBe(true);
-        expect(isLegacyRngState(seed)).toBe(false);
     });
 
     it("never repeats and fills all 128 bits", () => {

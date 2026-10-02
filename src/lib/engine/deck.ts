@@ -5,10 +5,7 @@ import type {
     TrumpIndex,
 } from "@/lib/card/types";
 
-/**
- * Expand a {@link DeckDefinition} into the concrete, ordered list of cards it
- * contains. Order is canonical (unshuffled) — callers shuffle via an `Rng`.
- */
+/** Canonical (unshuffled) order — the shuffle sequence depends on it, never reorder. */
 export function buildDeck(def: DeckDefinition): CardDescriptor[] {
     const cards: CardDescriptor[] = [];
 
