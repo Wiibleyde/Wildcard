@@ -1,7 +1,18 @@
+import type { Metadata } from "next";
 import type { Locale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { getAppSettings } from "@/lib/models/settings";
 import { createClient } from "@/lib/supabase/server";
+
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ lang: Locale }>;
+}): Promise<Metadata> {
+    const { lang } = await params;
+    const t = await getTranslations({ locale: lang, namespace: "maintenance" });
+    return { title: t("title") };
+}
 
 export default async function MaintenancePage({
     params,
@@ -12,22 +23,18 @@ export default async function MaintenancePage({
     setRequestLocale(lang);
     const t = await getTranslations("maintenance");
 
-    const supabase = await createClient();
-    const { maintenanceMessage } = await getAppSettings(supabase);
+    const { maintenanceMessage } = await getAppSettings(await createClient());
 
     return (
-        <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="flex min-h-screen items-center justify-center px-4 xl:px-10">
             <div
-                className="panel max-w-md w-full flex flex-col items-center gap-6 text-center px-6 py-10 xl:px-10 xl:py-12"
+                className="panel flex w-full max-w-md flex-col items-center gap-6 px-6 py-10 text-center lg:max-w-lg xl:max-w-xl xl:px-10 xl:py-12 2xl:max-w-2xl"
                 style={{ boxShadow: "0 8px 0 var(--ink)" }}
             >
                 <div
-                    className="w-16 h-16 flex items-center justify-center text-3xl"
+                    aria-hidden="true"
+                    className="flex h-16 w-16 items-center justify-center rounded-xl border-nb border-wc-ink bg-wc-gold text-3xl text-wc-ink"
                     style={{
-                        background: "var(--gold)",
-                        color: "var(--ink)",
-                        border: "2.5px solid var(--ink)",
-                        borderRadius: 12,
                         boxShadow: "0 4px 0 var(--ink)",
                         transform: "rotate(-4deg)",
                     }}
@@ -35,13 +42,10 @@ export default async function MaintenancePage({
                     ♠
                 </div>
                 <div className="flex flex-col gap-2">
-                    <h1 className="font-display text-3xl xl:text-4xl leading-none">
+                    <h1 className="font-display text-3xl leading-none xl:text-4xl">
                         {t("title")}
                     </h1>
-                    <p
-                        className="text-sm font-semibold"
-                        style={{ color: "#5a5340" }}
-                    >
+                    <p className="text-sm font-semibold text-wc-ink-soft xl:text-base">
                         {maintenanceMessage ?? t("description")}
                     </p>
                 </div>
