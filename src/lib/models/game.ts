@@ -517,13 +517,19 @@ export const APPLY_ERROR_STATUS: Record<ApplyErrorCode, number> = {
 
 /**
  * Bot move policy — intentionally simple ("fill with computers", not a hard
- * opponent): prefer shedding/acting over passing, then pick at random among the
- * remaining legal moves. The choice is non-deterministic but every bot action
- * is written to `game_actions`, so replay from the log stays exact.
+ * opponent): never gamble on a module's `riskyActions` (a slam announcement…),
+ * prefer shedding/acting over passing, then pick at random among the remaining
+ * legal moves. The choice is non-deterministic but every bot action is written
+ * to `game_actions`, so replay from the log stays exact.
  */
-function chooseBotAction(legal: readonly GameAction[]): GameAction {
-    const active = legal.filter((a) => a.type !== "pass");
-    const pool = active.length > 0 ? active : legal;
+export function chooseBotAction(
+    legal: readonly GameAction[],
+    risky: readonly string[] = [],
+): GameAction {
+    const safe = legal.filter((a) => !risky.includes(a.type));
+    const candidates = safe.length > 0 ? safe : legal;
+    const active = candidates.filter((a) => a.type !== "pass");
+    const pool = active.length > 0 ? active : candidates;
     return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -774,7 +780,7 @@ export async function advanceBots(
             // previous play before the next version bump arrives.
             await sleep(BOT_TURN_DELAY_MS);
 
-            const action = chooseBotAction(legal);
+            const action = chooseBotAction(legal, module.riskyActions);
             const result = dispatch(module, state, action, botId);
             if (!result.ok) {
                 console.error(

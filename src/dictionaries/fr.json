@@ -269,6 +269,14 @@
             "limitedPasses": {
                 "label": "Passes limitées (Vegas)",
                 "description": "Un seul passage dans la pioche (trois en pioche par 3)."
+            },
+            "announcedSlam": {
+                "label": "Chelem annoncé",
+                "description": "Le preneur peut annoncer le chelem avant la première carte et prend l’entame : +400 réussi, −200 raté."
+            },
+            "handful": {
+                "label": "Poignées",
+                "description": "Montrer 10/13/15 atouts (13/15/18 à trois) avant sa première carte : +20/30/40 au camp gagnant."
             }
         },
         "mode_title": "Mode de jeu",
@@ -312,7 +320,7 @@
             },
             "tarot_fft": {
                 "label": "FFT",
-                "description": "Règles de la Fédération Française de Tarot : Garde Sans / Contre, petit au bout, chelem."
+                "description": "Règlement officiel de la Fédération Française de Tarot : Garde Sans / Contre, petit au bout, poignées, chelem annoncé."
             },
             "tarot_simple": {
                 "label": "Simplifié",
@@ -435,7 +443,17 @@
         "game_no_winner": "Partie abandonnée — aucun gagnant",
         "forfeit_win": "{name} a abandonné — victoire !",
         "forfeit_by": "{name} a abandonné",
-        "you_forfeited": "Tu as abandonné la partie"
+        "you_forfeited": "Tu as abandonné la partie",
+        "tarot_your_slam": "Annonces-tu le chelem ?",
+        "tarot_announce_slam": "Annoncer le chelem",
+        "tarot_no_slam": "Pas de chelem",
+        "tarot_slam_status": "Chelem annoncé",
+        "tarot_show_handful": "Montrer une {level}",
+        "tarot_handful_simple": "poignée simple",
+        "tarot_handful_double": "poignée double",
+        "tarot_handful_triple": "poignée triple",
+        "tarot_log_slam": "{name} annonce le chelem !",
+        "tarot_log_handful": "{name} montre une {level}"
     },
     "realtime": {
         "reconnecting": "Reconnexion en cours…"

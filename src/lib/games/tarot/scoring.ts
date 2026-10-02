@@ -48,13 +48,56 @@ export interface TarotRules {
     /** « Chelem » — auto-detected slam: ±200 flat when one side wins every
      * trick (unannounced variant). */
     readonly slam: boolean;
+    /** « Poignée » — a player may show 10/13/15 trumps (13/15/18 at three)
+     * before their first card: +20/30/40 to the side that wins the deal.
+     * Absent on games dealt before the rule existed (= off). */
+    readonly handful?: boolean;
+    /** « Chelem annoncé » — the taker may announce a slam before the first
+     * card and then leads: +400 made, −200 missed. Absent = off (legacy). */
+    readonly announcedSlam?: boolean;
 }
 
 export const DEFAULT_TAROT_RULES: TarotRules = {
     gardeSansContre: true,
     petitAuBout: true,
     slam: true,
+    handful: true,
+    announcedSlam: true,
 };
+
+// ── Poignée (handful) ─────────────────────────────────────────────────────────
+
+export type HandfulLevel = "simple" | "double" | "triple";
+
+export const HANDFUL_LEVELS: readonly HandfulLevel[] = [
+    "simple",
+    "double",
+    "triple",
+];
+
+/** Flat prime per level — never multiplied by the contract (FFT). */
+export const HANDFUL_PRIME: Record<HandfulLevel, number> = {
+    simple: 20,
+    double: 30,
+    triple: 40,
+};
+
+/** Trumps a handful must show, by table size (FFT: 10/13/15 at four players,
+ * 13/15/18 at three). */
+export function handfulSize(level: HandfulLevel, playerCount: number): number {
+    const sizes: Record<HandfulLevel, number> =
+        playerCount === 3
+            ? { simple: 13, double: 15, triple: 18 }
+            : { simple: 10, double: 13, triple: 15 };
+    return sizes[level];
+}
+
+/** A shown handful — public from the moment it is declared. */
+export interface DeclaredHandful {
+    readonly level: HandfulLevel;
+    /** The trumps (and possibly the Excuse) laid on the table, strongest first. */
+    readonly cards: readonly CardDescriptor[];
+}
 
 /** One card laid by one player. */
 export interface TrickCard {
@@ -148,6 +191,10 @@ export interface DealInput {
      * Empty for Garde Sans / Garde Contre. */
     readonly ecart: readonly CardDescriptor[];
     readonly rules: TarotRules;
+    /** Handfuls shown during the deal, by player (any side). */
+    readonly handfuls?: Readonly<Record<string, DeclaredHandful>>;
+    /** The taker announced a slam before the first card. */
+    readonly slamAnnounced?: boolean;
 }
 
 /** Full, explainable breakdown of a scored deal (taker's perspective). */
@@ -164,8 +211,14 @@ export interface DealResult {
     readonly multiplier: number;
     /** Last-trick Petit bonus, taker's sign: +1 won it, −1 defence won it, 0 none. */
     readonly petitAuBout: -1 | 0 | 1;
-    /** Slam bonus, taker's perspective: +200, −200, or 0. */
+    /** Slam bonus, taker's perspective: +400 (announced, made), +200
+     * (unannounced, made), −200 (announced and missed, or a defence slam),
+     * or 0. */
     readonly chelem: number;
+    /** Handful primes, taker's perspective: the summed primes go to the side
+     * that wins the deal, whoever showed them. Present only when the handful
+     * rule is part of the game's rules (absent on legacy deals). */
+    readonly handful?: number;
     /** What the taker gains from EACH defender (negative = the taker pays). */
     readonly perDefender: number;
     /** Final signed score per player. Zero-sum across the table. */
@@ -268,19 +321,37 @@ export function scoreDeal(input: DealInput): DealResult {
         petitAuBout = bout.winnerId === taker ? 1 : -1;
     }
 
-    // « Chelem » — unannounced slam: one side wins all the tricks.
+    // « Chelem » — one side wins all the tricks. Announced (FFT): +400 when
+    // made, −200 when missed. Unannounced: +200 for a taker slam. A slam the
+    // defence inflicts on the taker earns it 200 either way — on top of the
+    // missed-announcement penalty when there was one.
     let chelem = 0;
-    if (rules.slam) {
+    if (rules.announcedSlam && input.slamAnnounced) {
+        chelem = takerWonAll ? 400 : -200;
+        if (defenceWonAll) chelem -= 200;
+    } else if (rules.slam) {
         if (takerWonAll) chelem = 200;
         else if (defenceWonAll) chelem = -200;
     }
 
+    // « Poignée » — flat primes (never multiplied), all credited to the side
+    // that wins the deal, whoever showed them.
+    const handfulTotal = rules.handful
+        ? Object.values(input.handfuls ?? {}).reduce(
+              (sum, h) => sum + HANDFUL_PRIME[h.level],
+              0,
+          )
+        : 0;
+    const handful = made ? handfulTotal : -handfulTotal;
+
     // Result per defender (taker's perspective): the signed contract value,
-    // plus the (independently signed) Petit prime, plus the flat slam prime.
+    // plus the (independently signed) Petit prime, the handful primes and the
+    // flat slam prime.
     const contractValue = (25 + gap) * multiplier;
     const perDefender =
         (made ? contractValue : -contractValue) +
         petitAuBout * 10 * multiplier +
+        handful +
         chelem;
 
     const defenders = players.filter((p) => p !== taker);
@@ -299,6 +370,9 @@ export function scoreDeal(input: DealInput): DealResult {
         multiplier,
         petitAuBout,
         chelem,
+        // Legacy deals (rules predating the handful) keep their exact shape,
+        // so a replay still lands byte for byte on the stored result.
+        ...(rules.handful === undefined ? {} : { handful }),
         perDefender,
         scores,
     };

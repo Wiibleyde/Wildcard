@@ -209,6 +209,13 @@ export interface GameModule<S extends GameState, A extends GameAction, V = S> {
     readonly ruleModes?: readonly GameRuleMode[];
 
     /**
+     * Action types the platform's naive bots never take unless nothing else is
+     * legal — gambles a random policy would only ever lose (e.g. announcing a
+     * Tarot slam). Omitted = every legal action is fair game.
+     */
+    readonly riskyActions?: readonly string[];
+
+    /**
      * Rebuild this module bound to a host-chosen rule set (already resolved to
      * a `key → boolean` map). Games with no `ruleToggles` may omit it; the
      * runner then deals the module as-is.

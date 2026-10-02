@@ -20,6 +20,10 @@ import {
     type CompletedTrick,
     DEFAULT_TAROT_RULES,
     type DealResult,
+    type DeclaredHandful,
+    HANDFUL_LEVELS,
+    type HandfulLevel,
+    handfulSize,
     isBout,
     scoreDeal,
     type TarotRules,
@@ -31,7 +35,7 @@ import {
  * engine's *multi-phase* proof. Where Président rotates a single play action,
  * Tarot runs three distinct sub-games behind one `GameModule`:
  *
- *   bidding ─▶ dog (chien / écart) ─▶ playing (jeu de la carte) ─▶ done
+ *   bidding ─▶ dog (chien / écart) ─▶ slam ─▶ playing (jeu de la carte) ─▶ done
  *
  * - **Bidding** (« enchères ») — one round, each player passes or overcalls
  *   with a strictly higher contract (Petite ▸ Garde ▸ Garde Sans ▸ Garde
@@ -42,6 +46,9 @@ import {
  *   and bouts may never be buried, trumps only when nothing else is left.
  *   Garde Sans skips it (chien scores for the taker), Garde Contre too (chien
  *   scores for the defence).
+ * - **Slam** (« chelem annoncé », FFT) — when that rule is on, the taker says
+ *   whether they announce a slam before the first card; announcing takes the
+ *   lead (« l'entame revient au demandeur »): +400 made, −200 missed.
  * - **Playing** — 18 (or 24) tricks. Follow suit; if void, you must trump and
  *   over-trump when able; the Excuse (« L'Excuse ») excuses you from following
  *   and almost always returns to its player.
@@ -53,9 +60,18 @@ import {
  * public chien), server-validated `apply` (illegal plays refused), and a pure
  * `outcome()` feeding ELO/XP.
  *
- * Out of scope by design (single-deal meta layer / extra annotations, like
- * Président's card exchange): the 5-player « roi appelé » partnership, declared
- * poignées, and announced chelems. Chelem here is auto-detected, unannounced.
+ * « Poignée » (FFT): just before laying their first card, any player holding
+ * 10/13/15 trumps (13/15/18 at three) may show them for a flat 20/30/40 that
+ * goes to the side winning the deal. The Excuse may stand in for the last
+ * trump only when the player holds no other. The server shows the STRONGEST
+ * trumps by default (hiding the low ones — the Petit first — as a player would);
+ * a client may instead name the exact cards, which are validated.
+ *
+ * Out of scope by design (single-deal meta layer, like Président's card
+ * exchange): the 5-player « roi appelé » partnership.
+ *
+ * Source: Fédération Française de Tarot, « Règlement officiel »
+ * (https://www.fftarot.fr).
  */
 
 /** Suited strength inside one suit: 1(A) low → King high (K>Q>C>J>10>…>1).
@@ -88,7 +104,7 @@ const DECK_SIZE = 78;
 const CHIEN_SIZE = 6;
 const ECART_SIZE = 6;
 
-export type TarotPhase = "bidding" | "dog" | "playing" | "done";
+export type TarotPhase = "bidding" | "dog" | "slam" | "playing" | "done";
 
 export interface TarotState extends GameState {
     readonly phase: TarotPhase;
@@ -123,6 +139,11 @@ export interface TarotState extends GameState {
     readonly tricks: readonly CompletedTrick[];
     /** The just-won trick, kept on the table until the next lead is laid. */
     readonly lastTrick: CompletedTrick | null;
+    /** Handfuls shown so far, by player. Absent until the first one (and on
+     * deals recorded before the rule existed). */
+    readonly handfuls?: Readonly<Record<string, DeclaredHandful>>;
+    /** The taker announced a slam. Absent unless announced. */
+    readonly slamAnnounced?: boolean;
 
     // ── result ────────────────────────────────────────────────────────────────
     readonly result: DealResult | null;
@@ -140,7 +161,17 @@ export type TarotAction =
           readonly type: "play";
           readonly playerId: string;
           readonly card: CardDescriptor;
-      };
+      }
+    /** Show a poignée before your first card. `cards` is optional: omitted,
+     * the server shows the strongest trumps that make up the level. */
+    | {
+          readonly type: "handful";
+          readonly playerId: string;
+          readonly level: HandfulLevel;
+          readonly cards?: readonly CardDescriptor[];
+      }
+    /** Slam phase: the taker announces a slam (a decline is a `pass`). */
+    | { readonly type: "announceSlam"; readonly playerId: string };
 
 export interface TarotPlayerView {
     readonly playerId: string;
@@ -151,6 +182,8 @@ export interface TarotPlayerView {
     readonly bid: Bid | "pass" | null;
     /** Tricks this player has won — public. */
     readonly trickWins: number;
+    /** The poignée this player showed, if any — public. */
+    readonly handful: DeclaredHandful | null;
     /** Own cards — present only in the viewer's own slot (RLS in code). */
     readonly hand?: readonly CardDescriptor[];
 }
@@ -176,6 +209,8 @@ export interface TarotView {
     /** The previous trick, shown until the next lead (empty mid-trick). */
     readonly lastTrick: CompletedTrick | null;
     readonly result: DealResult | null;
+    /** The taker announced a slam — public. */
+    readonly slamAnnounced: boolean;
     readonly players: readonly TarotPlayerView[];
     /** Viewer this projection was built for (`null` = spectator). */
     readonly self: string | null;
@@ -427,6 +462,101 @@ function nextSeat(state: TarotState, id: string): string {
     return order[(idx + 1) % order.length].id;
 }
 
+// ── poignée / chelem ──────────────────────────────────────────────────────────
+
+/** Strongest first — the order a handful is laid on the table. */
+function byTrumpDesc(a: CardDescriptor, b: CardDescriptor): number {
+    const rank = (c: CardDescriptor) => (isTrump(c) ? c.index : 0);
+    return rank(b) - rank(a);
+}
+
+/** Has `playerId` already laid a card this deal? A handful must come first. */
+function hasPlayed(state: TarotState, playerId: string): boolean {
+    return (
+        state.pile.some((p) => p.playerId === playerId) ||
+        state.tricks.some((t) => t.plays.some((p) => p.playerId === playerId))
+    );
+}
+
+/**
+ * The cards `hand` shows for a `level` poignée (FFT), or `null` if it can't:
+ * exactly N trumps, the strongest ones; the Excuse may complete it only when
+ * it is the player's last missing trump (it then implies they hold no other).
+ */
+export function handfulAt(
+    hand: readonly CardDescriptor[],
+    level: HandfulLevel,
+    playerCount: number,
+): readonly CardDescriptor[] | null {
+    const n = handfulSize(level, playerCount);
+    const trumps = hand.filter(isTrump).sort(byTrumpDesc);
+    if (trumps.length >= n) return trumps.slice(0, n);
+    const excuse = hand.find((c) => c.type === "fool");
+    if (excuse && trumps.length === n - 1) return [...trumps, excuse];
+    return null;
+}
+
+/** The highest poignée `hand` can show, or `null` when none is reachable. */
+export function bestHandful(
+    hand: readonly CardDescriptor[],
+    playerCount: number,
+): DeclaredHandful | null {
+    for (const level of [...HANDFUL_LEVELS].reverse()) {
+        const cards = handfulAt(hand, level, playerCount);
+        if (cards) return { level, cards };
+    }
+    return null;
+}
+
+/**
+ * Validate an explicit, client-named handful: N distinct held trumps (the
+ * Excuse allowed only when every held trump is shown with it). Returns the
+ * canonical cards strongest-first, or `null` when the selection is illegal.
+ */
+function validateHandful(
+    hand: readonly CardDescriptor[],
+    level: HandfulLevel,
+    cards: unknown,
+    playerCount: number,
+): readonly CardDescriptor[] | null {
+    if (!Array.isArray(cards)) return null;
+    if (cards.length !== handfulSize(level, playerCount)) return null;
+    const held: CardDescriptor[] = [];
+    for (const raw of cards) {
+        const card = heldCard(hand, raw);
+        if (!card || (card.type !== "trump" && card.type !== "fool")) {
+            return null;
+        }
+        if (held.some((c) => cardKey(c) === cardKey(card))) return null;
+        held.push(card);
+    }
+    const showsExcuse = held.some((c) => c.type === "fool");
+    if (
+        showsExcuse &&
+        held.filter(isTrump).length < hand.filter(isTrump).length
+    ) {
+        return null; // the Excuse only stands in for a trump you don't have
+    }
+    return held.sort(byTrumpDesc);
+}
+
+/**
+ * Hand over to the trick play once the contract (and écart) is settled. With
+ * the announced-slam rule the taker first decides (`slam` phase); otherwise
+ * the eldest hand leads trick one.
+ */
+function startPlay(state: TarotState, taker: string): TarotState {
+    if (state.rules.announcedSlam) {
+        return { ...state, phase: "slam", currentPlayerId: taker };
+    }
+    return {
+        ...state,
+        phase: "playing",
+        currentPlayerId: state.eldestId,
+        trickLeaderId: state.eldestId,
+    };
+}
+
 // ── bidding resolution ────────────────────────────────────────────────────────
 
 /**
@@ -494,14 +624,7 @@ function resolveBidding(
     }
 
     return {
-        state: {
-            ...state,
-            phase: "playing",
-            taker,
-            contract,
-            currentPlayerId: state.eldestId,
-            trickLeaderId: state.eldestId,
-        },
+        state: startPlay({ ...state, taker, contract }, taker),
         events,
     };
 }
@@ -537,6 +660,8 @@ function closeTrick(
             chien: state.chien,
             ecart: state.ecart,
             rules: state.rules,
+            handfuls: state.handfuls,
+            slamAnnounced: state.slamAnnounced,
         });
         events.push({
             type: "game_over",
@@ -576,18 +701,26 @@ export const TAROT_RULE_TOGGLES: readonly GameRuleToggle[] = [
     { key: "gardeSansContre", default: true },
     { key: "petitAuBout", default: true },
     { key: "slam", default: true },
+    { key: "announcedSlam", default: true, requires: "slam" },
+    { key: "handful", default: true },
 ];
 
 /**
  * Launch presets. The FFT rules (Fédération Française de Tarot, the reference
- * rulebook) first — the default; then a beginner table with only Petite/Garde
- * and none of the bonus primes.
+ * rulebook: poignées, announced slam…) first — the default; then a beginner
+ * table with only Petite/Garde and none of the bonus primes.
  */
 export const TAROT_RULE_MODES: readonly GameRuleMode[] = [
     { key: "tarot_fft", rules: {} },
     {
         key: "tarot_simple",
-        rules: { gardeSansContre: false, petitAuBout: false, slam: false },
+        rules: {
+            gardeSansContre: false,
+            petitAuBout: false,
+            slam: false,
+            announcedSlam: false,
+            handful: false,
+        },
     },
 ];
 
@@ -599,6 +732,8 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
     maxPlayers: 4,
     ruleToggles: TAROT_RULE_TOGGLES,
     ruleModes: TAROT_RULE_MODES,
+    // A random bot announcing a slam would only ever pay the −200.
+    riskyActions: ["announceSlam"],
 
     legalActions(state, playerId) {
         if (state.phase === "done") return [];
@@ -622,12 +757,32 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
             ).map((card) => ({ type: "discard", playerId, card }));
         }
 
+        if (state.phase === "slam") {
+            return [
+                { type: "announceSlam", playerId },
+                { type: "pass", playerId },
+            ];
+        }
+
         // playing
-        return legalCards(state.hands[playerId], state.pile).map((card) => ({
-            type: "play",
-            playerId,
-            card,
-        }));
+        const actions: TarotAction[] = legalCards(
+            state.hands[playerId],
+            state.pile,
+        ).map((card) => ({ type: "play", playerId, card }));
+        if (
+            state.rules.handful &&
+            !state.handfuls?.[playerId] &&
+            !hasPlayed(state, playerId)
+        ) {
+            const best = bestHandful(
+                state.hands[playerId],
+                state.players.length,
+            );
+            if (best) {
+                actions.push({ type: "handful", playerId, level: best.level });
+            }
+        }
+        return actions;
     },
 
     apply(state, action, rng: Rng) {
@@ -733,21 +888,22 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
                 { type: "discarded", payload: { playerId: action.playerId } },
             ];
 
-            // Six buried — the écart is set; the eldest hand leads trick one.
+            // Six buried — the écart is set; on to the slam decision, or the
+            // eldest hand leads trick one.
             if (ecart.length === ECART_SIZE) {
                 return {
                     ok: true,
-                    state: {
-                        ...state,
-                        phase: "playing",
-                        hands: {
-                            ...state.hands,
-                            [action.playerId]: remaining,
+                    state: startPlay(
+                        {
+                            ...state,
+                            hands: {
+                                ...state.hands,
+                                [action.playerId]: remaining,
+                            },
+                            ecart,
                         },
-                        ecart,
-                        currentPlayerId: state.eldestId,
-                        trickLeaderId: state.eldestId,
-                    },
+                        action.playerId,
+                    ),
                     events: [...events, { type: "ecart_done" }],
                 };
             }
@@ -763,7 +919,109 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
             };
         }
 
+        // ── slam announcement ───────────────────────────────────────────────────
+        if (state.phase === "slam") {
+            if (action.type !== "announceSlam" && action.type !== "pass") {
+                return fail(
+                    "wrong_phase",
+                    "Announce a slam or pass before the first card.",
+                );
+            }
+            if (action.type === "pass") {
+                return {
+                    ok: true,
+                    state: {
+                        ...state,
+                        phase: "playing",
+                        turn: state.turn + 1,
+                        currentPlayerId: state.eldestId,
+                        trickLeaderId: state.eldestId,
+                    },
+                    events: [
+                        {
+                            type: "slam_declined",
+                            payload: { playerId: action.playerId },
+                        },
+                    ],
+                };
+            }
+            // « L'entame revient de droit au joueur qui l'a demandé. »
+            return {
+                ok: true,
+                state: {
+                    ...state,
+                    phase: "playing",
+                    turn: state.turn + 1,
+                    slamAnnounced: true,
+                    currentPlayerId: action.playerId,
+                    trickLeaderId: action.playerId,
+                },
+                events: [
+                    {
+                        type: "slam_announced",
+                        payload: { playerId: action.playerId },
+                    },
+                ],
+            };
+        }
+
         // ── playing ──────────────────────────────────────────────────────────────
+        if (action.type === "handful") {
+            if (!state.rules.handful) {
+                return fail("rule_disabled", "Handfuls are not in play.");
+            }
+            if (state.handfuls?.[action.playerId]) {
+                return fail("already_shown", "A handful is shown only once.");
+            }
+            if (hasPlayed(state, action.playerId)) {
+                return fail(
+                    "too_late",
+                    "A handful is shown just before your first card.",
+                );
+            }
+            if (!HANDFUL_LEVELS.includes(action.level)) {
+                return fail("bad_handful", "Unknown handful level.");
+            }
+            const hand = state.hands[action.playerId];
+            const players = state.players.length;
+            // Omitted cards: the server shows the strongest trumps for the
+            // level (a lower level than held is allowed — it hides more).
+            const cards =
+                action.cards === undefined
+                    ? handfulAt(hand, action.level, players)
+                    : validateHandful(
+                          hand,
+                          action.level,
+                          action.cards,
+                          players,
+                      );
+            if (!cards) {
+                return fail(
+                    "illegal_handful",
+                    "Not enough trumps for that handful.",
+                );
+            }
+            return {
+                ok: true,
+                state: {
+                    ...state,
+                    turn: state.turn + 1,
+                    handfuls: {
+                        ...state.handfuls,
+                        [action.playerId]: { level: action.level, cards },
+                    },
+                },
+                events: [
+                    {
+                        type: "handful",
+                        payload: {
+                            playerId: action.playerId,
+                            level: action.level,
+                        },
+                    },
+                ],
+            };
+        }
         if (action.type !== "play") {
             return fail("wrong_phase", "Play a card to the trick.");
         }
@@ -884,6 +1142,7 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
             trickLeaderId: state.trickLeaderId,
             lastTrick: state.lastTrick,
             result: state.result,
+            slamAnnounced: state.slamAnnounced === true,
             self: viewerId,
             players: order.map((p): TarotPlayerView => {
                 const slot: TarotPlayerView = {
@@ -893,6 +1152,7 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
                     isTaker: state.taker === p.id,
                     bid: state.bids[p.id] ?? null,
                     trickWins: wins[p.id] ?? 0,
+                    handful: state.handfuls?.[p.id] ?? null,
                 };
                 return viewerId === p.id
                     ? { ...slot, hand: state.hands[p.id] }
@@ -915,10 +1175,17 @@ export function createTarot(
         withRules(chosen) {
             const pick = (key: keyof TarotRules): boolean =>
                 chosen[key] ?? DEFAULT_TAROT_RULES[key];
+            // Rules added after launch are bound only when the caller names
+            // them: a legacy game's persisted rules lack them, and replaying
+            // it must rebuild exactly that rule object (absent = off).
+            const optional = (key: "handful" | "announcedSlam") =>
+                typeof chosen[key] === "boolean" ? { [key]: chosen[key] } : {};
             return createTarot({
                 gardeSansContre: pick("gardeSansContre"),
                 petitAuBout: pick("petitAuBout"),
                 slam: pick("slam"),
+                ...optional("handful"),
+                ...optional("announcedSlam"),
             });
         },
         setup(players, rng, seed, gameId) {

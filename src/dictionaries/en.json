@@ -269,6 +269,14 @@
             "limitedPasses": {
                 "label": "Limited passes (Vegas)",
                 "description": "A single pass through the stock (three in draw-three)."
+            },
+            "announcedSlam": {
+                "label": "Announced slam",
+                "description": "The taker may announce a slam before the first card and leads: +400 made, −200 missed."
+            },
+            "handful": {
+                "label": "Handfuls",
+                "description": "Show 10/13/15 trumps (13/15/18 at three) before your first card: +20/30/40 to the winning side."
             }
         },
         "mode_title": "Game mode",
@@ -312,7 +320,7 @@
             },
             "tarot_fft": {
                 "label": "FFT",
-                "description": "French Tarot Federation rules: Garde Sans / Contre, petit au bout, slam."
+                "description": "Official French Tarot Federation rules: Garde Sans / Contre, petit au bout, handfuls, announced slam."
             },
             "tarot_simple": {
                 "label": "Simplified",
@@ -435,7 +443,17 @@
         "game_no_winner": "Game resigned — no winner",
         "forfeit_win": "{name} forfeited — you win!",
         "forfeit_by": "{name} forfeited",
-        "you_forfeited": "You forfeited the game"
+        "you_forfeited": "You forfeited the game",
+        "tarot_your_slam": "Announce a slam?",
+        "tarot_announce_slam": "Announce a slam",
+        "tarot_no_slam": "No slam",
+        "tarot_slam_status": "Slam announced",
+        "tarot_show_handful": "Show a {level}",
+        "tarot_handful_simple": "single handful",
+        "tarot_handful_double": "double handful",
+        "tarot_handful_triple": "triple handful",
+        "tarot_log_slam": "{name} announces a slam!",
+        "tarot_log_handful": "{name} shows a {level}"
     },
     "realtime": {
         "reconnecting": "Reconnecting…"
