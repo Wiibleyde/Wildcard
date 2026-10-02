@@ -99,6 +99,7 @@ export function playedMoves(version: number, terminal: boolean): number {
 /** The viewer-facing {@link GameEndInfo} for a finished game. */
 export function describeEnd(
     facts: EndFacts & {
+        readonly moduleId: string;
         readonly outcome: GameOutcome | null;
         readonly botIds: readonly string[];
         readonly version: number;
@@ -109,6 +110,7 @@ export function describeEnd(
     let xpGained: number | null = null;
     if (facts.viewerId !== null && facts.playerIds.includes(facts.viewerId)) {
         const awards = xpAwardsForGame(facts.outcome, facts.botIds, {
+            moduleId: facts.moduleId,
             excluded: facts.forfeitedBy ? [facts.forfeitedBy] : [],
             moveCount: playedMoves(facts.version, facts.terminal),
         });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GameOutcome } from "@/lib/engine/types";
-import { PARTICIPATION_XP, WIN_XP } from "@/lib/xp/xp";
+import { PARTICIPATION_XP, WIN_XP_PER_OPPONENT } from "@/lib/xp/xp";
 import {
     describeEnd,
     type EndFacts,
@@ -93,13 +93,20 @@ describe("playedMoves", () => {
 
 describe("describeEnd", () => {
     const outcome = resolveEndOutcome(forfeitFacts);
-    const base = { ...forfeitFacts, outcome, botIds: [], version: 5 };
+    const base = {
+        ...forfeitFacts,
+        moduleId: "president",
+        outcome,
+        botIds: [],
+        version: 5,
+    };
 
     it("tells a remaining player they won by forfeit, with XP", () => {
         expect(describeEnd({ ...base, viewerId: "alice" })).toEqual({
             reason: "forfeit",
             forfeitedBy: "bob",
-            xpGained: PARTICIPATION_XP + WIN_XP,
+            // 3 seats → 2 beaten opponents; Président weighs 1.
+            xpGained: PARTICIPATION_XP + 2 * WIN_XP_PER_OPPONENT,
         });
     });
 
