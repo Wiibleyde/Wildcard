@@ -164,6 +164,9 @@ describe("bidding", () => {
         s = ok(s, { type: "bid", playerId: "c", bid: "garde-sans" });
         s = ok(s, { type: "pass", playerId: "d" });
         s = ok(s, { type: "pass", playerId: "a" });
+        // FFT: the taker first says whether they announce a slam.
+        expect(s.phase).toBe("slam");
+        s = ok(s, { type: "pass", playerId: "c" });
         expect(s.phase).toBe("playing");
         expect(s.taker).toBe("c");
         // The new eldest leads the first trick.
@@ -209,6 +212,8 @@ describe("bidding", () => {
         s = ok(s, { type: "pass", playerId: "b" });
         s = ok(s, { type: "pass", playerId: "c" });
         s = ok(s, { type: "pass", playerId: "d" });
+        expect(s.phase).toBe("slam");
+        s = ok(s, { type: "pass", playerId: "a" }); // no slam
         expect(s.phase).toBe("playing");
         expect(s.taker).toBe("a");
         expect(s.hands.a.length).toBe(18); // chien untouched
@@ -269,6 +274,8 @@ describe("écart (the dog)", () => {
             const legal = tarot.legalActions(s, "a");
             s = ok(s, legal[0]);
         }
+        expect(s.phase).toBe("slam");
+        s = ok(s, { type: "pass", playerId: "a" }); // no slam
         expect(s.phase).toBe("playing");
         expect(s.hands.a.length).toBe(18);
         expect(s.ecart.length).toBe(6);

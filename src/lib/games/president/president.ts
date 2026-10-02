@@ -9,6 +9,7 @@ import { fail, seatOrder } from "@/lib/engine/rules";
 import type {
     GameEvent,
     GameModule,
+    GameRuleMode,
     GameRuleToggle,
     GameState,
 } from "@/lib/engine/types";
@@ -137,6 +138,27 @@ export const PRESIDENT_RULE_TOGGLES: readonly GameRuleToggle[] = [
     { key: "equalRankLock", default: true, requires: "equalRank" },
     { key: "revolution", default: false },
     { key: "quadClosesTrick", default: true },
+];
+
+/**
+ * Launch presets. French table rules first (the default); the others are the
+ * two most common departures listed on the French Wikipedia page: playing
+ * with « la révolution », or the bare climbing game without any table rule.
+ */
+export const PRESIDENT_RULE_MODES: readonly GameRuleMode[] = [
+    { key: "president_fr", rules: {} },
+    { key: "president_revolution", rules: { revolution: true } },
+    {
+        key: "president_simple",
+        rules: {
+            twoClosesTrick: false,
+            finishOnTwoPenalty: false,
+            equalRank: false,
+            equalRankLock: false,
+            revolution: false,
+            quadClosesTrick: false,
+        },
+    },
 ];
 
 export interface TrickPlay {
@@ -384,6 +406,7 @@ const base: Omit<
     minPlayers: 3,
     maxPlayers: 6,
     ruleToggles: PRESIDENT_RULE_TOGGLES,
+    ruleModes: PRESIDENT_RULE_MODES,
 
     legalActions(state, playerId) {
         if (state.phase === "done") return [];

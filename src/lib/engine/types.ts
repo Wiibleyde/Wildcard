@@ -117,6 +117,48 @@ export function resolveRuleToggles(
     return out;
 }
 
+/**
+ * A named rule preset — « règles françaises », « War (anglaise) », « Vegas »…
+ * A mode is pure data over the game's toggles: picking it in the lobby writes
+ * its values into the same `key → boolean` map the toggles already persist, so
+ * modes need no storage, route, or engine change of their own. The FIRST mode
+ * of a game's list is its default and must match the toggles' defaults (the
+ * French rules whenever a French variant exists).
+ */
+export interface GameRuleMode {
+    /** Stable key, unique across the catalog (i18n: `lobby.modes.<key>`). */
+    readonly key: string;
+    /** Value of every toggle under this mode; a missing key = its default. */
+    readonly rules: Readonly<Record<string, boolean>>;
+}
+
+/** Full, resolved toggle map a mode stands for. */
+export function ruleModeValues(
+    toggles: readonly GameRuleToggle[] | undefined,
+    mode: GameRuleMode,
+): Record<string, boolean> {
+    return resolveRuleToggles(toggles, mode.rules);
+}
+
+/**
+ * The mode a resolved rule set corresponds to, or `null` when the host has
+ * tweaked toggles away from every preset (« personnalisé »). Derived, never
+ * stored — one source of truth: the toggle map itself.
+ */
+export function matchRuleMode(
+    modes: readonly GameRuleMode[] | undefined,
+    toggles: readonly GameRuleToggle[] | undefined,
+    rules: Readonly<Record<string, boolean>>,
+): GameRuleMode | null {
+    if (!modes || !toggles) return null;
+    return (
+        modes.find((mode) => {
+            const values = ruleModeValues(toggles, mode);
+            return toggles.every((t) => values[t.key] === rules[t.key]);
+        }) ?? null
+    );
+}
+
 /** Final standings once the game is over. */
 export interface GameOutcome {
     /** Players ranked best-first; equal `rank` means a tie. */
@@ -159,6 +201,19 @@ export interface GameModule<S extends GameState, A extends GameAction, V = S> {
      * fresh module via {@link GameModule.withRules} at deal time.
      */
     readonly ruleToggles?: readonly GameRuleToggle[];
+
+    /**
+     * Named presets over {@link ruleToggles} offered at launch (first = the
+     * default, French rules when they exist). Omitted = no mode picker.
+     */
+    readonly ruleModes?: readonly GameRuleMode[];
+
+    /**
+     * Action types the platform's naive bots never take unless nothing else is
+     * legal — gambles a random policy would only ever lose (e.g. announcing a
+     * Tarot slam). Omitted = every legal action is fair game.
+     */
+    readonly riskyActions?: readonly string[];
 
     /**
      * Rebuild this module bound to a host-chosen rule set (already resolved to

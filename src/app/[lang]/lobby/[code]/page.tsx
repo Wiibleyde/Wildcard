@@ -47,6 +47,7 @@ export default async function Page({
     const admin = createAdminClient();
     const module = await resolveGameModule(admin, room.module_id);
     const ruleToggles = module?.ruleToggles ?? [];
+    const ruleModes = module?.ruleModes ?? [];
     const initialRules = resolveRuleToggles(module?.ruleToggles, room.rules);
 
     const { data: memberRows } = await supabase
@@ -111,6 +112,7 @@ export default async function Page({
                     seated={seated}
                     initialRole={initialRole}
                     ruleToggles={ruleToggles}
+                    ruleModes={ruleModes}
                     initialRules={initialRules}
                 />
             </div>

@@ -4,7 +4,13 @@ import type { CardDescriptor } from "@/lib/card/types";
 import { buildDeck } from "@/lib/engine/deck";
 import type { Rng } from "@/lib/engine/rng";
 import { fail } from "@/lib/engine/rules";
-import type { GameEvent, GameModule, GameState } from "@/lib/engine/types";
+import type {
+    GameEvent,
+    GameModule,
+    GameRuleMode,
+    GameRuleToggle,
+    GameState,
+} from "@/lib/engine/types";
 
 /**
  * Bataille (War) — the foundational two-player game.
@@ -14,9 +20,14 @@ import type { GameEvent, GameModule, GameState } from "@/lib/engine/types";
  * model a *simultaneous, engine-driven* game — there is no "current player",
  * and the entire outcome is derived on the server from hidden piles.
  *
- * French rules: on a tie (« bataille ! ») each player lays ONE card face down,
- * then flips a new one face up; the higher flip takes the whole pot, another
- * tie repeats the war. A player who runs out of cards loses.
+ * French rules (https://fr.wikipedia.org/wiki/Bataille_(jeu)), the default: on
+ * a tie (« bataille ! ») each player lays ONE card face down, then flips a new
+ * one face up; the higher flip takes the whole pot, another tie repeats the
+ * war. A player who runs out of cards loses.
+ *
+ * Variant — `threeCardWar` (English « War »,
+ * https://www.pagat.com/war/war.html): a tie stakes THREE cards face down
+ * before the deciding flip, so wars swing far more cards.
  *
  * Bataille has no skill and can, with recycled piles, run for a very long
  * time, so the game is capped at {@link MAX_ROUNDS} rounds: past it, the game
@@ -44,8 +55,27 @@ const RANK_VALUE = buildRankOrder([
 ]);
 
 /** Cards laid face-down by each player on a tie before the deciding flip — one
- * in the French game (the English "War" variant stakes three). */
+ * in the French game, three in the English "War" variant. */
 export const WAR_STAKE = 1;
+export const ENGLISH_WAR_STAKE = 3;
+
+/** Table rules (see the module doc). */
+export interface BatailleRules {
+    /** English « War » — stake three face-down cards on a tie, not one. */
+    readonly threeCardWar: boolean;
+}
+
+export const DEFAULT_BATAILLE_RULES: BatailleRules = { threeCardWar: false };
+
+export const BATAILLE_RULE_TOGGLES: readonly GameRuleToggle[] = [
+    { key: "threeCardWar", default: false },
+];
+
+/** Launch presets — French first (the default). */
+export const BATAILLE_RULE_MODES: readonly GameRuleMode[] = [
+    { key: "bataille_fr", rules: { threeCardWar: false } },
+    { key: "bataille_war", rules: { threeCardWar: true } },
+];
 
 /** Cap on chained wars (tie → stake → tie …) inside ONE round. Each war step
  * consumes ≥ 2 cards per player from a 52-card deck, so a single round can
@@ -77,6 +107,9 @@ export interface BatailleState extends GameState {
     readonly lastWinner: string | null;
     /** Rounds resolved so far. */
     readonly rounds: number;
+    /** Table rules this game was dealt with. Absent on games recorded before
+     * rules existed — those were French, the default. */
+    readonly rules?: BatailleRules;
 }
 
 export type BatailleAction = {
@@ -202,10 +235,11 @@ function resolveRound(state: BatailleState, rng: Rng): BatailleState {
         }
 
         // Tie → war: both lay face-down stakes, then the loop flips again.
-        const stakeA = stakeFaceDown(pileA, rng, WAR_STAKE);
+        const stake = state.rules?.threeCardWar ? ENGLISH_WAR_STAKE : WAR_STAKE;
+        const stakeA = stakeFaceDown(pileA, rng, stake);
         pileA = stakeA.pile;
         pot.push(...stakeA.cards);
-        const stakeB = stakeFaceDown(pileB, rng, WAR_STAKE);
+        const stakeB = stakeFaceDown(pileB, rng, stake);
         pileB = stakeB.pile;
         pot.push(...stakeB.cards);
     }
@@ -254,14 +288,136 @@ function resolveRound(state: BatailleState, rng: Rng): BatailleState {
     };
 }
 
-export const bataille: GameModule<BatailleState, BatailleAction, BatailleView> =
-    {
-        id: "bataille",
-        name: "Bataille",
-        deck: french52,
-        minPlayers: 2,
-        maxPlayers: 2,
+const base: Omit<
+    GameModule<BatailleState, BatailleAction, BatailleView>,
+    "setup"
+> = {
+    id: "bataille",
+    name: "Bataille",
+    deck: french52,
+    minPlayers: 2,
+    maxPlayers: 2,
+    ruleToggles: BATAILLE_RULE_TOGGLES,
+    ruleModes: BATAILLE_RULE_MODES,
 
+    legalActions(state, playerId) {
+        if (state.phase === "done") return [];
+        if (!Object.hasOwn(state.piles, playerId)) return [];
+        // Either seated player may trigger the shared round resolution.
+        return [{ type: "flip", playerId }];
+    },
+
+    apply(state, action, rng) {
+        if (state.phase === "done") {
+            return fail("game_over", "The game has already finished.");
+        }
+        // Client input: check the shape at runtime so a crafted payload
+        // is refused instead of throwing.
+        if (
+            typeof action !== "object" ||
+            action === null ||
+            typeof action.playerId !== "string"
+        ) {
+            return fail("invalid_action", "Malformed action.");
+        }
+        if (action.type !== "flip") {
+            return fail("illegal_action", `Unknown action "${action.type}".`);
+        }
+        if (!Object.hasOwn(state.piles, action.playerId)) {
+            return fail("not_a_player", "Actor is not seated in this game.");
+        }
+
+        const next = resolveRound(state, rng);
+        const events: GameEvent[] = [
+            {
+                type: "round_resolved",
+                payload: { winner: next.lastWinner, round: next.rounds },
+            },
+        ];
+        if (next.phase === "done") {
+            // Decided by the round cap rather than a player running dry.
+            if (next.players.every((p) => totalCards(next.piles[p.id]) > 0)) {
+                events.push({
+                    type: "round_limit",
+                    payload: { rounds: next.rounds },
+                });
+            }
+            events.push({ type: "game_over" });
+        }
+        return { ok: true, state: next, events };
+    },
+
+    isOver(state) {
+        return state.phase === "done";
+    },
+
+    outcome(state) {
+        if (state.phase !== "done") return null;
+
+        const scored = state.players
+            .map((p) => ({
+                playerId: p.id,
+                score: totalCards(state.piles[p.id]),
+            }))
+            .sort((x, y) => y.score - x.score);
+
+        let rank = 0;
+        let previous = Number.POSITIVE_INFINITY;
+        const rankings = scored.map((s, index) => {
+            if (s.score < previous) {
+                rank = index + 1;
+                previous = s.score;
+            }
+            return { playerId: s.playerId, rank, score: s.score };
+        });
+
+        const best = scored[0].score;
+        const winners = scored
+            .filter((s) => s.score === best)
+            .map((s) => s.playerId);
+
+        return { rankings, winners };
+    },
+
+    view(state, viewerId) {
+        return {
+            gameId: state.gameId,
+            phase: state.phase,
+            turn: state.turn,
+            lastWinner: state.lastWinner,
+            self: viewerId,
+            players: state.players.map((p) => {
+                const pile = state.piles[p.id];
+                return {
+                    playerId: p.id,
+                    name: p.name,
+                    drawCount: pile.draw.length,
+                    wonCount: pile.won.length,
+                    total: totalCards(pile),
+                    lastReveal: state.lastReveal[p.id] ?? [],
+                };
+            }),
+        };
+    },
+};
+
+/**
+ * Build a Bataille module bound to a rule set. Bound rules are stamped into the
+ * state so a saved game replays identically on any instance. The unbound
+ * module (`rules` omitted) stamps nothing: that is exactly how games recorded
+ * before rules existed were dealt, so their replays still match byte for byte.
+ */
+export function createBataille(
+    rules?: BatailleRules,
+): GameModule<BatailleState, BatailleAction, BatailleView> {
+    return {
+        ...base,
+        withRules(chosen) {
+            return createBataille({
+                threeCardWar:
+                    chosen.threeCardWar ?? DEFAULT_BATAILLE_RULES.threeCardWar,
+            });
+        },
         setup(players, rng, seed, gameId) {
             const [p0, p1] = players;
             const deck = rng.shuffle(buildDeck(french52));
@@ -281,114 +437,10 @@ export const bataille: GameModule<BatailleState, BatailleAction, BatailleView> =
                 lastReveal: { [p0.id]: [], [p1.id]: [] },
                 lastWinner: null,
                 rounds: 0,
-            };
-        },
-
-        legalActions(state, playerId) {
-            if (state.phase === "done") return [];
-            if (!Object.hasOwn(state.piles, playerId)) return [];
-            // Either seated player may trigger the shared round resolution.
-            return [{ type: "flip", playerId }];
-        },
-
-        apply(state, action, rng) {
-            if (state.phase === "done") {
-                return fail("game_over", "The game has already finished.");
-            }
-            // Client input: check the shape at runtime so a crafted payload
-            // is refused instead of throwing.
-            if (
-                typeof action !== "object" ||
-                action === null ||
-                typeof action.playerId !== "string"
-            ) {
-                return fail("invalid_action", "Malformed action.");
-            }
-            if (action.type !== "flip") {
-                return fail(
-                    "illegal_action",
-                    `Unknown action "${action.type}".`,
-                );
-            }
-            if (!Object.hasOwn(state.piles, action.playerId)) {
-                return fail(
-                    "not_a_player",
-                    "Actor is not seated in this game.",
-                );
-            }
-
-            const next = resolveRound(state, rng);
-            const events: GameEvent[] = [
-                {
-                    type: "round_resolved",
-                    payload: { winner: next.lastWinner, round: next.rounds },
-                },
-            ];
-            if (next.phase === "done") {
-                // Decided by the round cap rather than a player running dry.
-                if (
-                    next.players.every((p) => totalCards(next.piles[p.id]) > 0)
-                ) {
-                    events.push({
-                        type: "round_limit",
-                        payload: { rounds: next.rounds },
-                    });
-                }
-                events.push({ type: "game_over" });
-            }
-            return { ok: true, state: next, events };
-        },
-
-        isOver(state) {
-            return state.phase === "done";
-        },
-
-        outcome(state) {
-            if (state.phase !== "done") return null;
-
-            const scored = state.players
-                .map((p) => ({
-                    playerId: p.id,
-                    score: totalCards(state.piles[p.id]),
-                }))
-                .sort((x, y) => y.score - x.score);
-
-            let rank = 0;
-            let previous = Number.POSITIVE_INFINITY;
-            const rankings = scored.map((s, index) => {
-                if (s.score < previous) {
-                    rank = index + 1;
-                    previous = s.score;
-                }
-                return { playerId: s.playerId, rank, score: s.score };
-            });
-
-            const best = scored[0].score;
-            const winners = scored
-                .filter((s) => s.score === best)
-                .map((s) => s.playerId);
-
-            return { rankings, winners };
-        },
-
-        view(state, viewerId) {
-            return {
-                gameId: state.gameId,
-                phase: state.phase,
-                turn: state.turn,
-                lastWinner: state.lastWinner,
-                self: viewerId,
-                players: state.players.map((p) => {
-                    const pile = state.piles[p.id];
-                    return {
-                        playerId: p.id,
-                        name: p.name,
-                        drawCount: pile.draw.length,
-                        wonCount: pile.won.length,
-                        total: totalCards(pile),
-                        lastReveal: state.lastReveal[p.id] ?? [],
-                    };
-                }),
+                ...(rules ? { rules } : {}),
             };
         },
     };
+}
+
+export const bataille = createBataille();

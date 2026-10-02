@@ -10,7 +10,7 @@ import {
     type TableSeat,
     type TableZoneInstance,
 } from "../table/types";
-import type { Bid } from "./scoring";
+import type { Bid, HandfulLevel } from "./scoring";
 import {
     SUIT_STRENGTH,
     type TarotAction,
@@ -64,8 +64,21 @@ function cardLabel(ctx: TableContext, card: CardDescriptor): string {
     return "?";
 }
 
+function handfulLabel(ctx: TableContext, level: HandfulLevel): string {
+    return ctx.t(`tarot_handful_${level}`);
+}
+
 /** Short status line under an opponent's seat chip. */
 function seatStatus(
+    ctx: TableContext,
+    view: TarotView,
+    p: TarotPlayerView,
+): string {
+    const base = seatBaseStatus(ctx, view, p);
+    return p.handful ? `${base} · ${handfulLabel(ctx, p.handful.level)}` : base;
+}
+
+function seatBaseStatus(
     ctx: TableContext,
     view: TarotView,
     p: TarotPlayerView,
@@ -107,6 +120,16 @@ export const tarotTable = registerTable<TarotView>({
             arrangement: "row",
             cardSize: "md",
             framed: true,
+        },
+        // Poignées shown during the first trick — public, one per declarer.
+        // Top band, not center: on a height-bounded board every center row is
+        // sized to the region's height, so a second one would overflow. Who
+        // showed it reads on their seat chip and in the log, so no caption.
+        {
+            id: "handful",
+            placement: "top",
+            arrangement: "row",
+            cardSize: "xs",
         },
         { id: "hand", placement: "bottom", arrangement: "fan", cardSize: "lg" },
     ],
@@ -154,7 +177,9 @@ export const tarotTable = registerTable<TarotView>({
                 ? "tarot_your_bid"
                 : view.phase === "dog"
                   ? "tarot_your_ecart"
-                  : "your_turn";
+                  : view.phase === "slam"
+                    ? "tarot_your_slam"
+                    : "your_turn";
         const banner = ctx.isOver
             ? ctx.t("game_over")
             : isYourTurn
@@ -190,28 +215,53 @@ export const tarotTable = registerTable<TarotView>({
             });
         }
 
+        // Poignées stay on display until the first trick is won.
+        const firstTrick = view.players.every((p) => p.trickWins === 0);
+        const showingHandful =
+            view.phase === "playing" &&
+            firstTrick &&
+            view.players.some((p) => p.handful);
+        if (showingHandful) {
+            for (const p of view.players) {
+                if (!p.handful) continue;
+                zones.push({
+                    key: `handful:${p.playerId}`,
+                    zone: "handful",
+                    cards: p.handful.cards.map((card) => ({
+                        id: `handful:${p.playerId}:${cardKey(card)}`,
+                        card,
+                        ownerId: p.playerId,
+                    })),
+                });
+            }
+        }
+
         // The running trick (or the just-won one, kept until the next lead).
         if (view.phase === "playing" || view.phase === "done") {
             const showingLast = view.pile.length === 0 && view.lastTrick;
             const plays = showingLast ? view.lastTrick.plays : view.pile;
             const top = plays.at(-1);
-            zones.push({
-                key: "trick",
-                zone: "trick",
-                cards: plays.map((play) => ({
-                    id: `trick:${cardKey(play.card)}`,
-                    card: play.card,
-                    ownerId: play.playerId,
-                })),
-                caption: showingLast
-                    ? ctx.t("trick_won", {
-                          name: playerName(ctx, view.lastTrick.winnerId),
-                      })
-                    : top
-                      ? playerName(ctx, top.playerId)
-                      : undefined,
-                emptyHint: ctx.t("in_play"),
-            });
+            // The empty « en jeu » placeholder has a fixed card size; next to a
+            // handful row it would overflow a height-bounded board, so it
+            // waits for the first card (real cards size to the region).
+            if (plays.length > 0 || !showingHandful)
+                zones.push({
+                    key: "trick",
+                    zone: "trick",
+                    cards: plays.map((play) => ({
+                        id: `trick:${cardKey(play.card)}`,
+                        card: play.card,
+                        ownerId: play.playerId,
+                    })),
+                    caption: showingLast
+                        ? ctx.t("trick_won", {
+                              name: playerName(ctx, view.lastTrick.winnerId),
+                          })
+                        : top
+                          ? playerName(ctx, top.playerId)
+                          : undefined,
+                    emptyHint: ctx.t("in_play"),
+                });
         }
 
         // The hand becomes a one-tap picker: each legal card carries its play /
@@ -273,6 +323,41 @@ export const tarotTable = registerTable<TarotView>({
             }
         }
 
+        // Slam decision (FFT « chelem annoncé »): the taker, before any card.
+        if (view.phase === "slam" && isYourTurn) {
+            const announce = legal.find((a) => a.type === "announceSlam");
+            const pass = legal.find((a) => a.type === "pass");
+            if (announce) {
+                controls.push({
+                    key: "slam",
+                    label: ctx.t("tarot_announce_slam"),
+                    action: announce,
+                    variant: "primary",
+                });
+            }
+            if (pass) {
+                controls.push({
+                    key: "no-slam",
+                    label: ctx.t("tarot_no_slam"),
+                    action: pass,
+                    variant: "danger",
+                });
+            }
+        }
+
+        // Poignée: offered alongside the hand, just before your first card.
+        const handful = legal.find((a) => a.type === "handful");
+        if (view.phase === "playing" && isYourTurn && handful) {
+            controls.push({
+                key: "handful",
+                label: ctx.t("tarot_show_handful", {
+                    level: handfulLabel(ctx, handful.level),
+                }),
+                action: handful,
+                variant: "primary",
+            });
+        }
+
         return {
             banner: { label: banner, highlight: isYourTurn },
             seats,
@@ -305,6 +390,13 @@ export const tarotTable = registerTable<TarotView>({
                 });
             case "chien_revealed":
                 return ctx.t("tarot_log_chien");
+            case "slam_announced":
+                return ctx.t("tarot_log_slam", { name });
+            case "handful":
+                return ctx.t("tarot_log_handful", {
+                    name,
+                    level: handfulLabel(ctx, p.level as HandfulLevel),
+                });
             case "ecart_done":
                 return ctx.t("tarot_log_ecart");
             case "played":
@@ -350,10 +442,13 @@ function statusLine(ctx: TableContext, view: TarotView): string | undefined {
         );
     }
     if (view.contract && view.taker) {
-        return ctx.t("tarot_contract_status", {
+        const status = ctx.t("tarot_contract_status", {
             contract: bidLabel(ctx, view.contract),
             name: playerName(ctx, view.taker),
         });
+        return view.slamAnnounced
+            ? `${status} · ${ctx.t("tarot_slam_status")}`
+            : status;
     }
     return undefined;
 }
