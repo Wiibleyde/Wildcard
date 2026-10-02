@@ -2,22 +2,16 @@
 
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useCallback } from "react";
+import { roomTopic } from "@/lib/realtime/topics";
 import {
     type RealtimeStatus,
     useRealtimeSync,
 } from "@/lib/realtime/useRealtimeSync";
 import { getSupabaseSchema } from "@/lib/supabase/env";
 
-/**
- * Subscribe to a lobby: seat changes (`room_players`) and room status changes
- * (`rooms`). Both are public-safe tables, so clients read them directly under
- * RLS — Realtime pushes the deltas, the consumer refetches the current seats /
- * status and reacts (e.g. navigates everyone into the game when it starts).
- *
- * Returns the connection health (see {@link RealtimeStatus}); resilience —
- * disconnect detection, auto re-join, resync on every gap — lives in
- * {@link useRealtimeSync}. `onChange` must be stable (`useCallback`).
- */
+const ROOM_POLL_MS = 3000;
+
+/** Seats and room status, both public-safe and read under RLS. `onChange` must be stable. */
 export function useRoomChannel(
     roomId: string,
     onChange: () => void,
@@ -48,7 +42,5 @@ export function useRoomChannel(
         [roomId, onChange],
     );
 
-    // Poll every 3s while Realtime is down so the lobby roster (joins, bots,
-    // spectators, start) still refreshes for everyone.
-    return useRealtimeSync(`room:${roomId}`, build, onChange, 3000);
+    return useRealtimeSync(roomTopic(roomId), build, onChange, ROOM_POLL_MS);
 }
