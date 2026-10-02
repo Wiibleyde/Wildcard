@@ -12,3 +12,8 @@ export const BOARD_THEMES: Record<string, BoardTheme> = {
     midnight: midnightTheme,
     creator: creatorBoardTheme,
 };
+
+// A stale id in `player_customizations` falls back to the green felt.
+export function getBoardTheme(id: string | null | undefined): BoardTheme {
+    return (id && BOARD_THEMES[id]) || greenFeltTheme;
+}
