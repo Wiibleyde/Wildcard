@@ -7,12 +7,6 @@ import { cardKey } from "@/lib/card/utils";
 import { ecaCardLabel as cardLabel, isRedSuit } from "@/lib/eca/display";
 import type { EcaAction } from "@/lib/eca/types";
 
-/**
- * One seat in the sandbox, rendered entirely from that seat's own redacted
- * view: its hand, which cards are legal to play, and the draw / pass actions.
- * Every control dispatches through `onAct` — the same runner path a real match
- * uses.
- */
 export function TestPlaySeat({
     seat,
     over,

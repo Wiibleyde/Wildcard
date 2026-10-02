@@ -3,12 +3,6 @@
 import { useTranslations } from "next-intl";
 import type { EcaValidationError } from "@/lib/eca/validate";
 
-/**
- * Live validation report for the Studio editor — one line per error, keyed by
- * `path:code`. `errorText` (from {@link import("@/hooks/studio/useEcaEditor").useEcaEditor})
- * turns a known error code into a translated message, falling back to the
- * validator's English message.
- */
 export function ValidationReport({
     errors,
     errorText,

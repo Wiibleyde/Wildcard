@@ -6,16 +6,9 @@ import type {
 } from "@/lib/eca/types";
 
 /**
- * Editor-side mirror of an {@link EcaDefinition}: conditions and effects carry
- * a local `key` so list rows get stable React keys (no array indexes) without
- * losing focus on every edit. The schema itself has no such ids — but
- * `validateEcaDefinition` REBUILDS the definition field by field, stripping
- * unknown keys, so a draft can be fed to it directly and the returned
- * definition is clean for saving and test play.
- *
- * Initial keys are position-derived (deterministic, so SSR and hydration
- * agree); rows added afterwards — always in response to a user event, thus
- * client-only — use `crypto.randomUUID()`.
+ * Editor mirror of a definition with stable row keys. The validator rebuilds
+ * field by field, so the keys never reach the server. Initial keys are
+ * positional so SSR and hydration agree.
  */
 
 export type DraftCondition = EcaCondition & { readonly key: string };

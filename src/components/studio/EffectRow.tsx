@@ -1,63 +1,46 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import type { EcaEffect, EcaEventType } from "@/lib/eca/types";
+import {
+    ECA_DRAW_TARGETS,
+    ECA_EFFECT_SPECS,
+    type EcaEffectType,
+    effectTypesFor,
+    isOneOf,
+} from "@/lib/eca/schema";
+import type { EcaDrawTarget, EcaEffect, EcaEventType } from "@/lib/eca/types";
 import { ECA_DRAW_COUNT_MAX, ECA_DRAW_COUNT_MIN } from "@/lib/eca/validate";
-import type { Translate } from "@/lib/games/catalogView";
-import { dangerButtonStyle, fieldClass, fieldStyle } from "./fields";
+import {
+    dangerButtonStyle,
+    fieldClass,
+    fieldStyle,
+    labelClass,
+    labelStyle,
+} from "./fields";
+import type { StudioMessageKey } from "./messages";
+import { StudioRow } from "./StudioRow";
 
-/** One ALORS row: effect type select + its parameters. */
+const EFFECT_LABELS: Record<EcaEffectType, StudioMessageKey> = {
+    acceptCard: "effect_acceptCard",
+    rejectCard: "effect_rejectCard",
+    drawCards: "effect_drawCards",
+    skipNextPlayer: "effect_skipNextPlayer",
+    reverseDirection: "effect_reverseDirection",
+    playAgain: "effect_playAgain",
+    endGame: "effect_endGame",
+};
 
-type EffectType = EcaEffect["type"];
-
-const EFFECT_TYPES: ReadonlyArray<{
-    readonly id: EffectType;
-    readonly labelKey: string;
-    /** acceptCard / rejectCard / playAgain only answer a played card. */
-    readonly cardPlayedOnly: boolean;
-}> = [
-    { id: "acceptCard", labelKey: "effect_acceptCard", cardPlayedOnly: true },
-    { id: "rejectCard", labelKey: "effect_rejectCard", cardPlayedOnly: true },
-    { id: "drawCards", labelKey: "effect_drawCards", cardPlayedOnly: false },
-    {
-        id: "skipNextPlayer",
-        labelKey: "effect_skipNextPlayer",
-        cardPlayedOnly: false,
-    },
-    {
-        id: "reverseDirection",
-        labelKey: "effect_reverseDirection",
-        cardPlayedOnly: false,
-    },
-    { id: "playAgain", labelKey: "effect_playAgain", cardPlayedOnly: true },
-    { id: "endGame", labelKey: "effect_endGame", cardPlayedOnly: false },
-];
-
-function defaultEffect(type: EffectType): EcaEffect {
-    switch (type) {
-        case "acceptCard":
-            return { type: "acceptCard" };
-        case "rejectCard":
-            return { type: "rejectCard" };
-        case "drawCards":
-            return { type: "drawCards", target: "nextPlayer", count: 1 };
-        case "skipNextPlayer":
-            return { type: "skipNextPlayer" };
-        case "reverseDirection":
-            return { type: "reverseDirection" };
-        case "playAgain":
-            return { type: "playAgain" };
-        case "endGame":
-            return { type: "endGame", winner: "actor" };
-    }
-}
+const TARGET_LABELS: Record<EcaDrawTarget, StudioMessageKey> = {
+    actor: "effect_target_actor",
+    nextPlayer: "effect_target_nextPlayer",
+};
 
 interface Props {
     readonly effect: EcaEffect;
     readonly event: EcaEventType;
     readonly onChange: (effect: EcaEffect) => void;
     readonly onRemove: () => void;
-    /** The last effect of a rule cannot be removed (a rule needs ≥ 1). */
+    /** A rule needs at least one effect. */
     readonly removable: boolean;
 }
 
@@ -68,18 +51,13 @@ export function EffectRow({
     onRemove,
     removable,
 }: Props) {
-    // Dynamic labelKey lookups need the loose Translate shape.
-    const t = useTranslations("studio") as unknown as Translate;
+    const t = useTranslations("studio");
+    const types = effectTypesFor(event);
 
-    const types =
-        event === "cardPlayed"
-            ? EFFECT_TYPES
-            : EFFECT_TYPES.filter((entry) => !entry.cardPlayedOnly);
-
-    function handleType(id: string) {
-        const entry = types.find((candidate) => candidate.id === id);
-        if (entry && entry.id !== effect.type)
-            onChange(defaultEffect(entry.id));
+    function handleType(type: string) {
+        if (isOneOf(type, types) && type !== effect.type) {
+            onChange(ECA_EFFECT_SPECS[type].create());
+        }
     }
 
     function handleCount(raw: string) {
@@ -94,14 +72,14 @@ export function EffectRow({
         onChange({ ...effect, count });
     }
 
+    function handleTarget(target: string) {
+        if (effect.type === "drawCards" && isOneOf(target, ECA_DRAW_TARGETS)) {
+            onChange({ ...effect, target });
+        }
+    }
+
     return (
-        <div
-            className="flex flex-col gap-2 rounded-xl p-2.5 sm:flex-row sm:items-center"
-            style={{
-                background: "var(--cream)",
-                border: "2px solid var(--ink)",
-            }}
-        >
+        <StudioRow>
             <select
                 value={effect.type}
                 onChange={(e) => handleType(e.target.value)}
@@ -109,9 +87,9 @@ export function EffectRow({
                 className={`${fieldClass} min-w-0 flex-1`}
                 style={fieldStyle}
             >
-                {types.map((entry) => (
-                    <option key={entry.id} value={entry.id}>
-                        {t(entry.labelKey)}
+                {types.map((type) => (
+                    <option key={type} value={type}>
+                        {t(EFFECT_LABELS[type])}
                     </option>
                 ))}
             </select>
@@ -124,37 +102,25 @@ export function EffectRow({
                         max={ECA_DRAW_COUNT_MAX}
                         value={effect.count}
                         onChange={(e) => handleCount(e.target.value)}
-                        aria-label={t("effect_count_label")}
+                        aria-label={t("effect_count_aria")}
                         className={`${fieldClass} w-16 shrink-0`}
                         style={fieldStyle}
                     />
-                    <span
-                        className="text-xs font-bold uppercase tracking-widest"
-                        style={{ color: "#5a5340" }}
-                    >
+                    <span className={labelClass} style={labelStyle}>
                         {t("effect_count_label")} →
                     </span>
                     <select
                         value={effect.target}
-                        onChange={(e) =>
-                            onChange({
-                                ...effect,
-                                target:
-                                    e.target.value === "actor"
-                                        ? "actor"
-                                        : "nextPlayer",
-                            })
-                        }
+                        onChange={(e) => handleTarget(e.target.value)}
                         aria-label={t("effect_target_label")}
                         className={`${fieldClass} shrink-0`}
                         style={fieldStyle}
                     >
-                        <option value="actor">
-                            {t("effect_target_actor")}
-                        </option>
-                        <option value="nextPlayer">
-                            {t("effect_target_nextPlayer")}
-                        </option>
+                        {ECA_DRAW_TARGETS.map((target) => (
+                            <option key={target} value={target}>
+                                {t(TARGET_LABELS[target])}
+                            </option>
+                        ))}
                     </select>
                 </div>
             )}
@@ -169,6 +135,6 @@ export function EffectRow({
             >
                 ✕
             </button>
-        </div>
+        </StudioRow>
     );
 }

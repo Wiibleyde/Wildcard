@@ -1,288 +1,26 @@
 "use client";
 
-import Image from "next/image";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { useConfirm } from "@/components/ui/ConfirmProvider";
-import { GameButton } from "@/components/ui/GameButton";
-import { useRouter } from "@/i18n/navigation";
-import { apiFetch } from "@/lib/api/client";
-import { CRAZY_EIGHTS_LIKE, MINIMAL_VALID } from "@/lib/eca/fixtures";
-import { ecaModuleIdFor } from "@/lib/eca/id";
-import type { EcaDefinition } from "@/lib/eca/types";
-import { ECA_NAME_MAX } from "@/lib/eca/validate";
-// Client-safe: models/studio only pulls @/lib/eca at runtime (supabase imports are type-only).
+// Client-safe: models/studio only has type imports from supabase.
 import { MAX_ECA_GAMES_PER_OWNER } from "@/lib/models/studio";
-import { fieldClass, fieldStyle, labelClass, labelStyle } from "./fields";
+import { CreateGamePanel } from "./CreateGamePanel";
+import { StudioGameCard, type StudioGameSummary } from "./StudioGameCard";
 
-/**
- * Studio landing island: the creator's games (server-fetched through the RLS
- * client, passed down as summaries) plus the create flow — pick a template,
- * name it, POST, and jump into the editor.
- */
-
-export interface StudioGameSummary {
-    readonly id: string;
-    readonly name: string;
-    readonly description: string | null;
-    readonly status: "draft" | "published";
-    readonly ruleCount: number;
-    /** Display-ready public cover URL (already resolved), or null. */
-    readonly imageUrl: string | null;
-    readonly updatedAt: string;
-    /** Taken down by an admin: editable, but only an admin can republish. */
-    readonly moderationLocked?: boolean;
-}
-
-type TemplateId = "blank" | "example";
-
-const TEMPLATES: ReadonlyArray<{
-    readonly id: TemplateId;
-    readonly labelKey: "template_blank" | "template_example";
-    readonly descKey: "template_blank_desc" | "template_example_desc";
-    readonly definition: EcaDefinition;
-}> = [
-    {
-        id: "blank",
-        labelKey: "template_blank",
-        descKey: "template_blank_desc",
-        definition: MINIMAL_VALID,
-    },
-    {
-        id: "example",
-        labelKey: "template_example",
-        descKey: "template_example_desc",
-        definition: CRAZY_EIGHTS_LIKE,
-    },
-];
-
-interface Props {
+export function StudioHub({
+    games,
+}: {
     readonly games: readonly StudioGameSummary[];
-}
-
-export function StudioHub({ games }: Props) {
+}) {
     const t = useTranslations("studio");
-    const locale = useLocale();
-    const router = useRouter();
-    const confirm = useConfirm();
-
-    const [name, setName] = useState("");
-    const [template, setTemplate] = useState<TemplateId>("blank");
-    const [busy, setBusy] = useState(false);
-    const [deleting, setDeleting] = useState<string | null>(null);
-    const [launching, setLaunching] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-
-    // Mirrors the server-side per-owner cap — no doomed POST, instant hint.
-    const atLimit = games.length >= MAX_ECA_GAMES_PER_OWNER;
-
-    // timeZone pinned so the SSR (UTC) and client renders agree near midnight.
-    function formatDate(iso: string): string {
-        return new Date(iso).toLocaleDateString(
-            locale === "fr" ? "fr-FR" : "en-US",
-            {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-                timeZone: "UTC",
-            },
-        );
-    }
-
-    async function handleCreate() {
-        const trimmed = name.trim();
-        if (!trimmed || busy || atLimit) return;
-        setBusy(true);
-        setError(null);
-        try {
-            const base =
-                TEMPLATES.find((entry) => entry.id === template)?.definition ??
-                MINIMAL_VALID;
-            const definition: EcaDefinition = {
-                ...base,
-                meta: { ...base.meta, name: trimmed },
-            };
-            const payload: Record<string, unknown> = {
-                name: trimmed,
-                definition,
-            };
-            if (definition.meta.description !== undefined) {
-                payload.description = definition.meta.description;
-            }
-            const res = await apiFetch("/api/studio/games", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-            });
-            const data = (await res.json().catch(() => ({}))) as {
-                id?: unknown;
-                error?: unknown;
-            };
-            if (!res.ok || typeof data.id !== "string") {
-                setError(
-                    data.error === "limit_reached"
-                        ? t("create_limit")
-                        : t("create_error"),
-                );
-                setBusy(false);
-                return;
-            }
-            router.push(`/studio/${data.id}`);
-        } catch {
-            setError(t("create_error"));
-            setBusy(false);
-        }
-    }
-
-    /**
-     * Host a room for this game and jump into its lobby. Works for published
-     * games and — because the owner is the requester — for the creator's own
-     * unpublished drafts too (playtest with friends). The server re-validates
-     * the definition, so a broken draft surfaces as a play error here.
-     */
-    async function handlePlay(game: StudioGameSummary) {
-        if (launching) return;
-        setLaunching(game.id);
-        setError(null);
-        try {
-            const res = await apiFetch("/api/rooms", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    moduleId: ecaModuleIdFor(game.id),
-                    visibility: "private",
-                }),
-            });
-            const data = (await res.json().catch(() => ({}))) as {
-                code?: unknown;
-                error?: unknown;
-            };
-            if (!res.ok || typeof data.code !== "string") {
-                setError(
-                    res.status === 423 || data.error === "moderation_locked"
-                        ? t("api_errors.moderation_locked")
-                        : t("play_error"),
-                );
-                setLaunching(null);
-                return;
-            }
-            router.push(`/lobby/${data.code}`);
-        } catch {
-            setError(t("play_error"));
-            setLaunching(null);
-        }
-    }
-
-    async function handleDelete(game: StudioGameSummary) {
-        const accepted = await confirm({
-            title: t("delete"),
-            message: t("delete_confirm", { name: game.name }),
-            confirmLabel: t("delete"),
-            variant: "red",
-        });
-        if (!accepted) return;
-        setDeleting(game.id);
-        setError(null);
-        try {
-            const res = await apiFetch(`/api/studio/games/${game.id}`, {
-                method: "DELETE",
-            });
-            if (!res.ok) {
-                setError(
-                    res.status === 423
-                        ? t("api_errors.moderation_locked")
-                        : t("delete_error"),
-                );
-                return;
-            }
-            router.refresh();
-        } catch {
-            setError(t("delete_error"));
-        } finally {
-            setDeleting(null);
-        }
-    }
 
     return (
         <div className="flex flex-col gap-8">
-            {/* Create a new game from a template. */}
-            <section className="panel flex flex-col gap-4 p-5 sm:p-6">
-                <h2
-                    className="font-display text-xl"
-                    style={{ color: "var(--ink)" }}
-                >
-                    {t("create_title")}
-                </h2>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {TEMPLATES.map((entry) => {
-                        const selected = template === entry.id;
-                        return (
-                            <button
-                                key={entry.id}
-                                type="button"
-                                onClick={() => setTemplate(entry.id)}
-                                aria-pressed={selected}
-                                className="lift flex flex-col items-start gap-1 rounded-2xl p-4 text-left"
-                                style={{
-                                    background: selected
-                                        ? "var(--gold)"
-                                        : "var(--cream2)",
-                                    border: "2.5px solid var(--ink)",
-                                    boxShadow: "0 4px 0 var(--ink)",
-                                    color: "var(--ink)",
-                                }}
-                            >
-                                <span className="font-display text-lg">
-                                    {t(entry.labelKey)}
-                                </span>
-                                <span
-                                    className="text-xs font-semibold"
-                                    style={{ color: "#5a5340" }}
-                                >
-                                    {t(entry.descKey)}
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                    <div className="min-w-0 flex-1">
-                        <label
-                            htmlFor="studio-create-name"
-                            className={`${labelClass} mb-2 block`}
-                            style={labelStyle}
-                        >
-                            {t("create_name_label")}
-                        </label>
-                        <input
-                            id="studio-create-name"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            maxLength={ECA_NAME_MAX}
-                            placeholder={t("create_name_placeholder")}
-                            className={`${fieldClass} w-full`}
-                            style={fieldStyle}
-                        />
-                    </div>
-                    <GameButton
-                        variant="red"
-                        size="md"
-                        onClick={handleCreate}
-                        disabled={busy || atLimit || name.trim().length === 0}
-                        className="shrink-0"
-                    >
-                        {busy ? t("creating") : t("create")}
-                    </GameButton>
-                </div>
-                {atLimit && (
-                    <p
-                        className="text-xs font-semibold"
-                        style={{ color: "#5a5340" }}
-                    >
-                        {t("create_limit")}
-                    </p>
-                )}
-            </section>
+            <CreateGamePanel
+                atLimit={games.length >= MAX_ECA_GAMES_PER_OWNER}
+                onError={setError}
+            />
 
             {error && (
                 <p
@@ -298,7 +36,6 @@ export function StudioHub({ games }: Props) {
                 </p>
             )}
 
-            {/* Existing games. */}
             <section className="flex flex-col gap-4">
                 <h2 className="font-display text-xl text-wc-cream">
                     {t("my_games")}
@@ -310,115 +47,11 @@ export function StudioHub({ games }: Props) {
                 ) : (
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                         {games.map((game) => (
-                            <article
+                            <StudioGameCard
                                 key={game.id}
-                                className="panel lift flex flex-col gap-3 p-4 sm:p-5"
-                            >
-                                {game.imageUrl && (
-                                    <div
-                                        className="relative aspect-video w-full overflow-hidden rounded-xl"
-                                        style={{
-                                            border: "2.5px solid var(--ink)",
-                                        }}
-                                    >
-                                        <Image
-                                            src={game.imageUrl}
-                                            alt={game.name}
-                                            fill
-                                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                                            className="object-cover"
-                                            unoptimized
-                                        />
-                                    </div>
-                                )}
-                                <div className="flex items-start justify-between gap-2">
-                                    <h3
-                                        className="font-display text-lg leading-tight"
-                                        style={{ color: "var(--ink)" }}
-                                    >
-                                        {game.name}
-                                    </h3>
-                                    <span
-                                        className="stamp shrink-0"
-                                        style={
-                                            game.status === "published"
-                                                ? {
-                                                      background:
-                                                          "var(--green)",
-                                                      color: "var(--ink)",
-                                                  }
-                                                : {
-                                                      background:
-                                                          "var(--cream2)",
-                                                      color: "var(--ink)",
-                                                  }
-                                        }
-                                    >
-                                        {game.status === "published"
-                                            ? t("status_published")
-                                            : t("status_draft")}
-                                    </span>
-                                </div>
-                                {game.moderationLocked && (
-                                    <span
-                                        className="stamp self-start"
-                                        style={{
-                                            background: "var(--red)",
-                                            color: "var(--accent-ink)",
-                                        }}
-                                    >
-                                        {t("moderation_locked_badge")}
-                                    </span>
-                                )}
-                                {game.description && (
-                                    <p
-                                        className="line-clamp-2 text-xs font-semibold"
-                                        style={{ color: "#5a5340" }}
-                                    >
-                                        {game.description}
-                                    </p>
-                                )}
-                                <p
-                                    className="text-xs font-semibold"
-                                    style={{ color: "#5a5340" }}
-                                >
-                                    {t("rule_count", { n: game.ruleCount })} ·{" "}
-                                    {t("updated", {
-                                        date: formatDate(game.updatedAt),
-                                    })}
-                                </p>
-                                <div className="mt-auto flex flex-col gap-2">
-                                    <GameButton
-                                        variant="green"
-                                        size="sm"
-                                        onClick={() => handlePlay(game)}
-                                        disabled={launching !== null}
-                                        className="w-full"
-                                    >
-                                        {launching === game.id
-                                            ? t("launching")
-                                            : t("play")}
-                                    </GameButton>
-                                    <div className="flex gap-2">
-                                        <GameButton
-                                            variant="gold"
-                                            size="sm"
-                                            href={`/studio/${game.id}`}
-                                            className="flex-1"
-                                        >
-                                            {t("edit")}
-                                        </GameButton>
-                                        <GameButton
-                                            variant="red"
-                                            size="sm"
-                                            onClick={() => handleDelete(game)}
-                                            disabled={deleting !== null}
-                                        >
-                                            {t("delete")}
-                                        </GameButton>
-                                    </div>
-                                </div>
-                            </article>
+                                game={game}
+                                onError={setError}
+                            />
                         ))}
                     </div>
                 )}

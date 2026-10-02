@@ -1,15 +1,10 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import type { CSSProperties } from "react";
 import { GameButton } from "@/components/ui/GameButton";
 import type { EcaEditorController } from "@/hooks/studio/useEcaEditor";
+import { StatusStamp } from "./StatusStamp";
 
-/**
- * Editor header: back link, live title, status / validity badges, the
- * save / publish / delete actions, and the mutation-error line. Reads
- * everything from the {@link EcaEditorController} the editor owns.
- */
 export function EcaEditorHeader({
     editor,
 }: {
@@ -27,20 +22,12 @@ export function EcaEditorHeader({
         saved,
         publishing,
         deleting,
-        localError,
         publishDisabled,
-        mutationFailed,
-        mutationErrorCode,
+        errorMessage,
         handleSave,
         handleToggleStatus,
         handleDelete,
-        apiErrorText,
     } = editor;
-
-    const statusStamp: CSSProperties =
-        status === "published"
-            ? { background: "var(--green)", color: "var(--ink)" }
-            : { background: "var(--cream2)", color: "var(--ink)" };
 
     return (
         <header className="flex flex-col gap-3">
@@ -53,22 +40,8 @@ export function EcaEditorHeader({
                 {draft.meta.name || t("title")}
             </h1>
             <div className="flex flex-wrap items-center gap-2">
-                <span className="stamp" style={statusStamp}>
-                    {status === "published"
-                        ? t("status_published")
-                        : t("status_draft")}
-                </span>
-                {locked && (
-                    <span
-                        className="stamp"
-                        style={{
-                            background: "var(--red)",
-                            color: "var(--accent-ink)",
-                        }}
-                    >
-                        {t("moderation_locked_badge")}
-                    </span>
-                )}
+                <StatusStamp status={status} />
+                {locked && <StatusStamp status="locked" />}
                 {validation.ok ? (
                     <span
                         className="stamp"
@@ -128,12 +101,12 @@ export function EcaEditorHeader({
                     </span>
                 )}
             </div>
-            {(mutationFailed || localError) && (
+            {errorMessage !== null && (
                 <p
                     className="text-xs font-bold"
                     style={{ color: "var(--red)" }}
                 >
-                    {localError ?? apiErrorText(mutationErrorCode)}
+                    {errorMessage}
                 </p>
             )}
         </header>

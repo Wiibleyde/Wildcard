@@ -6,95 +6,25 @@ import {
     type DraftDefinition,
     toDraftDefinition,
 } from "@/components/studio/draft";
+import { studioApiErrorKey } from "@/components/studio/messages";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import { useRouter } from "@/i18n/navigation";
-import { apiFetch } from "@/lib/api/client";
+import { reconcileCondition } from "@/lib/eca/schema";
 import type { EcaDefinition } from "@/lib/eca/types";
 import {
     type EcaValidationError,
     validateEcaDefinitionForWrite,
 } from "@/lib/eca/validate";
-import type { Translate } from "@/lib/games/catalogView";
-import type { StudioErrorCode } from "@/lib/models/studio";
-
-/**
- * All editor state + CRUD wiring for {@link import("@/components/studio/EcaEditor").EcaEditor}.
- * Owns the draft definition (a keyed mirror of the stored
- * {@link EcaDefinition}), validates it live on every change, and talks to the
- * CRUD API: save (PATCH name/description/definition), publish / unpublish
- * (PATCH status), delete. The definition sent to the server is the validator's
- * REBUILT output — editor-local keys never leave the browser.
- */
-
-/** Validation error codes with a translation in `studio.errors.*`. */
-const KNOWN_ERROR_CODES: ReadonlySet<string> = new Set([
-    "not_object",
-    "invalid_version",
-    "invalid_name",
-    "invalid_description",
-    "invalid_players",
-    "invalid_deck",
-    "invalid_start_discard",
-    "invalid_hand_size",
-    "invalid_turn_flag",
-    "invalid_rules",
-    "invalid_rule",
-    "invalid_rule_id",
-    "invalid_rule_name",
-    "invalid_event",
-    "invalid_conditions",
-    "too_many_conditions",
-    "invalid_condition",
-    "invalid_operand",
-    "played_card_scope",
-    "invalid_comparator",
-    "non_numeric_comparison",
-    "invalid_effects",
-    "invalid_effect",
-    "effect_event_mismatch",
-    "invalid_draw_target",
-    "invalid_draw_count",
-    "invalid_winner",
-    "duplicate_rule_id",
-    "no_accepting_rule",
-    "invalid_win",
-    "literal_too_long",
-    "unknown_rank_literal",
-    "unknown_suit_literal",
-    "literal_not_numeric",
-    "incompatible_operands",
-    "missing_verdict",
-    "conflicting_verdict",
-    "reject_with_effects",
-    "unreachable_rule",
-]);
-
-/** Route-level failures (body cap) the model never returns. */
-type StudioRouteErrorCode = "payload_too_large";
-
-/**
- * `studio.api_errors.*` key per CRUD failure code. Typed as a full Record so
- * the compiler flags any drift when {@link StudioErrorCode} changes.
- */
-const API_ERROR_KEYS: Record<StudioErrorCode | StudioRouteErrorCode, string> = {
-    not_found: "api_errors.not_found",
-    invalid_definition: "api_errors.invalid_definition",
-    invalid_input: "api_errors.invalid_input",
-    limit_reached: "api_errors.limit_reached",
-    moderation_locked: "api_errors.moderation_locked",
-    payload_too_large: "api_errors.payload_too_large",
-    db_error: "api_errors.db_error",
-};
+import type { EcaGameStatus } from "@/lib/models/studio";
 
 export interface StudioGameDetail {
     readonly id: string;
     readonly ownerId: string;
     readonly name: string;
     readonly description: string | null;
-    readonly status: "draft" | "published";
+    readonly status: EcaGameStatus;
     readonly imageUrl: string | null;
-    /** Taken down by an admin — publishing is refused until restored. */
     readonly moderationLocked?: boolean;
     readonly definition: EcaDefinition;
 }
@@ -105,10 +35,11 @@ interface SavePayload {
     readonly definition: EcaDefinition;
 }
 
+type MutationKind = "save" | "status" | "delete";
+
+/** Editor state and CRUD wiring; only the validator's rebuilt definition is ever sent. */
 export function useEcaEditor(initialGame: StudioGameDetail) {
     const t = useTranslations("studio");
-    // Dynamic `errors.<code>` lookups need the loose Translate shape.
-    const te = useTranslations("studio") as unknown as Translate;
     const tCommon = useTranslations("common");
     const confirm = useConfirm();
     const router = useRouter();
@@ -120,18 +51,16 @@ export function useEcaEditor(initialGame: StudioGameDetail) {
     const [savedJson, setSavedJson] = useState(() =>
         JSON.stringify(toDraftDefinition(initialGame.definition)),
     );
-    const [localError, setLocalError] = useState<string | null>(null);
-    const [deleting, setDeleting] = useState(false);
+    // Only the most recent failure is shown, whichever mutation it came from.
+    const [lastFailure, setLastFailure] = useState<MutationKind | null>(null);
 
-    const saveMutation = useApiMutation<SavePayload>(
-        `/api/studio/games/${initialGame.id}`,
-        { successDuration: 2000 },
-    );
-    const statusMutation = useApiMutation<{ status: "draft" | "published" }>(
-        `/api/studio/games/${initialGame.id}`,
-    );
+    const url = `/api/studio/games/${initialGame.id}` as const;
+    const saveMutation = useApiMutation<SavePayload>(url, {
+        successDuration: 2000,
+    });
+    const statusMutation = useApiMutation<{ status: EcaGameStatus }>(url);
+    const deleteMutation = useApiMutation<undefined>(url, { method: "DELETE" });
 
-    // Write-time bar: the editor shows exactly what a save would refuse.
     const validation = useMemo(
         () => validateEcaDefinitionForWrite(draft),
         [draft],
@@ -140,13 +69,28 @@ export function useEcaEditor(initialGame: StudioGameDetail) {
     const saving = saveMutation.status === "pending";
     const saved = saveMutation.status === "success";
     const publishing = statusMutation.status === "pending";
+    // Stays busy after success while the router navigates away.
+    const deleting =
+        deleteMutation.status === "pending" ||
+        deleteMutation.status === "success";
 
     function patchMeta(patch: Partial<DraftDefinition["meta"]>) {
         setDraft((d) => ({ ...d, meta: { ...d.meta, ...patch } }));
     }
 
     function patchSetup(patch: Partial<DraftDefinition["setup"]>) {
-        setDraft((d) => ({ ...d, setup: { ...d.setup, ...patch } }));
+        setDraft((d) => {
+            const setup = { ...d.setup, ...patch };
+            if (setup.deckId === d.setup.deckId) return { ...d, setup };
+            // Rank literals of the old deck may not exist in the new one.
+            const rules = d.rules.map((rule) => ({
+                ...rule,
+                conditions: rule.conditions.map((condition) =>
+                    reconcileCondition(condition, setup.deckId),
+                ),
+            }));
+            return { ...d, setup, rules };
+        });
     }
 
     function patchTurn(patch: Partial<DraftDefinition["turn"]>) {
@@ -157,28 +101,35 @@ export function useEcaEditor(initialGame: StudioGameDetail) {
         setDraft((d) => ({ ...d, rules }));
     }
 
-    function parseCount(raw: string): number {
-        const parsed = Number.parseInt(raw, 10);
-        return Number.isNaN(parsed) ? 0 : parsed;
+    async function track(kind: MutationKind, run: Promise<boolean>) {
+        setLastFailure(null);
+        const ok = await run;
+        if (!ok) setLastFailure(kind);
+        return ok;
     }
 
     async function handleSave() {
         if (!validation.ok || !dirty || saving) return;
-        setLocalError(null);
-        const definition = validation.definition;
-        const ok = await saveMutation.mutate({
-            name: definition.meta.name,
-            description: definition.meta.description ?? null,
-            definition,
-        });
-        if (ok) setSavedJson(JSON.stringify(draft));
+        const { definition } = validation;
+        const snapshot = JSON.stringify(draft);
+        const ok = await track(
+            "save",
+            saveMutation.mutate({
+                name: definition.meta.name,
+                description: definition.meta.description ?? null,
+                definition,
+            }),
+        );
+        if (ok) setSavedJson(snapshot);
     }
 
     async function handleToggleStatus() {
         if (publishing) return;
-        setLocalError(null);
         const next = status === "published" ? "draft" : "published";
-        const ok = await statusMutation.mutate({ status: next });
+        const ok = await track(
+            "status",
+            statusMutation.mutate({ status: next }),
+        );
         if (ok) setStatus(next);
     }
 
@@ -190,34 +141,29 @@ export function useEcaEditor(initialGame: StudioGameDetail) {
             variant: "red",
         });
         if (!accepted) return;
-        setDeleting(true);
-        setLocalError(null);
-        const res = await apiFetch(`/api/studio/games/${initialGame.id}`, {
-            method: "DELETE",
-        });
-        if (!res.ok) {
-            setDeleting(false);
-            setLocalError(t("delete_error"));
-            return;
-        }
-        router.push("/studio");
+        const ok = await track("delete", deleteMutation.mutate(undefined));
+        if (ok) router.push("/studio");
     }
 
     function errorText(error: EcaValidationError): string {
-        return KNOWN_ERROR_CODES.has(error.code)
-            ? te(`errors.${error.code}`)
-            : error.message;
+        return t(`errors.${error.code}`);
     }
 
-    /** Known API failure codes get a real message; the rest stay generic. */
     function apiErrorText(code: string | null): string {
-        return code !== null && Object.hasOwn(API_ERROR_KEYS, code)
-            ? te(API_ERROR_KEYS[code as StudioErrorCode])
-            : tCommon("error");
+        const key = studioApiErrorKey(code);
+        return key ? t(key) : tCommon("error");
     }
 
-    // Locked at load time, or found out on a refused publish (the take-down
-    // may postdate the page load).
+    const errorMessage =
+        lastFailure === "delete"
+            ? t("delete_error")
+            : lastFailure === "save"
+              ? apiErrorText(saveMutation.error)
+              : lastFailure === "status"
+                ? apiErrorText(statusMutation.error)
+                : null;
+
+    // Locked at load, or found out on a refused publish.
     const locked =
         (initialGame.moderationLocked ?? false) ||
         (statusMutation.status === "error" &&
@@ -225,14 +171,6 @@ export function useEcaEditor(initialGame: StudioGameDetail) {
     const publishDisabled =
         publishing ||
         (status === "draft" && (dirty || !validation.ok || locked));
-    const mutationFailed =
-        saveMutation.status === "error" || statusMutation.status === "error";
-    const mutationErrorCode =
-        saveMutation.status === "error"
-            ? saveMutation.error
-            : statusMutation.status === "error"
-              ? statusMutation.error
-              : null;
 
     return {
         draft,
@@ -244,20 +182,16 @@ export function useEcaEditor(initialGame: StudioGameDetail) {
         saved,
         publishing,
         deleting,
-        localError,
         publishDisabled,
-        mutationFailed,
-        mutationErrorCode,
+        errorMessage,
         patchMeta,
         patchSetup,
         patchTurn,
         setRules,
-        parseCount,
         handleSave,
         handleToggleStatus,
         handleDelete,
         errorText,
-        apiErrorText,
     };
 }
 

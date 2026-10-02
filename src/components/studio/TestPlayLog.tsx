@@ -3,7 +3,6 @@
 import { useTranslations } from "next-intl";
 import type { LogEntry } from "@/hooks/studio/useTestPlay";
 
-/** The sandbox event log — newest first, bounded height, scrolls inside. */
 export function TestPlayLog({ log }: { readonly log: readonly LogEntry[] }) {
     const t = useTranslations("studio");
     return (

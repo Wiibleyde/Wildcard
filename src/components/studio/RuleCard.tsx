@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import type { CSSProperties } from "react";
+import { ECA_EFFECT_SPECS, ECA_EVENT_TYPES, isOneOf } from "@/lib/eca/schema";
 import type {
     EcaCondition,
     EcaDeckId,
@@ -19,26 +20,40 @@ import {
     fieldStyle,
     labelClass,
     labelStyle,
+    mutedTextStyle,
     squareButtonClass,
     squareButtonStyle,
 } from "./fields";
+import type { StudioMessageKey } from "./messages";
 
-/**
- * One editable rule: QUAND (event) / SI (conditions) / ALORS (effects), plus
- * ordering controls — order is load-bearing (first matching rule wins), which
- * the index stamp and the list-level hint make explicit.
- */
-
-const EVENT_STAMP: Record<EcaEventType, CSSProperties> = {
-    cardPlayed: { background: "var(--gold)", color: "var(--ink)" },
-    turnStarted: { background: "var(--blue)", color: "var(--accent-ink)" },
+const EVENTS: Record<
+    EcaEventType,
+    {
+        readonly label: StudioMessageKey;
+        readonly short: StudioMessageKey;
+        readonly stamp: CSSProperties;
+    }
+> = {
+    cardPlayed: {
+        label: "event_cardPlayed",
+        short: "event_cardPlayed_short",
+        stamp: { background: "var(--gold)", color: "var(--ink)" },
+    },
+    turnStarted: {
+        label: "event_turnStarted",
+        short: "event_turnStarted_short",
+        stamp: { background: "var(--blue)", color: "var(--accent-ink)" },
+    },
 };
+
+const addButtonClass =
+    "wc-chip self-start rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-40";
 
 function usesPlayedCard(operand: EcaOperand): boolean {
     return operand.kind === "card" && operand.source === "playedCard";
 }
 
-function defaultCondition(event: EcaEventType): EcaCondition {
+function starterCondition(event: EcaEventType): EcaCondition {
     return event === "cardPlayed"
         ? {
               lhs: { kind: "card", source: "playedCard", prop: "suit" },
@@ -52,7 +67,7 @@ function defaultCondition(event: EcaEventType): EcaCondition {
           };
 }
 
-function defaultEffect(event: EcaEventType): EcaEffect {
+function starterEffect(event: EcaEventType): EcaEffect {
     return event === "cardPlayed"
         ? { type: "acceptCard" }
         : { type: "drawCards", target: "actor", count: 1 };
@@ -79,14 +94,9 @@ export function RuleCard({
 }: Props) {
     const t = useTranslations("studio");
 
-    /**
-     * Switching to turnStarted quietly drops what cannot exist there
-     * (playedCard operands; accept/reject/playAgain effects) instead of
-     * leaving the creator a pile of validation errors.
-     */
+    /** turnStarted silently drops what cannot exist there instead of piling up errors. */
     function switchEvent(next: string) {
-        if (next !== "cardPlayed" && next !== "turnStarted") return;
-        if (next === rule.event) return;
+        if (!isOneOf(next, ECA_EVENT_TYPES) || next === rule.event) return;
         if (next === "cardPlayed") {
             onChange({ ...rule, event: next });
             return;
@@ -95,10 +105,7 @@ export function RuleCard({
             (c) => !usesPlayedCard(c.lhs) && !usesPlayedCard(c.rhs),
         );
         const effects = rule.effects.filter(
-            (e) =>
-                e.type !== "acceptCard" &&
-                e.type !== "rejectCard" &&
-                e.type !== "playAgain",
+            (e) => !ECA_EFFECT_SPECS[e.type].cardPlayedOnly,
         );
         onChange({
             ...rule,
@@ -107,18 +114,13 @@ export function RuleCard({
             effects:
                 effects.length > 0
                     ? effects
-                    : [
-                          {
-                              ...defaultEffect("turnStarted"),
-                              key: crypto.randomUUID(),
-                          },
-                      ],
+                    : [{ ...starterEffect(next), key: crypto.randomUUID() }],
         });
     }
 
     function addCondition() {
         const condition: DraftCondition = {
-            ...defaultCondition(rule.event),
+            ...starterCondition(rule.event),
             key: crypto.randomUUID(),
         };
         onChange({ ...rule, conditions: [...rule.conditions, condition] });
@@ -143,7 +145,7 @@ export function RuleCard({
     function addEffect() {
         if (rule.effects.length >= ECA_EFFECTS_MAX) return;
         const effect: DraftEffect = {
-            ...defaultEffect(rule.event),
+            ...starterEffect(rule.event),
             key: crypto.randomUUID(),
         };
         onChange({ ...rule, effects: [...rule.effects, effect] });
@@ -166,18 +168,8 @@ export function RuleCard({
         });
     }
 
-    const addButtonClass =
-        "wc-chip self-start rounded-lg px-3 py-1.5 text-xs font-bold";
-    const addButtonStyle: CSSProperties = {
-        background: "var(--cream2)",
-        border: "2px solid var(--ink)",
-        boxShadow: "0 2px 0 var(--ink)",
-        color: "var(--ink)",
-    };
-
     return (
         <article className="panel flex flex-col gap-4 p-4 sm:p-5">
-            {/* Header: priority stamp, name, event badge, ordering controls. */}
             <div className="flex flex-wrap items-center gap-2">
                 <span
                     className="stamp"
@@ -196,10 +188,8 @@ export function RuleCard({
                     className={`${fieldClass} min-w-36 flex-1`}
                     style={fieldStyle}
                 />
-                <span className="stamp" style={EVENT_STAMP[rule.event]}>
-                    {rule.event === "cardPlayed"
-                        ? t("event_cardPlayed_short")
-                        : t("event_turnStarted_short")}
+                <span className="stamp" style={EVENTS[rule.event].stamp}>
+                    {t(EVENTS[rule.event].short)}
                 </span>
                 <div className="ml-auto flex items-center gap-1.5">
                     <button
@@ -234,7 +224,6 @@ export function RuleCard({
                 </div>
             </div>
 
-            {/* QUAND */}
             <section className="flex flex-col gap-2">
                 <p className={labelClass} style={labelStyle}>
                     {t("when_title")}
@@ -246,23 +235,20 @@ export function RuleCard({
                     className={fieldClass}
                     style={fieldStyle}
                 >
-                    <option value="cardPlayed">{t("event_cardPlayed")}</option>
-                    <option value="turnStarted">
-                        {t("event_turnStarted")}
-                    </option>
+                    {ECA_EVENT_TYPES.map((event) => (
+                        <option key={event} value={event}>
+                            {t(EVENTS[event].label)}
+                        </option>
+                    ))}
                 </select>
             </section>
 
-            {/* SI */}
             <section className="flex flex-col gap-2">
                 <p className={labelClass} style={labelStyle}>
                     {t("if_title")}
                 </p>
                 {rule.conditions.length === 0 && (
-                    <p
-                        className="text-xs font-semibold"
-                        style={{ color: "#5a5340" }}
-                    >
+                    <p className="text-xs font-semibold" style={mutedTextStyle}>
                         {t("conditions_empty")}
                     </p>
                 )}
@@ -282,13 +268,12 @@ export function RuleCard({
                     type="button"
                     onClick={addCondition}
                     className={addButtonClass}
-                    style={addButtonStyle}
+                    style={squareButtonStyle}
                 >
                     + {t("add_condition")}
                 </button>
             </section>
 
-            {/* ALORS */}
             <section className="flex flex-col gap-2">
                 <p className={labelClass} style={labelStyle}>
                     {t("then_title")}
@@ -307,8 +292,8 @@ export function RuleCard({
                     type="button"
                     onClick={addEffect}
                     disabled={rule.effects.length >= ECA_EFFECTS_MAX}
-                    className={`${addButtonClass} disabled:opacity-40`}
-                    style={addButtonStyle}
+                    className={addButtonClass}
+                    style={squareButtonStyle}
                 >
                     + {t("add_effect")}
                 </button>
