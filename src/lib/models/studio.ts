@@ -54,7 +54,7 @@ const CHECK_VIOLATION = "23514";
 
 export type EcaGameStatus = "draft" | "published";
 
-export interface EcaGameSummary {
+interface EcaGameSummary {
     readonly id: string;
     readonly ownerId: string;
     readonly name: string;
@@ -111,7 +111,6 @@ function toSummary(row: SummaryRow): Omit<EcaGameSummary, "ruleCount"> {
     };
 }
 
-/** Trimmed, within bounds, or `null`. */
 function parseName(name: unknown): string | null {
     if (typeof name !== "string") return null;
     const trimmed = name.trim();
@@ -170,7 +169,6 @@ function withMeta(
     };
 }
 
-/** The creator's own games, most recently edited first. */
 export async function listEcaGames(
     client: Admin,
     ownerId: string,

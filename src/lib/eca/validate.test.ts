@@ -9,7 +9,6 @@ import {
 const base: EcaDefinition = MINIMAL_VALID;
 const baseRule: EcaRule = base.rules[0];
 
-/** Run the validator on a broken input and return the error codes. */
 function errorsOf(input: unknown): string[] {
     const result = validateEcaDefinition(input);
     if (result.ok) throw new Error("expected validation to fail");
@@ -484,9 +483,6 @@ describe("validateEcaDefinition — win", () => {
     });
 });
 
-// ── Write-time lints ─────────────────────────────────────────────────────────
-
-/** Run the write validator on a broken input and return the error codes. */
 function writeErrorsOf(input: unknown): string[] {
     const result = validateEcaDefinitionForWrite(input);
     if (result.ok) throw new Error("expected write validation to fail");

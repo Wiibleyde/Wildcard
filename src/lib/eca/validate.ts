@@ -33,7 +33,7 @@ import {
  * {@link validateEcaDefinitionForWrite} (structure + semantic lints).
  */
 
-export type EcaValidationErrorCode =
+type EcaValidationErrorCode =
     | "not_object"
     | "invalid_version"
     | "invalid_name"
@@ -84,7 +84,7 @@ export interface EcaValidationError {
     readonly message: string;
 }
 
-export type EcaValidationResult =
+type EcaValidationResult =
     | { readonly ok: true; readonly definition: EcaDefinition }
     | { readonly ok: false; readonly errors: readonly EcaValidationError[] };
 
@@ -95,10 +95,10 @@ export const ECA_PLAYERS_MIN = 2;
 export const ECA_PLAYERS_MAX = 8;
 export const ECA_HAND_SIZE_MIN = 1;
 export const ECA_HAND_SIZE_MAX = 26;
-export const ECA_RULES_MIN = 1;
+const ECA_RULES_MIN = 1;
 export const ECA_RULES_MAX = 32;
-export const ECA_CONDITIONS_MAX = 8;
-export const ECA_EFFECTS_MIN = 1;
+const ECA_CONDITIONS_MAX = 8;
+const ECA_EFFECTS_MIN = 1;
 export const ECA_EFFECTS_MAX = 8;
 export const ECA_DRAW_COUNT_MIN = 1;
 export const ECA_DRAW_COUNT_MAX = 8;
@@ -121,7 +121,6 @@ function isIntInRange(
     );
 }
 
-/** Trimmed name within bounds, or `null`. */
 function parseName(value: unknown, min: number, max: number): string | null {
     if (typeof value !== "string") return null;
     const name = value.trim();
@@ -628,8 +627,6 @@ export function validateEcaDefinition(input: unknown): EcaValidationResult {
         },
     };
 }
-
-// ── Write-time lints ─────────────────────────────────────────────────────────
 
 function sameOperand(a: EcaOperand, b: EcaOperand): boolean {
     return JSON.stringify(a) === JSON.stringify(b);

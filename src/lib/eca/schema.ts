@@ -19,7 +19,7 @@ export const ECA_STAT_SOURCES = [
     "discardPileCount",
 ] as const;
 export const ECA_COMPARATORS = ["eq", "neq", "gt", "gte", "lt", "lte"] as const;
-export const ECA_EQUALITY_COMPARATORS = [
+const ECA_EQUALITY_COMPARATORS = [
     "eq",
     "neq",
 ] as const satisfies readonly EcaComparator[];
@@ -92,14 +92,11 @@ export function isOneOf<T extends string>(
     options: readonly T[],
 ): value is T {
     return (
-        typeof value === "string" &&
-        (options as readonly string[]).includes(value)
+        typeof value === "string" && options.some((option) => option === value)
     );
 }
 
-// ── Operand domains ──────────────────────────────────────────────────────────
-
-export type EcaOperandDomain = "rank" | "suit" | "number";
+type EcaOperandDomain = "rank" | "suit" | "number";
 
 /** What an operand evaluates to; `null` for a literal (it takes its counterpart's domain). */
 export function operandDomain(operand: EcaOperand): EcaOperandDomain | null {
@@ -113,7 +110,7 @@ export function operandDomain(operand: EcaOperand): EcaOperandDomain | null {
     }
 }
 
-export function isNumericOperand(operand: EcaOperand): boolean {
+function isNumericOperand(operand: EcaOperand): boolean {
     return operand.kind === "literal"
         ? typeof operand.value === "number"
         : operandDomain(operand) === "number";
@@ -138,9 +135,9 @@ export function literalFitsDomain(
     const deck = DECKS[deckId];
     switch (domain) {
         case "rank":
-            return (deck.ranks as readonly (string | number)[]).includes(value);
+            return deck.ranks.some((rank) => rank === value);
         case "suit":
-            return (deck.suits as readonly (string | number)[]).includes(value);
+            return deck.suits.some((suit) => suit === value);
         case "number":
             return typeof value === "number";
     }
@@ -166,7 +163,7 @@ export function literalDomainFor(counterpart: EcaOperand): EcaOperandDomain {
 }
 
 /** Coerce `literal` to its counterpart's domain when it no longer fits (side or deck changed). */
-export function reconcileLiteral(
+function reconcileLiteral(
     counterpart: EcaOperand,
     literal: EcaOperand,
     deckId: EcaDeckId,

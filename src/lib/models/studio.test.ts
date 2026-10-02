@@ -22,11 +22,7 @@ interface Call {
     readonly filters: Array<[string, unknown]>;
 }
 
-/**
- * Minimal chainable stand-in for the supabase-js query builder — just the
- * surface the studio models use. Reads answer `row`; writes are recorded
- * (with their `.eq` filters) and answer `writeError`.
- */
+/** Chainable query-builder stand-in: reads answer `row`, writes are recorded and answer `writeError`. */
 function fakeClient(row: Row | null, writeError: Row | null = null) {
     const calls: Call[] = [];
     const removed: string[][] = [];

@@ -45,7 +45,7 @@ type EcaLogKey =
     | "log_turn_advanced"
     | "log_game_ended";
 
-export type EcaLogText = (
+type EcaLogText = (
     key: EcaLogKey,
     values?: Record<string, string | number>,
 ) => string;
