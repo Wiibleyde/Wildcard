@@ -14,11 +14,7 @@ import {
     type TableZoneInstance,
 } from "../table/types";
 
-/**
- * One table config for every studio game: they all share a hand, a draw pile,
- * a discard and the verbs playCard / drawCard / pass. (The Studio sandbox has
- * its own lighter UI; only the event log text is shared, via `describeEcaEvent`.)
- */
+/** Every studio game shares the same zones and verbs, hence one table config. */
 
 export const ecaTable = registerTable<EcaView, EcaAction>({
     zones: [
