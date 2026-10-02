@@ -11,15 +11,9 @@ import {
 } from "../table/types";
 
 /**
- * ECA (studio) table — ONE config renders every creator-authored game, because
- * every ECA game shares the same shape: a hand, a draw pile, a discard, and the
- * three verbs `playCard` / `drawCard` / `pass`. There is no per-game React and
- * no per-game config: the generic {@link GameModule} contract already reduced
- * each studio game to this common surface, so a single view→table projection
- * covers all of them.
- *
- * Interaction is direct-play (tap a legal card to lay it), matching the studio
- * sandbox: the board a creator tests in is the board everyone else plays on.
+ * One table config for every studio game: they all share a hand, a draw pile,
+ * a discard and the verbs playCard / drawCard / pass. (The Studio sandbox has
+ * its own lighter UI; only the event log text is shared, via `describeEcaEvent`.)
  */
 
 export const ecaTable = registerTable<EcaView>({
@@ -41,13 +35,7 @@ export const ecaTable = registerTable<EcaView>({
         { id: "hand", placement: "bottom", arrangement: "fan", cardSize: "lg" },
     ],
 
-    /**
-     * Optimistic prediction of the viewer's own play/pass: the card leaves the
-     * hand and lands on the discard immediately, the turn blanked so the board
-     * stops offering moves until the server reconciles. Rule effects (draw, skip,
-     * reverse, play-again, end) are the server's to settle a beat later. `drawCard`
-     * is never predicted — it reveals a face-down card the client can't know.
-     */
+    /** Rule effects are left to the server; a draw is never predicted (hidden card). */
     predict(view, action, viewerId) {
         if (viewerId === null || view.currentPlayerId !== viewerId) return null;
         const a = action as EcaAction;
@@ -97,7 +85,7 @@ export const ecaTable = registerTable<EcaView>({
                 status: ctx.t("cards_left", { n: p.handCount }),
             }));
 
-        // The payload's legal actions came from this module — safe narrow.
+        // Legal actions come from this module.
         const legal = ctx.legalActions as readonly EcaAction[];
         const drawAction = legal.find((a) => a.type === "drawCard");
         const passAction = legal.find((a) => a.type === "pass");
@@ -106,9 +94,8 @@ export const ecaTable = registerTable<EcaView>({
             if (a.type === "playCard") playByKey.set(cardKey(a.card), a);
         }
 
-        // Draw pile: a face-down stock (up to three slivers for depth). Clicking
-        // the pile draws — the action lives on the zone so it works even once the
-        // pile is visually empty but a reshuffle can still refill it.
+        // The draw action lives on the zone: it still works once the pile looks
+        // empty but a reshuffle can refill it.
         const drawSlots = Math.min(view.drawPileCount, 3);
         const drawCards: TableCardItem[] = Array.from(
             { length: drawSlots },
@@ -133,8 +120,7 @@ export const ecaTable = registerTable<EcaView>({
                 cards: view.topDiscard
                     ? [
                           {
-                              // Scope the id by discard depth so each new top
-                              // card gets a fresh identity and animates in.
+                              // Depth-scoped id so each new top card animates in.
                               id: `discard:${cardKey(view.topDiscard)}:${view.discardCount}`,
                               card: view.topDiscard,
                           },
@@ -154,17 +140,14 @@ export const ecaTable = registerTable<EcaView>({
                         id: `hand:${cardKey(card)}`,
                         card,
                         action,
-                        // Your turn but this card has no legal play right now: a
-                        // blocked move, not an inert card — a click says why.
+                        // Clickable so the board can say why it is blocked.
                         illegal: isYourTurn && action === undefined,
                     };
                 }),
             });
         }
 
-        // Draw / Pass surface only when the game's rules make them legal this
-        // turn — an ECA game may disable either entirely, and the view carries no
-        // turn-config flags, so legality is the single source of truth.
+        // The view carries no turn flags: legality alone decides these controls.
         const controls: TableControl[] = [];
         if (drawAction) {
             controls.push({
