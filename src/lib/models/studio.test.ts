@@ -116,6 +116,21 @@ describe("studio model — id validation", () => {
     });
 });
 
+describe("studio model — names", () => {
+    it("stores trimmed names and refuses blank ones", async () => {
+        const { admin, calls } = fakeClient(storedRow());
+        expect(
+            await updateEcaGame(admin, GAME, OWNER, { name: "   " }),
+        ).toEqual({ ok: false, error: "invalid_input" });
+        expect(
+            await updateEcaGame(admin, GAME, OWNER, { name: "  Mon jeu " }),
+        ).toEqual({ ok: true });
+        expect(calls.find((c) => c.op === "update")?.payload).toMatchObject({
+            name: "Mon jeu",
+        });
+    });
+});
+
 describe("studio model — moderation lock", () => {
     it("refuses the owner's publish while locked", async () => {
         const { admin, calls } = fakeClient(
