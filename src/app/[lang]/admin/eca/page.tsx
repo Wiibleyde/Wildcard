@@ -1,17 +1,29 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import type { Locale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import {
     type AdminEcaGameView,
     EcaGamesAdminPanel,
 } from "@/components/admin/EcaGamesAdminPanel";
-import { GameButton } from "@/components/ui/GameButton";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { PageShell } from "@/components/ui/PageShell";
+import { redirect } from "@/i18n/navigation";
 import { getUserRole, roleAtLeast } from "@/lib/auth/roles";
 import { requireAuthUser } from "@/lib/auth/session";
 import { listAllEcaGames } from "@/lib/models/adminStudio";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { ecaImagesBucket, publicStorageUrl } from "@/lib/supabase/storage";
+
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ lang: Locale }>;
+}): Promise<Metadata> {
+    const { lang } = await params;
+    const t = await getTranslations({ locale: lang, namespace: "admin" });
+    return { title: t("eca_title") };
+}
 
 export default async function AdminEcaPage({
     params,
@@ -24,18 +36,16 @@ export default async function AdminEcaPage({
     const user = await requireAuthUser(lang, `/${lang}/admin/eca`);
     const supabase = await createClient();
 
-    // In-app gate only; the moderation API re-checks the admin role server-side.
+    // In-app gate only; the moderation API re-checks the admin role.
     const role = await getUserRole(supabase, user.id);
-    if (!roleAtLeast(role, "moderator")) redirect(`/${lang}`);
-    const canManage = role === "admin";
+    if (!roleAtLeast(role, "moderator")) {
+        return redirect({ href: "/", locale: lang });
+    }
 
     const t = await getTranslations("admin");
 
-    // Service-role read: the RLS select policy would hide other creators'
-    // drafts from a moderator, so the cross-owner listing runs on the admin
-    // client — safe here because the role gate above already passed.
-    const admin = createAdminClient();
-    const rows = await listAllEcaGames(admin);
+    // Service role: RLS would hide other creators' drafts from a moderator. Gated above.
+    const rows = await listAllEcaGames(createAdminClient());
     const games: AdminEcaGameView[] = rows.map((g) => ({
         id: g.id,
         ownerName: g.ownerName,
@@ -50,22 +60,13 @@ export default async function AdminEcaPage({
     }));
 
     return (
-        <div className="min-h-screen px-4 pt-8 pb-16 md:pt-12 xl:px-10">
-            <div className="mx-auto flex max-w-lg flex-col gap-8 lg:max-w-5xl xl:max-w-7xl">
-                <header className="flex flex-col gap-2">
-                    <div>
-                        <GameButton variant="ghost" size="sm" href="/admin">
-                            ← {t("eca_back")}
-                        </GameButton>
-                    </div>
-                    <h1 className="h-xl text-2xl xl:text-3xl">
-                        {t("eca_title")}
-                    </h1>
-                    <p className="sub text-sm">{t("eca_subtitle")}</p>
-                </header>
-
-                <EcaGamesAdminPanel games={games} canManage={canManage} />
-            </div>
-        </div>
+        <PageShell width="wide" className="flex flex-col gap-8">
+            <PageHeader
+                title={t("eca_title")}
+                subtitle={t("eca_subtitle")}
+                back={{ href: "/admin", label: t("eca_back") }}
+            />
+            <EcaGamesAdminPanel games={games} canManage={role === "admin"} />
+        </PageShell>
     );
 }

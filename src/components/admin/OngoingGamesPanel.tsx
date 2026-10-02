@@ -1,27 +1,24 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
-import { GameButton } from "@/components/ui/GameButton";
+import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { usePollingWithClock } from "@/hooks/usePollingWithClock";
+import { useRouter } from "@/i18n/navigation";
 import { apiFetch } from "@/lib/api/client";
 import type { OngoingGame } from "@/lib/models/admin";
 import { GameRow } from "./GameRow";
+import { PanelHeader } from "./PanelHeader";
 
 const REFRESH_MS = 10_000;
 
 type Props = {
     games: OngoingGame[];
-    /** Only admins may force-end a game; moderators see a read-only list. */
+    /** Admins only; moderators get a read-only list. */
     canEnd: boolean;
 };
 
-/**
- * Moderator view of every live game. Keeps the server-rendered list fresh by
- * polling `router.refresh()` and ticks a clock for relative "started" times.
- */
 export function OngoingGamesPanel({ games, canEnd }: Props) {
     const t = useTranslations("admin");
     const router = useRouter();
@@ -32,8 +29,6 @@ export function OngoingGamesPanel({ games, canEnd }: Props) {
     const [endingId, setEndingId] = useState<string | null>(null);
     const [endError, setEndError] = useState<string | null>(null);
 
-    // Server re-checks the admin role and bumps the game version, so every open
-    // client refetches and lands on the game-over screen.
     async function endGame(game: OngoingGame) {
         const ok = await confirm({
             title: t("end_title"),
@@ -62,47 +57,19 @@ export function OngoingGamesPanel({ games, canEnd }: Props) {
     }
 
     return (
-        <section className="panel-d p-5 xl:p-6 flex flex-col gap-4">
-            <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                    <h2 className="font-display text-xl xl:text-2xl leading-none">
-                        {t("ongoing_title")}
-                    </h2>
-                    <span
-                        className="stamp"
-                        style={{
-                            background: "var(--green)",
-                            color: "var(--ink)",
-                        }}
-                    >
-                        {games.length}
-                    </span>
-                </div>
-                <GameButton
-                    variant="ghost"
-                    size="sm"
-                    onClick={refreshNow}
-                    disabled={refreshing}
-                >
-                    {t("refresh")}
-                </GameButton>
-            </div>
+        <section className="panel-d flex flex-col gap-4 p-5 xl:p-6">
+            <PanelHeader
+                title={t("ongoing_title")}
+                badge={String(games.length)}
+                accent="var(--green)"
+                onRefresh={refreshNow}
+                refreshing={refreshing}
+            />
 
-            {endError && (
-                <p
-                    role="alert"
-                    className="text-sm font-bold"
-                    style={{ color: "var(--red)" }}
-                >
-                    {endError}
-                </p>
-            )}
+            {endError && <ErrorBanner>{endError}</ErrorBanner>}
 
             {games.length === 0 ? (
-                <p
-                    className="text-sm font-semibold py-8 text-center"
-                    style={{ color: "var(--muted)" }}
-                >
+                <p className="py-8 text-center text-sm font-semibold text-wc-muted">
                     {t("no_games")}
                 </p>
             ) : (

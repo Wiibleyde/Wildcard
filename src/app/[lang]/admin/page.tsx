@@ -1,15 +1,28 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import type { Locale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { MaintenanceControl } from "@/components/admin/MaintenanceControl";
 import { OngoingGamesPanel } from "@/components/admin/OngoingGamesPanel";
 import { GameButton } from "@/components/ui/GameButton";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { PageShell } from "@/components/ui/PageShell";
+import { redirect } from "@/i18n/navigation";
 import { getUserRole, roleAtLeast } from "@/lib/auth/roles";
 import { requireAuthUser } from "@/lib/auth/session";
 import { listOngoingGames } from "@/lib/models/admin";
 import { getAppSettings } from "@/lib/models/settings";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ lang: Locale }>;
+}): Promise<Metadata> {
+    const { lang } = await params;
+    const t = await getTranslations({ locale: lang, namespace: "admin" });
+    return { title: t("title") };
+}
 
 export default async function AdminPage({
     params,
@@ -22,62 +35,62 @@ export default async function AdminPage({
     const user = await requireAuthUser(lang, `/${lang}/admin`);
     const supabase = await createClient();
 
-    // In-app gate only; API writes re-check the role server-side (defense in depth).
+    // In-app gate only; API writes re-check the role server-side.
     const role = await getUserRole(supabase, user.id);
-    if (!roleAtLeast(role, "moderator")) redirect(`/${lang}`);
+    if (!roleAtLeast(role, "moderator")) {
+        return redirect({ href: "/", locale: lang });
+    }
 
     const isAdmin = role === "admin";
     const t = await getTranslations("admin");
 
     const [games, settings] = await Promise.all([
         // Service role: members-only room RLS would hide private-room games
-        // from staff who are not seated in them, so they could never be
-        // force-ended. Safe — the role gate above ran server-side first.
+        // from staff, who could then never force-end them. Gated above.
         listOngoingGames(createAdminClient()),
         isAdmin ? getAppSettings(supabase) : Promise.resolve(null),
     ]);
 
     return (
-        <div className="min-h-screen px-4 xl:px-10 pt-8 md:pt-12 pb-16">
-            <div className="max-w-lg lg:max-w-5xl xl:max-w-7xl mx-auto flex flex-col gap-8">
-                <header className="flex flex-col gap-2">
-                    <div className="flex items-center gap-3 flex-wrap">
-                        <h1 className="h-xl text-2xl xl:text-3xl">
-                            {t("title")}
-                        </h1>
-                        <span
-                            className="stamp"
-                            style={{
-                                background: isAdmin
-                                    ? "var(--gold)"
-                                    : "var(--purple)",
-                                color: isAdmin
-                                    ? "var(--ink)"
-                                    : "var(--accent-ink)",
-                            }}
-                        >
-                            {isAdmin ? t("role_admin") : t("role_moderator")}
-                        </span>
-                    </div>
-                    <p className="sub text-sm">{t("subtitle")}</p>
-                    <div className="mt-1">
-                        <GameButton variant="gold" size="sm" href="/admin/eca">
-                            {t("eca_manage")}
-                        </GameButton>
-                    </div>
-                </header>
-
-                <div className="grid grid-cols-1 lg:grid-cols-[1fr_22.5rem] xl:grid-cols-[1fr_25rem] gap-6 items-start">
-                    <OngoingGamesPanel games={games} canEnd={isAdmin} />
-
-                    {isAdmin && settings && (
-                        <MaintenanceControl
-                            initialEnabled={settings.maintenance}
-                            initialMessage={settings.maintenanceMessage}
-                        />
-                    )}
+        <PageShell width="wide" className="flex flex-col gap-8">
+            <PageHeader
+                title={t("title")}
+                subtitle={t("subtitle")}
+                badge={
+                    <span
+                        className="stamp"
+                        style={
+                            isAdmin
+                                ? {
+                                      background: "var(--gold)",
+                                      color: "var(--ink)",
+                                  }
+                                : {
+                                      background: "var(--purple)",
+                                      color: "var(--accent-ink)",
+                                  }
+                        }
+                    >
+                        {isAdmin ? t("role_admin") : t("role_moderator")}
+                    </span>
+                }
+            >
+                <div className="mt-1">
+                    <GameButton variant="gold" size="sm" href="/admin/eca">
+                        {t("eca_manage")}
+                    </GameButton>
                 </div>
+            </PageHeader>
+
+            <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_22.5rem] xl:grid-cols-[1fr_25rem]">
+                <OngoingGamesPanel games={games} canEnd={isAdmin} />
+                {isAdmin && settings && (
+                    <MaintenanceControl
+                        initialEnabled={settings.maintenance}
+                        initialMessage={settings.maintenanceMessage}
+                    />
+                )}
             </div>
-        </div>
+        </PageShell>
     );
 }
