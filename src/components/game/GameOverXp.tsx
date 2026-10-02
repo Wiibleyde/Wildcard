@@ -139,10 +139,17 @@ export function GameOverXp({
                                 color: "var(--accent-ink)",
                             }}
                         >
-                            {t("level_short")}{" "}
-                            <span ref={levelRef} className="tabular-nums">
-                                {xp.levelBefore}
-                            </span>
+                            {t.rich("level_badge", {
+                                level: xp.levelBefore,
+                                n: (chunks) => (
+                                    <span
+                                        ref={levelRef}
+                                        className="tabular-nums"
+                                    >
+                                        {chunks}
+                                    </span>
+                                ),
+                            })}
                         </span>
                     </div>
 

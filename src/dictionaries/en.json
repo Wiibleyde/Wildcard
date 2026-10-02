@@ -359,7 +359,7 @@
         "winners": "Winners",
         "back_to_lobby": "Back to lobby",
         "xp_title": "Experience",
-        "level_short": "Lv.",
+        "level_badge": "Lv. <n>{level}</n>",
         "level_up": "Level up!",
         "place_president": "President",
         "place_vice_president": "Vice-President",
