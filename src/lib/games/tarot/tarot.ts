@@ -1,16 +1,23 @@
 import { tarot78 } from "@/lib/card/decks";
-import { dealRoundRobin, removeCards } from "@/lib/card/hand";
+import { dealRoundRobin, takeCards } from "@/lib/card/hand";
 import { buildRankOrder } from "@/lib/card/rank";
 import type { CardDescriptor, Suit } from "@/lib/card/types";
 import { cardKey, isCardDescriptor } from "@/lib/card/utils";
 import { buildDeck } from "@/lib/engine/deck";
 import type { Rng } from "@/lib/engine/rng";
-import { fail, seatOrder } from "@/lib/engine/rules";
+import {
+    bindRules,
+    defineRules,
+    fail,
+    rankByScore,
+    rotateFrom,
+    seatAfter,
+    seatOrder,
+} from "@/lib/engine/rules";
 import type {
     GameEvent,
     GameModule,
     GameRuleMode,
-    GameRuleToggle,
     GameState,
     Player,
 } from "@/lib/engine/types";
@@ -30,52 +37,20 @@ import {
     type TrickCard,
 } from "./scoring";
 
-/**
- * Tarot français (3–4 joueurs) — the catalog's most complex module and the
- * engine's *multi-phase* proof. Where Président rotates a single play action,
- * Tarot runs three distinct sub-games behind one `GameModule`:
+/*
+ * Tarot français (3–4 players) — the engine's multi-phase proof:
  *
- *   bidding ─▶ dog (chien / écart) ─▶ slam ─▶ playing (jeu de la carte) ─▶ done
+ *   bidding ─▶ dog (chien / écart) ─▶ slam ─▶ playing ─▶ done
  *
- * - **Bidding** (« enchères ») — one round, each player passes or overcalls
- *   with a strictly higher contract (Petite ▸ Garde ▸ Garde Sans ▸ Garde
- *   Contre). The highest bidder is the *taker* (« preneur »), alone against
- *   the others (« défenseurs »).
- * - **Dog** (« le chien ») — on Petite/Garde the taker takes the six face-up
- *   chien cards into hand, then buries six of their own (« l'écart »); Kings
- *   and bouts may never be buried, trumps only when nothing else is left.
- *   Garde Sans skips it (chien scores for the taker), Garde Contre too (chien
- *   scores for the defence).
- * - **Slam** (« chelem annoncé », FFT) — when that rule is on, the taker says
- *   whether they announce a slam before the first card; announcing takes the
- *   lead (« l'entame revient au demandeur »): +400 made, −200 missed.
- * - **Playing** — 18 (or 24) tricks. Follow suit; if void, you must trump and
- *   over-trump when able; the Excuse (« L'Excuse ») excuses you from following
- *   and almost always returns to its player.
- * - **Scoring** lives in {@link scoreDeal}: the famous count-to-a-threshold set
- *   by the number of bouts the taker captured (36/41/51/56 points).
- *
- * The four engine guarantees hold: determinism (seeded shuffle in `state`),
- * `view()` as in-code RLS (a player only ever sees their own hand and the
- * public chien), server-validated `apply` (illegal plays refused), and a pure
- * `outcome()` feeding ELO/XP.
- *
- * « Poignée » (FFT): just before laying their first card, any player holding
- * 10/13/15 trumps (13/15/18 at three) may show them for a flat 20/30/40 that
- * goes to the side winning the deal. The Excuse may stand in for the last
- * trump only when the player holds no other. The server shows the STRONGEST
- * trumps by default (hiding the low ones — the Petit first — as a player would);
- * a client may instead name the exact cards, which are validated.
- *
- * Out of scope by design (single-deal meta layer, like Président's card
- * exchange): the 5-player « roi appelé » partnership.
- *
- * Source: Fédération Française de Tarot, « Règlement officiel »
- * (https://www.fftarot.fr).
+ * Bidding is one round of strict overcalls; Petite/Garde take the chien and
+ * bury six (never Kings or bouts, trumps only when forced); the FFT announced
+ * slam gives the taker the lead; play follows suit, trumps and over-trumps.
+ * Poignées are shown just before a player's first card. Scoring lives in
+ * `scoring.ts`. Out of scope: the 5-player « roi appelé ».
+ * Source: Fédération Française de Tarot, « Règlement officiel ».
  */
 
-/** Suited strength inside one suit: 1(A) low → King high (K>Q>C>J>10>…>1).
- * Shared with the table adapter's hand sort so there is one source of truth. */
+/** Within a suit: A low → K high (K > Q > C > J > 10 …). */
 export const SUIT_STRENGTH = buildRankOrder([
     "A",
     "2",
@@ -100,57 +75,46 @@ const ALL_BIDS: readonly Bid[] = [
     "garde-contre",
 ];
 
-const DECK_SIZE = 78;
 const CHIEN_SIZE = 6;
 const ECART_SIZE = 6;
 
-export type TarotPhase = "bidding" | "dog" | "slam" | "playing" | "done";
+type TarotPhase = "bidding" | "dog" | "slam" | "playing" | "done";
 
 export interface TarotState extends GameState {
     readonly phase: TarotPhase;
-    /** Always a seated player while the game runs; the taker at `done`. */
+    /** A seated player while running; the taker at `done`. */
     readonly currentPlayerId: string;
-    /** Lobby-chosen rules — stamped in so any instance replays identically. */
     readonly rules: TarotRules;
-    /** Eldest hand (« à la droite du donneur ») — opens bidding, leads trick 1. */
+    /** Opens the bidding and leads trick one; moves one seat on each redeal. */
     readonly eldestId: string;
-
     readonly hands: Readonly<Record<string, readonly CardDescriptor[]>>;
 
-    // ── bidding ──────────────────────────────────────────────────────────────
-    /** Each player's spoken bid; absent until they have bid. */
     readonly bids: Readonly<Record<string, Bid | "pass">>;
     readonly taker: string | null;
     readonly contract: Bid | null;
-    /** Times the cards were redealt because everyone passed (« tout le monde
-     * passe »). Each redeal reshuffles from the seeded RNG and moves the deal
-     * one seat on, so it stays a pure function of (seed, action log). */
+    /** All-pass redeals so far, each reshuffled from the seeded RNG. */
     readonly redeals: number;
 
-    // ── dog / écart ───────────────────────────────────────────────────────────
-    /** The six chien cards (public on Petite/Garde once bidding resolves). */
     readonly chien: readonly CardDescriptor[];
-    /** Cards the taker has buried so far (secret to everyone else). */
+    /** Secret to everyone but the taker. */
     readonly ecart: readonly CardDescriptor[];
 
-    // ── trick play ────────────────────────────────────────────────────────────
     readonly pile: readonly TrickCard[];
     readonly trickLeaderId: string | null;
     readonly tricks: readonly CompletedTrick[];
-    /** The just-won trick, kept on the table until the next lead is laid. */
+    /** Kept on the table until the next lead. */
     readonly lastTrick: CompletedTrick | null;
-    /** Handfuls shown so far, by player. Absent until the first one (and on
-     * deals recorded before the rule existed). */
+    /** Absent until the first one is shown (and on legacy deals). */
     readonly handfuls?: Readonly<Record<string, DeclaredHandful>>;
-    /** The taker announced a slam. Absent unless announced. */
+    /** Absent unless announced. */
     readonly slamAnnounced?: boolean;
 
-    // ── result ────────────────────────────────────────────────────────────────
     readonly result: DealResult | null;
 }
 
 export type TarotAction =
     | { readonly type: "bid"; readonly playerId: string; readonly bid: Bid }
+    /** Bidding pass, or declining the slam. */
     | { readonly type: "pass"; readonly playerId: string }
     | {
           readonly type: "discard";
@@ -162,15 +126,13 @@ export type TarotAction =
           readonly playerId: string;
           readonly card: CardDescriptor;
       }
-    /** Show a poignée before your first card. `cards` is optional: omitted,
-     * the server shows the strongest trumps that make up the level. */
+    /** Omitted `cards`: the server shows the strongest trumps for the level. */
     | {
           readonly type: "handful";
           readonly playerId: string;
           readonly level: HandfulLevel;
           readonly cards?: readonly CardDescriptor[];
       }
-    /** Slam phase: the taker announces a slam (a decline is a `pass`). */
     | { readonly type: "announceSlam"; readonly playerId: string };
 
 export interface TarotPlayerView {
@@ -178,45 +140,43 @@ export interface TarotPlayerView {
     readonly name: string;
     readonly handCount: number;
     readonly isTaker: boolean;
-    /** Public bid once spoken (`null` while still to bid / after the deal). */
+    /** Public once spoken (`null` until then); kept for the rest of the deal. */
     readonly bid: Bid | "pass" | null;
-    /** Tricks this player has won — public. */
     readonly trickWins: number;
-    /** The poignée this player showed, if any — public. */
     readonly handful: DeclaredHandful | null;
-    /** Own cards — present only in the viewer's own slot (RLS in code). */
+    /** Viewer's own slot only. */
     readonly hand?: readonly CardDescriptor[];
+}
+
+/** What the trick zone shows: the running trick, or the won one (`wonBy` set). */
+interface TarotDisplayTrick {
+    readonly plays: readonly TrickCard[];
+    readonly wonBy: string | null;
 }
 
 export interface TarotView {
     readonly gameId: string;
     readonly phase: TarotPhase;
     readonly turn: number;
-    readonly currentPlayerId: string;
+    /** `null` in an optimistic prediction until the server answers. */
+    readonly currentPlayerId: string | null;
     readonly rules: TarotRules;
     readonly taker: string | null;
     readonly contract: Bid | null;
     readonly redeals: number;
-    /** Strongest bid so far — drives the legal overcalls in the UI. */
     readonly highestBid: Bid | null;
-    /** The chien, revealed during the dog phase and at game end; else `[]`. */
+    /** Revealed during the dog phase and at game end; else `[]`. */
     readonly chien: readonly CardDescriptor[];
     readonly chienRevealed: boolean;
-    /** How many of the six écart cards the taker has buried. */
     readonly ecartCount: number;
     readonly pile: readonly TrickCard[];
     readonly trickLeaderId: string | null;
-    /** The previous trick, shown until the next lead (empty mid-trick). */
-    readonly lastTrick: CompletedTrick | null;
+    readonly displayTrick: TarotDisplayTrick;
     readonly result: DealResult | null;
-    /** The taker announced a slam — public. */
     readonly slamAnnounced: boolean;
     readonly players: readonly TarotPlayerView[];
-    /** Viewer this projection was built for (`null` = spectator). */
     readonly self: string | null;
 }
-
-// ── pure card-rule helpers ────────────────────────────────────────────────────
 
 function isTrump(
     c: CardDescriptor,
@@ -228,7 +188,6 @@ function isKing(c: CardDescriptor): boolean {
     return c.type === "suited" && c.rank === "K";
 }
 
-/** Highest trump index already in the trick, or 0 when none has been laid. */
 function topTrump(pile: readonly TrickCard[]): number {
     return pile.reduce(
         (max, p) => (isTrump(p.card) ? Math.max(max, p.card.index) : max),
@@ -236,14 +195,13 @@ function topTrump(pile: readonly TrickCard[]): number {
     );
 }
 
-type Required =
+type TrickDemand =
     | { readonly kind: "free" }
     | { readonly kind: "suit"; readonly suit: Suit }
     | { readonly kind: "trump" };
 
-/** What the trick demands: set by the first non-Excuse card (a fresh lead, or a
- * pile holding only the Excuse, is free — the next real card sets the suit). */
-function requiredSuit(pile: readonly TrickCard[]): Required {
+/** Set by the first non-Excuse card: a pile holding only the Excuse is still free. */
+function trickDemand(pile: readonly TrickCard[]): TrickDemand {
     const lead = pile.find((p) => p.card.type !== "fool");
     if (!lead) return { kind: "free" };
     if (lead.card.type === "trump") return { kind: "trump" };
@@ -253,29 +211,13 @@ function requiredSuit(pile: readonly TrickCard[]): Required {
     return { kind: "free" };
 }
 
-function dedupe(cards: readonly CardDescriptor[]): CardDescriptor[] {
-    const seen = new Set<string>();
-    const out: CardDescriptor[] = [];
-    for (const c of cards) {
-        const k = cardKey(c);
-        if (seen.has(k)) continue;
-        seen.add(k);
-        out.push(c);
-    }
-    return out;
-}
-
-/**
- * The cards `hand` may legally play onto `pile`, enforcing the full « jeu de la
- * carte »: follow the led suit if able; if void, trump and over-trump when you
- * can; the Excuse may always be played. A fresh lead allows anything.
- */
+/** Follow suit; if void, trump and over-trump when able; the Excuse is always playable. */
 export function legalCards(
     hand: readonly CardDescriptor[],
     pile: readonly TrickCard[],
 ): CardDescriptor[] {
-    const req = requiredSuit(pile);
-    if (req.kind === "free") return [...hand];
+    const demand = trickDemand(pile);
+    if (demand.kind === "free") return [...hand];
 
     const fool = hand.filter((c) => c.type === "fool");
     const trumps = hand.filter(isTrump);
@@ -283,33 +225,26 @@ export function legalCards(
     const overTrumps = trumps.filter((c) => c.index > high);
     const mustTrump = overTrumps.length > 0 ? overTrumps : trumps;
 
-    if (req.kind === "suit") {
+    if (demand.kind === "suit") {
         const suited = hand.filter(
-            (c) => c.type === "suited" && c.suit === req.suit,
+            (c) => c.type === "suited" && c.suit === demand.suit,
         );
-        if (suited.length > 0) return dedupe([...suited, ...fool]);
-        if (trumps.length > 0) return dedupe([...mustTrump, ...fool]);
-        return [...hand]; // void in suit and trumps — discard anything
+        if (suited.length > 0) return [...suited, ...fool];
     }
-
-    // Led suit is trump.
-    if (trumps.length > 0) return dedupe([...mustTrump, ...fool]);
-    return [...hand]; // no trump to follow with — discard anything
+    if (trumps.length > 0) return [...mustTrump, ...fool];
+    return [...hand];
 }
 
-/** Where a trick sits in the deal — only needed for the Excuse-au-chelem rule. */
-export interface TrickContext {
-    /** This is the deal's final trick (every hand is now empty). */
+interface TrickContext {
     readonly isLastTrick: boolean;
-    /** The side of the player who led this trick won every previous trick. */
+    /** The side of the trick's leader won every previous trick. */
     readonly leaderSideWonAll: boolean;
 }
 
 /**
- * Resolve a completed trick's winner: highest trump, else highest card of the
- * led suit. The Excuse never wins — with one FFT exception: a side that has won
- * every previous trick and *leads* the Excuse to the last trick wins that trick
- * with it, so playing the Excuse last never breaks a chelem.
+ * Highest trump, else highest card of the led suit. The Excuse never wins —
+ * except led to the last trick by a side that won all the others (FFT), so
+ * playing it last never breaks a slam.
  */
 export function trickWinner(
     plays: readonly TrickCard[],
@@ -348,8 +283,7 @@ export function trickWinner(
     return best.playerId;
 }
 
-/** Did `playerId`'s side (taker vs. defence) win every trick in `tricks`?
- * Vacuously true before the first trick. */
+/** Vacuously true before the first trick. */
 function sideWonAll(
     tricks: readonly CompletedTrick[],
     playerId: string,
@@ -359,11 +293,7 @@ function sideWonAll(
     return tricks.every((t) => (t.winnerId === taker) === isTakerSide);
 }
 
-/**
- * Cards the taker may bury in the écart right now. Kings and bouts are never
- * allowed; trumps only become legal once there aren't enough plain cards left
- * to reach six — so the taker can always complete a legal écart.
- */
+/** Never Kings or bouts; trumps only once plain cards can't complete the six. */
 export function discardableCards(
     hand: readonly CardDescriptor[],
     buried: number,
@@ -373,12 +303,10 @@ export function discardableCards(
         (c) => !isKing(c) && !isBout(c) && c.type !== "trump",
     );
     if (plain.length >= need) return plain;
-    // Forced to bury trumps (never the bout trumps 1 / 21).
     const trumps = hand.filter((c) => isTrump(c) && !isBout(c));
     return [...plain, ...trumps];
 }
 
-/** Strongest bid spoken so far, with its bidder, or `null` if all passed. */
 function highestBid(
     bids: Readonly<Record<string, Bid | "pass">>,
 ): { bid: Bid; player: string } | null {
@@ -391,7 +319,6 @@ function highestBid(
     return best;
 }
 
-/** Bids that strictly overcall `floor` and are permitted by the rules. */
 function availableBids(floor: number, rules: TarotRules): Bid[] {
     return ALL_BIDS.filter(
         (b) =>
@@ -401,25 +328,11 @@ function availableBids(floor: number, rules: TarotRules): Bid[] {
     );
 }
 
-/** Players in turn order starting from `eldestId` (bidding / dealing order). */
-function orderFrom(
-    players: readonly Player[],
-    eldestId: string,
-): readonly Player[] {
-    const order = seatOrder(players);
-    const start = Math.max(
-        0,
-        order.findIndex((p) => p.id === eldestId),
-    );
-    return [...order.slice(start), ...order.slice(0, start)];
+function nextSeat(players: readonly Player[], id: string): string {
+    return seatAfter(players, id) ?? id;
 }
 
-/**
- * Shuffle a full deck and deal it: 72 cards round-robin from the eldest hand,
- * the last six form the chien. A uniform shuffle makes which cards land in the
- * chien uniformly random — the traditional packet-deal ritual only matters at a
- * physical table.
- */
+/** Round-robin from the eldest; the last six form the chien (a uniform shuffle makes that fair). */
 function deal(
     players: readonly Player[],
     eldestId: string,
@@ -428,24 +341,20 @@ function deal(
     hands: Record<string, readonly CardDescriptor[]>;
     chien: readonly CardDescriptor[];
 } {
-    const order = orderFrom(players, eldestId);
+    const order = rotateFrom(players, eldestId);
     const deck = rng.shuffle(buildDeck(tarot78));
     const dealt = dealRoundRobin(
-        deck.slice(0, DECK_SIZE - CHIEN_SIZE),
+        deck.slice(0, deck.length - CHIEN_SIZE),
         order.length,
     );
     const hands: Record<string, readonly CardDescriptor[]> = {};
     order.forEach((p, i) => {
         hands[p.id] = dealt[i];
     });
-    return { hands, chien: deck.slice(DECK_SIZE - CHIEN_SIZE) };
+    return { hands, chien: deck.slice(deck.length - CHIEN_SIZE) };
 }
 
-/**
- * The canonical card in `hand` matching an untrusted client card, or `null`.
- * Strict shape validation first: `cardKey` alone stringifies, so a trump sent
- * as `index: "1"` would otherwise pass for the Petit.
- */
+/** Strict validation first: `cardKey` alone would let `index: "1"` pass for the Petit. */
 function heldCard(
     hand: readonly CardDescriptor[],
     card: unknown,
@@ -455,22 +364,12 @@ function heldCard(
     return hand.find((c) => cardKey(c) === key) ?? null;
 }
 
-/** Next seat after `id`, cyclically — turn order within a trick. */
-function nextSeat(state: TarotState, id: string): string {
-    const order = seatOrder(state.players);
-    const idx = order.findIndex((p) => p.id === id);
-    return order[(idx + 1) % order.length].id;
-}
-
-// ── poignée / chelem ──────────────────────────────────────────────────────────
-
-/** Strongest first — the order a handful is laid on the table. */
+/** Strongest first — the order a handful is laid. */
 function byTrumpDesc(a: CardDescriptor, b: CardDescriptor): number {
     const rank = (c: CardDescriptor) => (isTrump(c) ? c.index : 0);
     return rank(b) - rank(a);
 }
 
-/** Has `playerId` already laid a card this deal? A handful must come first. */
 function hasPlayed(state: TarotState, playerId: string): boolean {
     return (
         state.pile.some((p) => p.playerId === playerId) ||
@@ -479,9 +378,8 @@ function hasPlayed(state: TarotState, playerId: string): boolean {
 }
 
 /**
- * The cards `hand` shows for a `level` poignée (FFT), or `null` if it can't:
- * exactly N trumps, the strongest ones; the Excuse may complete it only when
- * it is the player's last missing trump (it then implies they hold no other).
+ * Exactly N trumps, the strongest; the Excuse may complete it only as the
+ * last missing trump (which implies no other is held). `null` if unreachable.
  */
 export function handfulAt(
     hand: readonly CardDescriptor[],
@@ -496,7 +394,6 @@ export function handfulAt(
     return null;
 }
 
-/** The highest poignée `hand` can show, or `null` when none is reachable. */
 export function bestHandful(
     hand: readonly CardDescriptor[],
     playerCount: number,
@@ -508,11 +405,7 @@ export function bestHandful(
     return null;
 }
 
-/**
- * Validate an explicit, client-named handful: N distinct held trumps (the
- * Excuse allowed only when every held trump is shown with it). Returns the
- * canonical cards strongest-first, or `null` when the selection is illegal.
- */
+/** A client-named handful: N distinct held trumps, the Excuse only alongside every held trump. */
 function validateHandful(
     hand: readonly CardDescriptor[],
     level: HandfulLevel,
@@ -535,34 +428,29 @@ function validateHandful(
         showsExcuse &&
         held.filter(isTrump).length < hand.filter(isTrump).length
     ) {
-        return null; // the Excuse only stands in for a trump you don't have
+        return null;
     }
     return held.sort(byTrumpDesc);
 }
 
-/**
- * Hand over to the trick play once the contract (and écart) is settled. With
- * the announced-slam rule the taker first decides (`slam` phase); otherwise
- * the eldest hand leads trick one.
- */
+function beginPlay(state: TarotState, leader: string): TarotState {
+    return {
+        ...state,
+        phase: "playing",
+        currentPlayerId: leader,
+        trickLeaderId: leader,
+    };
+}
+
+/** Contract settled: the taker decides on the slam first when that rule is on. */
 function startPlay(state: TarotState, taker: string): TarotState {
     if (state.rules.announcedSlam) {
         return { ...state, phase: "slam", currentPlayerId: taker };
     }
-    return {
-        ...state,
-        phase: "playing",
-        currentPlayerId: state.eldestId,
-        trickLeaderId: state.eldestId,
-    };
+    return beginPlay(state, state.eldestId);
 }
 
-// ── bidding resolution ────────────────────────────────────────────────────────
-
-/**
- * Bidding is over (everyone has spoken). Resolve the contract and move into the
- * dog or straight to the trick play — or end the deal if all passed.
- */
+/** Everyone has spoken: take the contract into the dog or the play, or redeal on an all-pass. */
 function resolveBidding(
     state: TarotState,
     rng: Rng,
@@ -572,17 +460,13 @@ function resolveBidding(
 } {
     const best = highestBid(state.bids);
     if (!best) {
-        // « Tout le monde passe » — the deal is void: shuffle a fresh deck from
-        // the seeded RNG and pass the deal one seat on, as at a real table. A
-        // void deal is never "finished", so it can't feed ELO/history as a
-        // fake four-way draw.
-        const eldestId = nextSeat(state, state.eldestId);
+        // A void deal never "finishes", so it can't feed ELO as a fake draw.
+        const eldestId = nextSeat(state.players, state.eldestId);
         const { hands, chien } = deal(state.players, eldestId, rng);
         return {
             state: {
                 ...state,
                 phase: "bidding",
-                rngState: rng.state,
                 redeals: state.redeals + 1,
                 eldestId,
                 currentPlayerId: eldestId,
@@ -603,8 +487,6 @@ function resolveBidding(
         { type: "contract", payload: { playerId: taker, contract } },
     ];
 
-    // Petite / Garde: the taker picks up the chien and must bury six. Garde Sans
-    // / Garde Contre skip the dog — the chien scores untouched for one side.
     if (contract === "petite" || contract === "garde") {
         events.push({ type: "chien_revealed", payload: { contract } });
         return {
@@ -629,10 +511,7 @@ function resolveBidding(
     };
 }
 
-// ── trick resolution ──────────────────────────────────────────────────────────
-
-/** Close a full trick: attribute it, hand the lead to its winner, and end the
- * deal once every hand is empty (scoring the result). */
+/** Attribute a full trick, hand the lead to its winner, and score once every hand is empty. */
 function closeTrick(
     state: TarotState,
     pile: readonly TrickCard[],
@@ -651,66 +530,58 @@ function closeTrick(
         { type: "trick_won", payload: { playerId: winnerId } },
     ];
 
-    if (handsEmpty && state.taker && state.contract) {
-        const result = scoreDeal({
-            players: state.players.map((p) => p.id),
-            taker: state.taker,
-            contract: state.contract,
-            tricks,
-            chien: state.chien,
-            ecart: state.ecart,
-            rules: state.rules,
-            handfuls: state.handfuls,
-            slamAnnounced: state.slamAnnounced,
-        });
-        events.push({
-            type: "game_over",
-            payload: { made: result.made, taker: state.taker },
-        });
+    if (!handsEmpty) {
         return {
             state: {
                 ...state,
-                phase: "done",
                 pile: [],
                 tricks,
                 lastTrick: trick,
-                trickLeaderId: null,
-                currentPlayerId: state.taker,
-                result,
+                trickLeaderId: winnerId,
+                currentPlayerId: winnerId,
             },
             events,
         };
     }
 
+    if (!state.taker || !state.contract) {
+        throw new Error("tarot: deal played out without a contract");
+    }
+    const result = scoreDeal({
+        players: state.players.map((p) => p.id),
+        taker: state.taker,
+        contract: state.contract,
+        tricks,
+        chien: state.chien,
+        ecart: state.ecart,
+        rules: state.rules,
+        handfuls: state.handfuls,
+        slamAnnounced: state.slamAnnounced,
+    });
+    events.push({
+        type: "game_over",
+        payload: { made: result.made, taker: state.taker },
+    });
     return {
         state: {
             ...state,
+            phase: "done",
             pile: [],
             tricks,
             lastTrick: trick,
-            trickLeaderId: winnerId,
-            currentPlayerId: winnerId,
+            trickLeaderId: null,
+            currentPlayerId: state.taker,
+            result,
         },
         events,
     };
 }
 
-// ── module ────────────────────────────────────────────────────────────────────
+export const TAROT_RULE_TOGGLES = defineRules(DEFAULT_TAROT_RULES, {
+    announcedSlam: "slam",
+});
 
-export const TAROT_RULE_TOGGLES: readonly GameRuleToggle[] = [
-    { key: "gardeSansContre", default: true },
-    { key: "petitAuBout", default: true },
-    { key: "slam", default: true },
-    { key: "announcedSlam", default: true, requires: "slam" },
-    { key: "handful", default: true },
-];
-
-/**
- * Launch presets. The FFT rules (Fédération Française de Tarot, the reference
- * rulebook: poignées, announced slam…) first — the default; then a beginner
- * table with only Petite/Garde and none of the bonus primes.
- */
-export const TAROT_RULE_MODES: readonly GameRuleMode[] = [
+const TAROT_RULE_MODES: readonly GameRuleMode[] = [
     { key: "tarot_fft", rules: {} },
     {
         key: "tarot_simple",
@@ -732,7 +603,7 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
     maxPlayers: 4,
     ruleToggles: TAROT_RULE_TOGGLES,
     ruleModes: TAROT_RULE_MODES,
-    // A random bot announcing a slam would only ever pay the −200.
+    // A random bot announcing a slam would only ever pay the penalty.
     riskyActions: ["announceSlam"],
 
     legalActions(state, playerId) {
@@ -764,7 +635,6 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
             ];
         }
 
-        // playing
         const actions: TarotAction[] = legalCards(
             state.hands[playerId],
             state.pile,
@@ -785,15 +655,11 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
         return actions;
     },
 
-    apply(state, action, rng: Rng) {
-        if (state.phase === "done") {
-            return fail("game_over", "The deal has already finished.");
-        }
+    apply(state, action, rng) {
         if (action.playerId !== state.currentPlayerId) {
             return fail("not_your_turn", "It is not this player's turn.");
         }
 
-        // ── bidding ───────────────────────────────────────────────────────────
         if (state.phase === "bidding") {
             if (action.type !== "bid" && action.type !== "pass") {
                 return fail("wrong_phase", "Bidding expects a bid or a pass.");
@@ -835,14 +701,9 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
                       },
             ];
 
-            // Bidding runs from the eldest hand, which moves on each redeal.
-            const order = orderFrom(state.players, state.eldestId);
+            const order = rotateFrom(state.players, state.eldestId);
             const spoken = Object.keys(bids).length;
-            const advanced: TarotState = {
-                ...state,
-                bids,
-                turn: state.turn + 1,
-            };
+            const advanced: TarotState = { ...state, bids };
 
             if (spoken < order.length) {
                 return {
@@ -860,16 +721,16 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
             };
         }
 
-        // ── dog / écart ─────────────────────────────────────────────────────────
         if (state.phase === "dog") {
             if (action.type !== "discard") {
                 return fail("wrong_phase", "Bury a card to form the écart.");
             }
             const hand = state.hands[action.playerId];
-            const held = heldCard(hand, action.card);
-            if (!held) {
+            const took = takeCards(hand, [action.card]);
+            if (!took) {
                 return fail("not_in_hand", "Buried a card not held in hand.");
             }
+            const held = took.taken[0];
             const legal = discardableCards(hand, state.ecart.length);
             if (!legal.some((c) => cardKey(c) === cardKey(held))) {
                 return fail(
@@ -877,66 +738,30 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
                     "Kings, bouts and (unless forced) trumps stay in hand.",
                 );
             }
-            const remaining = removeCards(hand, [held]);
-            if (remaining === null) {
-                return fail("not_in_hand", "Buried a card not held in hand.");
-            }
 
-            // Store the canonical held card, never the client's object.
-            const ecart = [...state.ecart, held];
+            const buried: TarotState = {
+                ...state,
+                hands: { ...state.hands, [action.playerId]: took.remaining },
+                ecart: [...state.ecart, held],
+            };
             const events: GameEvent[] = [
                 { type: "discarded", payload: { playerId: action.playerId } },
             ];
-
-            // Six buried — the écart is set; on to the slam decision, or the
-            // eldest hand leads trick one.
-            if (ecart.length === ECART_SIZE) {
-                return {
-                    ok: true,
-                    state: startPlay(
-                        {
-                            ...state,
-                            hands: {
-                                ...state.hands,
-                                [action.playerId]: remaining,
-                            },
-                            ecart,
-                        },
-                        action.playerId,
-                    ),
-                    events: [...events, { type: "ecart_done" }],
-                };
+            if (buried.ecart.length < ECART_SIZE) {
+                return { ok: true, state: buried, events };
             }
-
             return {
                 ok: true,
-                state: {
-                    ...state,
-                    hands: { ...state.hands, [action.playerId]: remaining },
-                    ecart,
-                },
-                events,
+                state: startPlay(buried, action.playerId),
+                events: [...events, { type: "ecart_done" }],
             };
         }
 
-        // ── slam announcement ───────────────────────────────────────────────────
         if (state.phase === "slam") {
-            if (action.type !== "announceSlam" && action.type !== "pass") {
-                return fail(
-                    "wrong_phase",
-                    "Announce a slam or pass before the first card.",
-                );
-            }
             if (action.type === "pass") {
                 return {
                     ok: true,
-                    state: {
-                        ...state,
-                        phase: "playing",
-                        turn: state.turn + 1,
-                        currentPlayerId: state.eldestId,
-                        trickLeaderId: state.eldestId,
-                    },
+                    state: beginPlay(state, state.eldestId),
                     events: [
                         {
                             type: "slam_declined",
@@ -945,17 +770,19 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
                     ],
                 };
             }
+            if (action.type !== "announceSlam") {
+                return fail(
+                    "wrong_phase",
+                    "Announce a slam or pass before the first card.",
+                );
+            }
             // « L'entame revient de droit au joueur qui l'a demandé. »
             return {
                 ok: true,
-                state: {
-                    ...state,
-                    phase: "playing",
-                    turn: state.turn + 1,
-                    slamAnnounced: true,
-                    currentPlayerId: action.playerId,
-                    trickLeaderId: action.playerId,
-                },
+                state: beginPlay(
+                    { ...state, slamAnnounced: true },
+                    action.playerId,
+                ),
                 events: [
                     {
                         type: "slam_announced",
@@ -965,7 +792,6 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
             };
         }
 
-        // ── playing ──────────────────────────────────────────────────────────────
         if (action.type === "handful") {
             if (!state.rules.handful) {
                 return fail("rule_disabled", "Handfuls are not in play.");
@@ -984,8 +810,7 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
             }
             const hand = state.hands[action.playerId];
             const players = state.players.length;
-            // Omitted cards: the server shows the strongest trumps for the
-            // level (a lower level than held is allowed — it hides more).
+            // A lower level than held is allowed — it hides more.
             const cards =
                 action.cards === undefined
                     ? handfulAt(hand, action.level, players)
@@ -1005,7 +830,6 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
                 ok: true,
                 state: {
                     ...state,
-                    turn: state.turn + 1,
                     handfuls: {
                         ...state.handfuls,
                         [action.playerId]: { level: action.level, cards },
@@ -1026,31 +850,25 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
             return fail("wrong_phase", "Play a card to the trick.");
         }
         const hand = state.hands[action.playerId];
-        const held = heldCard(hand, action.card);
-        if (!held) {
+        const took = takeCards(hand, [action.card]);
+        if (!took) {
             return fail("not_in_hand", "Played a card not held in hand.");
         }
+        // The canonical held card goes on the table — never the client's object.
+        const held = took.taken[0];
         const legal = legalCards(hand, state.pile);
         if (!legal.some((c) => cardKey(c) === cardKey(held))) {
             return fail("illegal_play", "Must follow suit, trump, or excuse.");
         }
-        const remaining = removeCards(hand, [held]);
-        if (remaining === null) {
-            return fail("not_in_hand", "Played a card not held in hand.");
-        }
 
-        // A fresh lead clears the previous trick still on display.
         const leadingNow = state.pile.length === 0;
-        // The canonical held card goes on the table (and to scoring/events) —
-        // never the client's object, which may carry a lookalike or junk.
         const pile = [...state.pile, { playerId: action.playerId, card: held }];
         const withPlay: TarotState = {
             ...state,
-            hands: { ...state.hands, [action.playerId]: remaining },
+            hands: { ...state.hands, [action.playerId]: took.remaining },
             pile,
             trickLeaderId: leadingNow ? action.playerId : state.trickLeaderId,
             lastTrick: leadingNow ? null : state.lastTrick,
-            turn: state.turn + 1,
         };
         const events: GameEvent[] = [
             {
@@ -1064,7 +882,7 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
                 ok: true,
                 state: {
                     ...withPlay,
-                    currentPlayerId: nextSeat(state, action.playerId),
+                    currentPlayerId: nextSeat(state.players, action.playerId),
                 },
                 events,
             };
@@ -1084,46 +902,27 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
 
     outcome(state) {
         if (state.phase !== "done") return null;
-
-        // Every `done` state carries a result: a passed-out deal is redealt
-        // instead of ending, so there is no void outcome to report.
-        if (!state.result) return null;
-        const ids = state.players.map((p) => p.id);
-
-        // Taker vs. defenders: the two sides win or lose together, so defenders
-        // always share a rank. Rank by final signed score, taker's `score`
-        // carried through for transparency.
-        const result = state.result;
-        const ranked = [...ids].sort(
-            (a, b) => result.scores[b] - result.scores[a],
+        // An all-pass deal is redealt, never finished: `done` always has a result.
+        const { result } = state;
+        if (!result) throw new Error("tarot: finished deal without a result");
+        // Taker vs. defenders by signed score — defenders always share a rank.
+        return rankByScore(
+            state.players.map((p) => ({
+                playerId: p.id,
+                score: result.scores[p.id],
+            })),
+            { higherIsBetter: true },
         );
-        let rank = 1;
-        const rankings = ranked.map((playerId, i) => {
-            if (
-                i > 0 &&
-                result.scores[playerId] !== result.scores[ranked[i - 1]]
-            ) {
-                rank = i + 1;
-            }
-            return { playerId, rank, score: result.scores[playerId] };
-        });
-        const top = rankings[0].score;
-        return {
-            rankings,
-            winners: rankings
-                .filter((r) => r.score === top)
-                .map((r) => r.playerId),
-        };
     },
 
     view(state, viewerId) {
-        const order = seatOrder(state.players);
         const best = highestBid(state.bids);
         const wins: Record<string, number> = {};
         for (const t of state.tricks) {
             wins[t.winnerId] = (wins[t.winnerId] ?? 0) + 1;
         }
         const chienRevealed = state.phase === "dog" || state.phase === "done";
+        const showingLast = state.pile.length === 0 && state.lastTrick;
 
         return {
             gameId: state.gameId,
@@ -1140,11 +939,16 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
             ecartCount: state.ecart.length,
             pile: state.pile,
             trickLeaderId: state.trickLeaderId,
-            lastTrick: state.lastTrick,
+            displayTrick: showingLast
+                ? {
+                      plays: showingLast.plays,
+                      wonBy: showingLast.winnerId,
+                  }
+                : { plays: state.pile, wonBy: null },
             result: state.result,
             slamAnnounced: state.slamAnnounced === true,
             self: viewerId,
-            players: order.map((p): TarotPlayerView => {
+            players: seatOrder(state.players).map((p): TarotPlayerView => {
                 const slot: TarotPlayerView = {
                     playerId: p.id,
                     name: p.name,
@@ -1162,31 +966,19 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
     },
 };
 
-/**
- * Build a Tarot module bound to a rule set. Rules are stamped into the state at
- * deal time, so a saved game resumes/replays identically on any instance — pair
- * the persisted `state.rules` with the seed and the action log.
- */
-export function createTarot(
+function createTarot(
     rules: TarotRules = DEFAULT_TAROT_RULES,
 ): GameModule<TarotState, TarotAction, TarotView> {
     return {
         ...base,
         withRules(chosen) {
-            const pick = (key: keyof TarotRules): boolean =>
-                chosen[key] ?? DEFAULT_TAROT_RULES[key];
-            // Rules added after launch are bound only when the caller names
-            // them: a legacy game's persisted rules lack them, and replaying
-            // it must rebuild exactly that rule object (absent = off).
-            const optional = (key: "handful" | "announcedSlam") =>
-                typeof chosen[key] === "boolean" ? { [key]: chosen[key] } : {};
-            return createTarot({
-                gardeSansContre: pick("gardeSansContre"),
-                petitAuBout: pick("petitAuBout"),
-                slam: pick("slam"),
-                ...optional("handful"),
-                ...optional("announcedSlam"),
-            });
+            // Rules added after launch stay absent unless named, so a legacy
+            // game's persisted rules rebuild exactly (absent = off).
+            return createTarot(
+                bindRules(chosen, DEFAULT_TAROT_RULES, {
+                    legacyOptional: ["handful", "announcedSlam"],
+                }),
+            );
         },
         setup(players, rng, seed, gameId) {
             const eldestId = seatOrder(players)[0].id;
@@ -1219,5 +1011,4 @@ export function createTarot(
     };
 }
 
-/** Default module — all table rules enabled. */
 export const tarot = createTarot();

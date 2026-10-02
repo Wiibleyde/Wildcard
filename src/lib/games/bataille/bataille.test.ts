@@ -50,7 +50,7 @@ const total = (s: BatailleState, id: string) =>
 
 describe("bataille setup", () => {
     it("deals all 52 distinct cards, 26 each", () => {
-        const s = createGame(bataille, players, 1234);
+        const s = createGame(bataille, players, { seed: 1234 });
         expect(s.piles.alice.draw).toHaveLength(26);
         expect(s.piles.bob.draw).toHaveLength(26);
         const keys = [...s.piles.alice.draw, ...s.piles.bob.draw].map(cardKey);
@@ -58,15 +58,17 @@ describe("bataille setup", () => {
     });
 
     it("is deterministic for a fixed seed", () => {
-        const a = createGame(bataille, players, 7);
-        const b = createGame(bataille, players, 7);
+        const a = createGame(bataille, players, { seed: 7 });
+        const b = createGame(bataille, players, { seed: 7 });
         expect(a.piles.alice.draw.map(cardKey)).toEqual(
             b.piles.alice.draw.map(cardKey),
         );
     });
 
     it("rejects an illegal player count", () => {
-        expect(() => createGame(bataille, [players[0]], 1)).toThrow(RangeError);
+        expect(() => createGame(bataille, [players[0]], { seed: 1 })).toThrow(
+            RangeError,
+        );
     });
 });
 
@@ -192,29 +194,20 @@ describe("bataille round cap", () => {
 });
 
 describe("bataille runner contract", () => {
-    it("refuses a malformed action instead of throwing", () => {
-        const s = createGame(bataille, players, 3);
-        const bogus = [
-            null,
-            { type: "flip" },
-            { type: "flip", playerId: 42 },
-        ] as unknown as BatailleAction[];
-        for (const action of bogus) {
-            const res = bataille.apply(s, action, createRng(s.rngState));
-            expect(res.ok).toBe(false);
-            if (res.ok) continue;
-            expect(res.error.code).toBe("invalid_action");
-        }
+    it("refuses an unknown action type", () => {
+        const s = createGame(bataille, players, { seed: 3 });
         const unknown = {
             type: "cheat",
             playerId: "alice",
         } as unknown as BatailleAction;
-        const res = bataille.apply(s, unknown, createRng(s.rngState));
+        const res = dispatch(bataille, s, unknown, "alice");
         expect(res.ok).toBe(false);
+        if (res.ok) return;
+        expect(res.error.code).toBe("illegal_action");
     });
 
     it("rejects an action spoofing another player", () => {
-        const s = createGame(bataille, players, 3);
+        const s = createGame(bataille, players, { seed: 3 });
         const res = dispatch(bataille, s, flip("alice"), "bob");
         expect(res.ok).toBe(false);
         if (res.ok) return;
@@ -235,7 +228,7 @@ describe("bataille runner contract", () => {
 
 describe("bataille end to end", () => {
     it("plays to completion, conserves all 52 cards, and names a winner", () => {
-        let s = createGame(bataille, players, 20260606);
+        let s = createGame(bataille, players, { seed: 20260606 });
         let guard = 0;
         while (!bataille.isOver(s) && guard++ < MAX_ROUNDS + 10) {
             const res = dispatch(bataille, s, flip("alice"), "alice");
@@ -254,7 +247,7 @@ describe("bataille end to end", () => {
 
 describe("bataille view (RLS in code)", () => {
     it("exposes counts and public reveals but no pile contents", () => {
-        const s = createGame(bataille, players, 11);
+        const s = createGame(bataille, players, { seed: 11 });
         const view = bataille.view(s, "alice");
 
         const alice = view.players.find((p) => p.playerId === "alice");

@@ -1,39 +1,28 @@
-import type { Rng } from "@/lib/engine/rng";
 import type { CardDescriptor } from "./types";
-import { cardKey } from "./utils";
+import { cardKey, isCardDescriptor } from "./utils";
 
 /**
- * Hand-manipulation helpers shared by every card game. These are the verbs a
- * game's reducer performs on a player's hand — kept pure and identity-based
- * (via {@link cardKey}) so they work for any deck.
+ * Take one occurrence of each requested (untrusted) card out of `hand`, or
+ * `null` if any is malformed or not held. `taken` holds the hand's own
+ * copies: reducers store those, never the client's objects.
  */
-
-/**
- * Remove one occurrence of each of `cards` from `hand`, returning the new hand
- * — or `null` if any requested card is not actually held. The `null` is what
- * lets a reducer reject "played a card not in hand" without trusting the
- * client. Matches by {@link cardKey}, so two physical copies (Pinochle) are
- * removed one at a time.
- */
-export function removeCards(
+export function takeCards(
     hand: readonly CardDescriptor[],
-    cards: readonly CardDescriptor[],
-): readonly CardDescriptor[] | null {
+    requested: readonly unknown[],
+): { taken: CardDescriptor[]; remaining: CardDescriptor[] } | null {
     const remaining = [...hand];
-    for (const card of cards) {
+    const taken: CardDescriptor[] = [];
+    for (const card of requested) {
+        if (!isCardDescriptor(card)) return null;
         const key = cardKey(card);
         const index = remaining.findIndex((c) => cardKey(c) === key);
         if (index === -1) return null;
+        taken.push(remaining[index]);
         remaining.splice(index, 1);
     }
-    return remaining;
+    return { taken, remaining };
 }
 
-/**
- * Deal a shuffled deck round-robin into `count` hands (one card each in turn).
- * The default deal for trick/shedding games (Président, Belote, Tarot). Returns
- * `count` hands in order; callers map them onto seated players.
- */
 export function dealRoundRobin(
     deck: readonly CardDescriptor[],
     count: number,
@@ -44,6 +33,3 @@ export function dealRoundRobin(
     });
     return hands;
 }
-
-/** Re-export so a game can shuffle+deal from one import. */
-export type { Rng };

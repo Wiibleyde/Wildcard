@@ -1,24 +1,15 @@
 import type { CardDescriptor } from "@/lib/card/types";
 
-/**
- * French Tarot scoring — the "comptage à seuil" the game is famous for.
- *
- * This module is deliberately split from the reducer (`tarot.ts`): a finished
- * deal's score is a **pure function of its tricks** (plus the écart/chien and
- * the contract). Isolating it keeps the most rule-dense, jury-defensible part
- * of the game independently unit-testable, and mirrors the engine's wider
- * determinism ethos (a game = pure function of seed + action log).
- *
- * Everything is computed in **demi-points** (card values doubled to integers)
- * to dodge floating-point error: a King is worth 4.5 points, i.e. 9 demis. The
- * 78-card deck totals exactly 91 points = 182 demis, an invariant every score
- * preserves (see {@link scoreDeal} and its tests).
+/*
+ * French Tarot scoring (« comptage à seuil »), split from the reducer: a deal's
+ * score is a pure function of its tricks, chien/écart and contract. Computed
+ * in demi-points (values ×2) to stay in integers; the 78-card deck always
+ * totals 182 demis (91 points).
  */
 
-/** The four contracts a taker can win the bidding with, weakest → strongest. */
 export type Bid = "petite" | "garde" | "garde-sans" | "garde-contre";
 
-/** Bidding strength — only a strictly higher bid may overcall (one round). */
+/** Bidding strength — only a strictly higher bid overcalls. */
 export const BID_RANK: Record<Bid, number> = {
     petite: 1,
     garde: 2,
@@ -26,11 +17,7 @@ export const BID_RANK: Record<Bid, number> = {
     "garde-contre": 4,
 };
 
-/**
- * Contract multiplier applied to the whole result. Note it is NOT the bidding
- * rank: Garde Sans / Garde Contre jump to ×4 / ×6 because the taker forgoes (or
- * gambles against) the chien.
- */
+/** NOT the bidding rank: Sans/Contre jump to ×4/×6 (the taker forgoes the chien). */
 export const BID_MULTIPLIER: Record<Bid, number> = {
     petite: 1,
     garde: 2,
@@ -38,34 +25,35 @@ export const BID_MULTIPLIER: Record<Bid, number> = {
     "garde-contre": 6,
 };
 
-/** Rules that change scoring (declared in the lobby, stamped into the state). */
+const PETIT = 1;
+const TWENTY_ONE = 21;
+
+/** Base value of a contract, before the point gap and the multiplier. */
+const CONTRACT_BASE = 25;
+/** « Petit au bout », multiplied by the contract. */
+const PETIT_AU_BOUT_BONUS = 10;
+const ANNOUNCED_SLAM_MADE = 400;
+const SLAM_BONUS = 200;
+
 export interface TarotRules {
-    /** Allow the higher Garde Sans / Garde Contre overcalls in the bidding. */
     readonly gardeSansContre: boolean;
-    /** « Petit au bout » — +10 (×mult) to whoever wins the last trick if the
-     * Petit (trump 1) is played in it. */
+    /** +10 (×mult) to whoever wins the last trick when the Petit is in it. */
     readonly petitAuBout: boolean;
-    /** « Chelem » — auto-detected slam: ±200 flat when one side wins every
-     * trick (unannounced variant). */
+    /** Unannounced slam: ±200 when one side wins every trick. */
     readonly slam: boolean;
-    /** « Poignée » — a player may show 10/13/15 trumps (13/15/18 at three)
-     * before their first card: +20/30/40 to the side that wins the deal.
-     * Absent on games dealt before the rule existed (= off). */
-    readonly handful?: boolean;
-    /** « Chelem annoncé » — the taker may announce a slam before the first
-     * card and then leads: +400 made, −200 missed. Absent = off (legacy). */
+    /** Taker may announce before the first card: +400 made, −200 missed. Absent = off (legacy deals). */
     readonly announcedSlam?: boolean;
+    /** « Poignée »: flat primes to the side winning the deal. Absent = off (legacy deals). */
+    readonly handful?: boolean;
 }
 
 export const DEFAULT_TAROT_RULES: TarotRules = {
     gardeSansContre: true,
     petitAuBout: true,
     slam: true,
-    handful: true,
     announcedSlam: true,
+    handful: true,
 };
-
-// ── Poignée (handful) ─────────────────────────────────────────────────────────
 
 export type HandfulLevel = "simple" | "double" | "triple";
 
@@ -75,15 +63,14 @@ export const HANDFUL_LEVELS: readonly HandfulLevel[] = [
     "triple",
 ];
 
-/** Flat prime per level — never multiplied by the contract (FFT). */
-export const HANDFUL_PRIME: Record<HandfulLevel, number> = {
+/** Never multiplied by the contract (FFT). */
+const HANDFUL_PRIME: Record<HandfulLevel, number> = {
     simple: 20,
     double: 30,
     triple: 40,
 };
 
-/** Trumps a handful must show, by table size (FFT: 10/13/15 at four players,
- * 13/15/18 at three). */
+/** FFT: 10/13/15 trumps at four players, 13/15/18 at three. */
 export function handfulSize(level: HandfulLevel, playerCount: number): number {
     const sizes: Record<HandfulLevel, number> =
         playerCount === 3
@@ -92,76 +79,59 @@ export function handfulSize(level: HandfulLevel, playerCount: number): number {
     return sizes[level];
 }
 
-/** A shown handful — public from the moment it is declared. */
 export interface DeclaredHandful {
     readonly level: HandfulLevel;
-    /** The trumps (and possibly the Excuse) laid on the table, strongest first. */
+    /** Strongest first. */
     readonly cards: readonly CardDescriptor[];
 }
 
-/** One card laid by one player. */
 export interface TrickCard {
     readonly playerId: string;
     readonly card: CardDescriptor;
 }
 
-/** A finished trick: the cards in play order plus the resolved winner. */
 export interface CompletedTrick {
     readonly leaderId: string;
     readonly plays: readonly TrickCard[];
-    /** Highest trump, else highest card of the led suit. Never the Excuse —
-     * except when a side that swept every earlier trick leads it to the last
-     * one (Excuse au chelem, see `trickWinner`). */
     readonly winnerId: string;
 }
 
-/** The three *bouts* (oudlers): trump 1 (Petit), trump 21, and the Excuse.
- * They alone set the points threshold the taker must reach — and are the most
- * valuable cards in the deck. */
+function isPetit(card: CardDescriptor): boolean {
+    return card.type === "trump" && card.index === PETIT;
+}
+
+/** The three bouts — Petit, 21 and the Excuse — set the taker's threshold. */
 export function isBout(card: CardDescriptor): boolean {
     if (card.type === "fool") return true;
-    return card.type === "trump" && (card.index === 1 || card.index === 21);
+    return (
+        card.type === "trump" &&
+        (card.index === PETIT || card.index === TWENTY_ONE)
+    );
 }
 
-/**
- * Card value in **demi-points** (real value ×2, so every value is an integer):
- * - Bout or King — 9 (4.5 pts)
- * - Queen (Dame) — 7 (3.5)
- * - Cavalier — 5 (2.5)
- * - Valet (Jack) — 3 (1.5)
- * - everything else (pips, plain trumps) — 1 (0.5)
- */
+/** Demi-points: bout/King 9, Queen 7, Cavalier 5, Jack 3, anything else 1. */
 export function cardPointsDemi(card: CardDescriptor): number {
-    if (card.type === "fool") return 9; // the Excuse is a bout — worth 4.5
-    if (card.type === "trump") {
-        return card.index === 1 || card.index === 21 ? 9 : 1;
+    if (isBout(card)) return 9;
+    if (card.type !== "suited") return 1;
+    switch (card.rank) {
+        case "K":
+            return 9;
+        case "Q":
+            return 7;
+        case "C":
+            return 5;
+        case "J":
+            return 3;
+        default:
+            return 1;
     }
-    if (card.type === "suited") {
-        switch (card.rank) {
-            case "K":
-                return 9; // Roi
-            case "Q":
-                return 7; // Dame
-            case "C":
-                return 5; // Cavalier
-            case "J":
-                return 3; // Valet
-            default:
-                return 1; // pips A(1)–10
-        }
-    }
-    return 1; // jokers never appear in a tarot deck — defensive default
 }
 
-/** Sum a pile's card values, in demi-points. */
 export function pilePointsDemi(cards: readonly CardDescriptor[]): number {
     return cards.reduce((sum, c) => sum + cardPointsDemi(c), 0);
 }
 
-/**
- * Points the taker must reach, by the number of bouts in their final pile.
- * Fewer bouts ⇒ harder contract. This is the eponymous "seuil".
- */
+/** Points the taker needs, by bouts won — the eponymous « seuil ». */
 export function thresholdForBouts(bouts: number): number {
     switch (bouts) {
         case 3:
@@ -171,79 +141,59 @@ export function thresholdForBouts(bouts: number): number {
         case 1:
             return 51;
         default:
-            return 56; // 0 bouts
+            return 56;
     }
 }
 
-/** Inputs to {@link scoreDeal} — everything a finished deal is scored from. */
 export interface DealInput {
-    /** All player ids (any order). */
     readonly players: readonly string[];
     readonly taker: string;
     readonly contract: Bid;
-    /** Completed tricks, in play order; the last one drives « petit au bout ». */
     readonly tricks: readonly CompletedTrick[];
-    /** The six dog cards. Counted for the taker on Garde Sans, for the defence
-     * on Garde Contre, and ignored here on Petite/Garde (those cards live in the
-     * taker's hand → tricks, or in the écart below). */
+    /** Counted for the taker on Garde Sans, the defence on Garde Contre; else already in play. */
     readonly chien: readonly CardDescriptor[];
-    /** The six cards the taker set aside (Petite/Garde) — counted for the taker.
-     * Empty for Garde Sans / Garde Contre. */
+    /** Counted for the taker (empty on Sans/Contre). */
     readonly ecart: readonly CardDescriptor[];
     readonly rules: TarotRules;
-    /** Handfuls shown during the deal, by player (any side). */
     readonly handfuls?: Readonly<Record<string, DeclaredHandful>>;
-    /** The taker announced a slam before the first card. */
     readonly slamAnnounced?: boolean;
 }
 
-/** Full, explainable breakdown of a scored deal (taker's perspective). */
+/** Taker's perspective. */
 export interface DealResult {
-    /** Taker card points (real points, may be a half). */
     readonly takerPoints: number;
-    /** Defence card points — `takerPoints + defencePoints === 91`. */
+    /** `takerPoints + defencePoints === 91`. */
     readonly defencePoints: number;
     readonly bouts: number;
     readonly threshold: number;
-    /** `takerPoints − threshold`; ≥ 0 ⇒ contract made. */
+    /** ≥ 0 ⇒ made. */
     readonly diff: number;
     readonly made: boolean;
     readonly multiplier: number;
-    /** Last-trick Petit bonus, taker's sign: +1 won it, −1 defence won it, 0 none. */
+    /** +1 taker won it, −1 defence won it, 0 none. */
     readonly petitAuBout: -1 | 0 | 1;
-    /** Slam bonus, taker's perspective: +400 (announced, made), +200
-     * (unannounced, made), −200 (announced and missed, or a defence slam),
-     * or 0. */
     readonly chelem: number;
-    /** Handful primes, taker's perspective: the summed primes go to the side
-     * that wins the deal, whoever showed them. Present only when the handful
-     * rule is part of the game's rules (absent on legacy deals). */
+    /** Absent on legacy deals (rules predating the handful) — keeps their stored shape. */
     readonly handful?: number;
-    /** What the taker gains from EACH defender (negative = the taker pays). */
+    /** What the taker gains from EACH defender (negative = pays). */
     readonly perDefender: number;
-    /** Final signed score per player. Zero-sum across the table. */
+    /** Zero-sum across the table. */
     readonly scores: Record<string, number>;
 }
 
 /**
- * Score a finished deal. Pure — no randomness, no state mutation.
- *
- * The hard part is the Excuse (« L'Excuse »): it never wins a trick. Normally
- * the player who plays it keeps it in their own pile and hands a low (0.5) card
- * to the trick's winner; on the very last trick it is instead captured by the
- * winner — unless its owner's side has swept every trick (grand chelem; a
- * chelem side leading the Excuse to the last trick wins that trick). We
- * resolve all of that by assigning each card to the taker or defence pile, then
- * applying the half-point Excuse transfers as a demi-point adjustment, so the
- * 182-demi (91-point) total is always conserved.
+ * The Excuse never wins a trick: its owner keeps it and hands the winner a
+ * low card (half a point) — except on the last trick, where the winner
+ * captures it unless its owner's side swept every trick (grand chelem).
+ * Cards go to the taker or defence pile; Excuse exchanges are a demi-point
+ * adjustment, so the 182-demi total is always conserved.
  */
 export function scoreDeal(input: DealInput): DealResult {
     const { players, taker, contract, tricks, chien, ecart, rules } = input;
 
     const takerCards: CardDescriptor[] = [];
     const defenceCards: CardDescriptor[] = [];
-    // Net demi-points moved by Excuse exchanges: + toward the taker, − toward
-    // the defence. Keeps the 0.5 card transfer exact without tracking identities.
+    // + toward the taker, − toward the defence.
     let excuseTransferDemi = 0;
 
     const takerWonAll = tricks.every((t) => t.winnerId === taker);
@@ -255,8 +205,7 @@ export function scoreDeal(input: DealInput): DealResult {
         const excuse = trick.plays.find((p) => p.card.type === "fool");
 
         for (const play of trick.plays) {
-            if (play.card.type === "fool") continue; // resolved below
-            sink.push(play.card);
+            if (play.card.type !== "fool") sink.push(play.card);
         }
 
         if (!excuse) return;
@@ -265,24 +214,17 @@ export function scoreDeal(input: DealInput): DealResult {
         const excuseSideWonAll = excuseIsTaker ? takerWonAll : defenceWonAll;
         const isLastTrick = index === tricks.length - 1;
 
-        // Last trick: the Excuse is captured by the trick winner — unless its
-        // owner's side made a grand chelem, in which case they keep it.
         if (isLastTrick && !excuseSideWonAll) {
             sink.push(excuse.card);
             return;
         }
 
-        // Otherwise the Excuse goes back to its owner's pile…
         (excuseIsTaker ? takerCards : defenceCards).push(excuse.card);
-        // …and its owner owes the trick winner one low card (0.5 = 1 demi).
         if (winnerIsTaker !== excuseIsTaker) {
             excuseTransferDemi += winnerIsTaker ? 1 : -1;
         }
     });
 
-    // Écart always counts for the taker (empty on Sans/Contre). The chien is
-    // a block bonus for one side on Sans/Contre, and already accounted on Petite
-    // /Garde (its cards passed through the taker's hand).
     for (const c of ecart) takerCards.push(c);
     if (contract === "garde-sans") for (const c of chien) takerCards.push(c);
     if (contract === "garde-contre")
@@ -296,17 +238,13 @@ export function scoreDeal(input: DealInput): DealResult {
     const thresholdDemi = threshold * 2;
     const made = takerDemi >= thresholdDemi;
     const gapDemi = Math.abs(takerDemi - thresholdDemi);
-    // The half-point goes to the taker (« le demi-point bénéficie au preneur »):
-    // round the gap up when they win (bigger reward), down when they lose
-    // (smaller penalty). Both nudge the result in the taker's favour.
+    // « Le demi-point bénéficie au preneur »: round up when made, down when not.
     const gap = made ? Math.ceil(gapDemi / 2) : Math.floor(gapDemi / 2);
 
     const multiplier = BID_MULTIPLIER[contract];
 
-    // « Petit au bout » — Petit (trump 1) played in the last trick: +10 (×mult)
-    // to whichever side won that trick. When a chelem side spends the last
-    // trick leading the Excuse, the FFT moves "the end" one trick earlier: the
-    // Petit counts au bout if it falls in the penultimate trick.
+    // A slam side spending the last trick on the Excuse moves « the end » one
+    // trick earlier (FFT): the Petit then counts in the penultimate trick.
     let petitAuBout: -1 | 0 | 1 = 0;
     const last = tricks[tricks.length - 1];
     const excuseClosesSlam =
@@ -314,28 +252,21 @@ export function scoreDeal(input: DealInput): DealResult {
         last.plays[0]?.card.type === "fool" &&
         last.winnerId === last.plays[0].playerId;
     const bout = excuseClosesSlam ? tricks[tricks.length - 2] : last;
-    if (
-        rules.petitAuBout &&
-        bout?.plays.some((p) => p.card.type === "trump" && p.card.index === 1)
-    ) {
+    if (rules.petitAuBout && bout?.plays.some((p) => isPetit(p.card))) {
         petitAuBout = bout.winnerId === taker ? 1 : -1;
     }
 
-    // « Chelem » — one side wins all the tricks. Announced (FFT): +400 when
-    // made, −200 when missed. Unannounced: +200 for a taker slam. A slam the
-    // defence inflicts on the taker earns it 200 either way — on top of the
-    // missed-announcement penalty when there was one.
+    // A defence slam earns it the slam bonus either way — on top of a missed
+    // announcement's penalty.
     let chelem = 0;
     if (rules.announcedSlam && input.slamAnnounced) {
-        chelem = takerWonAll ? 400 : -200;
-        if (defenceWonAll) chelem -= 200;
+        chelem = takerWonAll ? ANNOUNCED_SLAM_MADE : -SLAM_BONUS;
+        if (defenceWonAll) chelem -= SLAM_BONUS;
     } else if (rules.slam) {
-        if (takerWonAll) chelem = 200;
-        else if (defenceWonAll) chelem = -200;
+        if (takerWonAll) chelem = SLAM_BONUS;
+        else if (defenceWonAll) chelem = -SLAM_BONUS;
     }
 
-    // « Poignée » — flat primes (never multiplied), all credited to the side
-    // that wins the deal, whoever showed them.
     const handfulTotal = rules.handful
         ? Object.values(input.handfuls ?? {}).reduce(
               (sum, h) => sum + HANDFUL_PRIME[h.level],
@@ -344,13 +275,10 @@ export function scoreDeal(input: DealInput): DealResult {
         : 0;
     const handful = made ? handfulTotal : -handfulTotal;
 
-    // Result per defender (taker's perspective): the signed contract value,
-    // plus the (independently signed) Petit prime, the handful primes and the
-    // flat slam prime.
-    const contractValue = (25 + gap) * multiplier;
+    const contractValue = (CONTRACT_BASE + gap) * multiplier;
     const perDefender =
         (made ? contractValue : -contractValue) +
-        petitAuBout * 10 * multiplier +
+        petitAuBout * PETIT_AU_BOUT_BONUS * multiplier +
         handful +
         chelem;
 
@@ -370,8 +298,6 @@ export function scoreDeal(input: DealInput): DealResult {
         multiplier,
         petitAuBout,
         chelem,
-        // Legacy deals (rules predating the handful) keep their exact shape,
-        // so a replay still lands byte for byte on the stored result.
         ...(rules.handful === undefined ? {} : { handful }),
         perDefender,
         scores,

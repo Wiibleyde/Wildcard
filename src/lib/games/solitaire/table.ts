@@ -1,8 +1,11 @@
 import type { CardDescriptor, Suit } from "@/lib/card/types";
-import { cardKey, FACE_DOWN_CARD } from "@/lib/card/utils";
+import { cardKey, isRank, isSuit, SUIT_SYMBOL } from "@/lib/card/utils";
+import { faceDownPile, turnBanner } from "../table/helpers";
 import {
     registerTable,
+    type TableBanner,
     type TableCardItem,
+    type TableContext,
     type TableControl,
     type TableZoneInstance,
 } from "../table/types";
@@ -13,22 +16,12 @@ import type {
     SolitaireView,
 } from "./solitaire";
 
-/** Empty-foundation hint: the suit it collects, so the board reads at a glance. */
-const SUIT_SYMBOL: Record<Suit, string> = {
-    spades: "♠",
-    hearts: "♥",
-    diamonds: "♦",
-    clubs: "♣",
-};
-
-/** A card's drop destination → the action that completes the move there. */
 type Drop = { readonly zoneKey: string; readonly action: SolitaireAction };
 
 function suitOf(card: CardDescriptor): Suit | null {
     return card.type === "suited" ? card.suit : null;
 }
 
-/** Immutably push `card` onto its foundation (bump top + count). */
 function pushFoundation(
     foundations: readonly SolitaireFoundationView[],
     suit: Suit,
@@ -39,7 +32,6 @@ function pushFoundation(
     );
 }
 
-/** Immutably replace one column's face-up run. */
 function replaceUp(
     tableau: readonly SolitaireColumnView[],
     column: number,
@@ -48,7 +40,6 @@ function replaceUp(
     return tableau.map((c, i) => (i === column ? { ...c, up } : c));
 }
 
-/** Immutably append cards to one column's face-up run. */
 function appendUp(
     tableau: readonly SolitaireColumnView[],
     column: number,
@@ -59,22 +50,22 @@ function appendUp(
     );
 }
 
+function banner(view: SolitaireView, ctx: TableContext): TableBanner {
+    if (view.phase === "won")
+        return { label: ctx.t("you_win"), highlight: false };
+    if (view.phase === "lost") {
+        return { label: ctx.t("solitaire_resigned"), highlight: false };
+    }
+    // Solo game: always the seated player's turn; spectators are told so.
+    return turnBanner(ctx, ctx.viewerId);
+}
+
 /**
- * Solitaire table — stock, waste and the four foundations as `stack` piles on
- * top; the seven tableau columns as `cascade` runs in the centre. No seats, no
- * hand: it is a single-player board.
- *
- * Two ways to play every move, both built from `legalActions`:
- * - **Drag and drop** — each movable card carries its full set of `dropTargets`
- *   (one per legal destination, keyed by zone) plus the `dragStack` run that
- *   lifts out with it. Dropping on a foundation or column dispatches that
- *   target's action, so the *player* picks where it goes.
- * - **Double-click** — the same card carries its *best* move (foundation first,
- *   then the leftmost legal column) as the `action` auto-move shortcut.
- *
- * Drawing/recycling lives on a control button (single click), because the stock
- * pile is empty exactly when you need to recycle and an empty zone has nothing
- * to grab.
+ * Stock, waste and foundations as piles on top, the seven columns as
+ * cascades. Every move is offered twice from `legalActions`: drag-and-drop
+ * (`dropTargets`, the player picks the destination) and double-click (the
+ * card's `action`: foundation first, else the leftmost column). Drawing and
+ * recycling live on the stock zone itself, which stays clickable when empty.
  */
 export const solitaireTable = registerTable<SolitaireView>({
     zones: [
@@ -87,8 +78,6 @@ export const solitaireTable = registerTable<SolitaireView>({
             cardSize: "sm",
         },
         {
-            // Seven columns share the board width (`fill`): cards size to the
-            // column, so the tableau scales from 375px to 2K without wrapping.
             id: "tableau",
             placement: "center",
             arrangement: "cascade",
@@ -97,14 +86,8 @@ export const solitaireTable = registerTable<SolitaireView>({
     ],
 
     /**
-     * Optimistic prediction of the viewer's own move — the card slides to its
-     * destination immediately, no round-trip. Only moves whose every effect is
-     * already on the board are predicted; anything that would reveal a hidden
-     * card returns `null` (the server reconciles a beat later):
-     * - `draw` / `autoFinish` — turn over face-down stock cards;
-     * - `foundationToTableau` — the card now exposed under the foundation top is
-     *   not in the view (only the top leaks);
-     * - emptying a column's last face-up card flips the face-down one beneath.
+     * Not predicted (they reveal hidden cards): draw/autoFinish, a foundation
+     * card coming back down, and emptying a column onto its face-down cards.
      */
     predict(view, action) {
         const a = action as SolitaireAction;
@@ -133,7 +116,6 @@ export const solitaireTable = registerTable<SolitaireView>({
                 const card = col?.up.at(-1);
                 const s = card && suitOf(card);
                 if (!col || !card || !s) return null;
-                // Emptying the last face-up card flips a hidden one — bail.
                 if (col.up.length === 1 && col.downCount > 0) return null;
                 return {
                     ...view,
@@ -153,7 +135,6 @@ export const solitaireTable = registerTable<SolitaireView>({
                 const cut = from.up.length - a.count;
                 const run = from.up.slice(cut);
                 const leftover = from.up.slice(0, cut);
-                // Moving the whole run off a column with hidden cards flips one.
                 if (leftover.length === 0 && from.downCount > 0) return null;
                 return {
                     ...view,
@@ -175,29 +156,16 @@ export const solitaireTable = registerTable<SolitaireView>({
             match: (a: SolitaireAction) => boolean,
         ): SolitaireAction | undefined => legal.find(match);
 
-        const banner =
-            view.phase === "won"
-                ? ctx.t("you_win")
-                : view.phase === "lost"
-                  ? ctx.t("solitaire_resigned")
-                  : ctx.t("your_turn");
-
-        // One-click finish — surfaced only when the engine deems the win
-        // assured (no face-down cards left). It plays the rest out in a quick
-        // cascade so the player skips the busywork once the outcome is settled.
+        const controls: TableControl[] = [];
         const autoFinish = find((a) => a.type === "autoFinish");
-        const controls: TableControl[] = autoFinish
-            ? [
-                  {
-                      key: "auto-finish",
-                      label: ctx.t("auto_finish"),
-                      action: autoFinish,
-                      variant: "success",
-                  },
-              ]
-            : [];
-        // Resign — the only exit from a deal that cannot be won (unlimited
-        // redeals mean a stuck board would otherwise never finish).
+        if (autoFinish) {
+            controls.push({
+                key: "auto-finish",
+                label: ctx.t("auto_finish"),
+                action: autoFinish,
+                variant: "success",
+            });
+        }
         const resign = find((a) => a.type === "resign");
         if (resign) {
             controls.push({
@@ -209,21 +177,6 @@ export const solitaireTable = registerTable<SolitaireView>({
             });
         }
 
-        // ── Stock: a face-down pile. Clicking anywhere on it draws a card, or
-        //    recycles the waste once empty (the click lives on the zone, so it
-        //    works even when there is no card left to click). ─────────────────
-        const draw = find((a) => a.type === "draw");
-        const stockSlots = Math.min(view.stockCount, 3);
-        const stockCards: TableCardItem[] = Array.from(
-            { length: stockSlots },
-            (_, i) => ({
-                id: `stock:${i}`,
-                card: FACE_DOWN_CARD,
-                faceDown: true,
-            }),
-        );
-
-        // ── Waste: face-up pile; only the top is playable (drag or click) ───
         const wasteTop = view.waste.at(-1);
         const wasteAction =
             find((a) => a.type === "wasteToFoundation") ??
@@ -253,32 +206,23 @@ export const solitaireTable = registerTable<SolitaireView>({
             };
         });
 
-        // ── Tableau: hidden cards as backs, then the clickable face-up run ──
         const tableauZones: TableZoneInstance[] = view.tableau.map(
             (col, column) => {
-                const downCards: TableCardItem[] = Array.from(
-                    { length: col.downCount },
-                    (_, k) => ({
-                        id: `t${column}:down:${k}`,
-                        card: FACE_DOWN_CARD,
-                        faceDown: true,
-                    }),
-                );
                 const upCards: TableCardItem[] = col.up.map((card, k) => {
                     const isTop = k === col.up.length - 1;
                     const count = col.up.length - k;
                     const s = suitOf(card);
 
-                    // The run starting at this card can move to any column that
-                    // accepts it; only a lone top card can also go up.
+                    // The run from this card can go to any accepting column;
+                    // only a lone top card can also go up.
                     const drops: Drop[] = [];
-                    const toFoundation =
-                        isTop &&
-                        find(
-                            (a) =>
-                                a.type === "tableauToFoundation" &&
-                                a.column === column,
-                        );
+                    const toFoundation = isTop
+                        ? find(
+                              (a) =>
+                                  a.type === "tableauToFoundation" &&
+                                  a.column === column,
+                          )
+                        : undefined;
                     if (toFoundation && s) {
                         drops.push({
                             zoneKey: `foundation:${s}`,
@@ -297,17 +241,12 @@ export const solitaireTable = registerTable<SolitaireView>({
                             });
                         }
                     }
-                    // Auto-move shortcut (double-click): foundation first, else
-                    // the leftmost legal column.
-                    const action =
-                        (toFoundation || undefined) ?? drops[0]?.action;
 
-                    // The run that lifts out with this card (this card first).
                     const run = col.up.slice(k);
                     return {
                         id: `t${column}:up:${cardKey(card)}`,
                         card,
-                        action,
+                        action: toFoundation ?? drops[0]?.action,
                         dropTargets: drops.length ? drops : undefined,
                         dragStack:
                             run.length > 1
@@ -321,7 +260,10 @@ export const solitaireTable = registerTable<SolitaireView>({
                 return {
                     key: `tableau:${column}`,
                     zone: "tableau",
-                    cards: [...downCards, ...upCards],
+                    cards: [
+                        ...faceDownPile(`t${column}:down`, col.downCount),
+                        ...upCards,
+                    ],
                     emptyHint: ctx.t("empty_column"),
                 };
             },
@@ -329,7 +271,6 @@ export const solitaireTable = registerTable<SolitaireView>({
 
         const foundationZones: TableZoneInstance[] = view.foundations.map(
             (f) => {
-                // A foundation top can be dragged back down onto the tableau.
                 const drops: Drop[] = [];
                 for (const a of legal) {
                     if (a.type === "foundationToTableau" && a.suit === f.suit) {
@@ -357,16 +298,15 @@ export const solitaireTable = registerTable<SolitaireView>({
         );
 
         return {
-            banner: { label: banner, highlight: !ctx.isOver },
+            banner: banner(view, ctx),
             zones: [
                 {
                     key: "stock",
                     zone: "stock",
-                    cards: stockCards,
+                    cards: faceDownPile("stock", Math.min(view.stockCount, 3)),
                     caption: ctx.t("cards_left", { n: view.stockCount }),
                     emptyHint: ctx.t("recycle"),
-                    // Draw / recycle — clicking the pile (or its empty slot).
-                    action: draw,
+                    action: find((a) => a.type === "draw"),
                 },
                 { key: "waste", zone: "waste", cards: wasteCards },
                 ...foundationZones,
@@ -381,12 +321,11 @@ export const solitaireTable = registerTable<SolitaireView>({
         const p = event.payload ?? {};
         switch (event.type) {
             case "to_foundation":
-                // The auto-finish floods the foundations in one burst — logging
-                // each would bury the feed; the "won" line covers it.
+                // The auto-finish floods the feed; its "won" line covers it.
                 if (p.auto) return null;
                 return ctx.t("log_to_foundation", {
-                    rank: String(p.rank ?? "?"),
-                    suit: SUIT_SYMBOL[(p.suit as Suit) ?? "spades"],
+                    rank: isRank(p.rank) ? p.rank : "?",
+                    suit: isSuit(p.suit) ? SUIT_SYMBOL[p.suit] : "?",
                 });
             case "recycle":
                 return ctx.t("log_recycle");
@@ -394,7 +333,6 @@ export const solitaireTable = registerTable<SolitaireView>({
                 return ctx.t("you_win");
             case "resigned":
                 return ctx.t("solitaire_resigned");
-            // Draws and tableau shuffling are noise — keep the feed to progress.
             default:
                 return null;
         }

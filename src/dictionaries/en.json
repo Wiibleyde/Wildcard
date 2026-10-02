@@ -335,6 +335,7 @@
     "game": {
         "your_turn": "Your turn",
         "waiting_for": "Waiting for {name}",
+        "waiting": "Waiting…",
         "spectating": "You are spectating",
         "flip": "Flip",
         "pass": "Pass",

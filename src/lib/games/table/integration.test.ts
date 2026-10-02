@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { clientState, createGame, dispatch } from "@/lib/engine/runner";
 import type { AnyGameModule, GameAction, Player } from "@/lib/engine/types";
-import { GAME_TABLES, GAMES } from "@/lib/games";
+import { getGameModule, getGameTable } from "@/lib/games";
 import type { AnyGameTableConfig, TableContext, TableData } from "./types";
 
 /**
@@ -49,6 +49,8 @@ function checkTableData(
     legalActions: readonly GameAction[],
 ) {
     expect(data.banner.label.length).toBeGreaterThan(0);
+    // Unknown names render as "?" — a banner must never wait for nobody.
+    expect(data.banner.label).not.toContain("?");
 
     const templateIds = new Set(table.zones.map((z) => z.id));
     const cardIds = new Set<string>();
@@ -96,8 +98,10 @@ function playThrough(
     table: AnyGameTableConfig,
     players: Player[],
     seed: number,
+    pick: (legal: readonly GameAction[], step: number) => GameAction = (l) =>
+        l[0],
 ) {
-    let state = createGame(module, players, seed);
+    let state = createGame(module, players, { seed });
     let guard = 0;
     let statesChecked = 0;
 
@@ -120,7 +124,7 @@ function playThrough(
         const actor = state.currentPlayerId ?? players[0].id;
         const legal = module.legalActions(state, actor);
         expect(legal.length).toBeGreaterThan(0);
-        const result = dispatch(module, state, legal[0], actor);
+        const result = dispatch(module, state, pick(legal, guard), actor);
         if (!result.ok) throw new Error(result.error.code);
         state = result.state;
     }
@@ -130,13 +134,34 @@ function playThrough(
 }
 
 describe("full games rendered through table configs", () => {
-    it("bataille: every state projects cleanly for all viewers", () => {
-        const module = GAMES.bataille;
-        playThrough(module, GAME_TABLES.bataille, seats(2), 20260611);
-    });
+    const games: ReadonlyArray<[string, number, number]> = [
+        ["bataille", 2, 20260611],
+        ["president", 4, 424242],
+        ["tarot", 4, 31],
+        ["tarot", 3, 77],
+    ];
+    it.each(games)(
+        "%s (%i players): every state projects cleanly",
+        (id, n, seed) => {
+            const module = getGameModule(id);
+            const table = getGameTable(id);
+            if (!module || !table) throw new Error(`unregistered game "${id}"`);
+            playThrough(module, table, seats(n), seed);
+        },
+    );
 
-    it("président: every state projects cleanly for all viewers", () => {
-        const module = GAMES.president;
-        playThrough(module, GAME_TABLES.president, seats(4), 424242);
+    it("solitaire: every state projects cleanly, spectator included", () => {
+        const module = getGameModule("solitaire");
+        const table = getGameTable("solitaire");
+        if (!module || !table) throw new Error("solitaire unregistered");
+        // Prefer real moves over draws; resign once the deal stalls.
+        playThrough(module, table, seats(1), 2024, (legal, step) => {
+            const resign = legal.find((a) => a.type === "resign");
+            if (step > 300 && resign) return resign;
+            return (
+                legal.find((a) => a.type !== "draw" && a.type !== "resign") ??
+                legal[0]
+            );
+        });
     });
 });

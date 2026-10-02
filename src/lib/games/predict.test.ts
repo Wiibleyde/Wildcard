@@ -30,7 +30,7 @@ describe("president — predict matches apply on the viewer's hand", () => {
     it("the played cards always leave the hand exactly", () => {
         let cases = 0;
         for (const seed of [1, 7, 42, 1234, 90210]) {
-            let state = createGame(president, P4, seed);
+            let state = createGame(president, P4, { seed });
             for (let step = 0; step < 60 && !president.isOver(state); step++) {
                 const actor = state.currentPlayerId;
                 const legal = president.legalActions(state, actor);
@@ -95,7 +95,7 @@ describe("solitaire — predict matches apply on the whole board", () => {
     it("predicted board equals the real board for every predicted move", () => {
         let cases = 0;
         for (const seed of [1, 2, 7, 42, 99, 2024]) {
-            let state = createGame(solitaire, players, seed);
+            let state = createGame(solitaire, players, { seed });
             for (let step = 0; step < 120 && !solitaire.isOver(state); step++) {
                 const legal = solitaire.legalActions(state, "solo");
                 if (legal.length === 0) break;

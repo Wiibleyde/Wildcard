@@ -1,29 +1,38 @@
 import { describe, expect, it } from "vitest";
-import { dealRoundRobin, removeCards } from "./hand";
+import { dealRoundRobin, takeCards } from "./hand";
 import type { CardDescriptor } from "./types";
 
 const c = (suit: string, rank: string): CardDescriptor =>
     ({ type: "suited", suit, rank }) as CardDescriptor;
 
-describe("removeCards", () => {
-    it("removes one occurrence of each requested card", () => {
+describe("takeCards", () => {
+    it("takes one occurrence of each requested card", () => {
         const hand = [c("hearts", "7"), c("spades", "K"), c("clubs", "2")];
-        const next = removeCards(hand, [c("spades", "K")]);
-        expect(next).not.toBeNull();
-        expect(next).toHaveLength(2);
-        expect(next?.some((x) => x.type === "suited" && x.rank === "K")).toBe(
-            false,
-        );
+        const next = takeCards(hand, [c("spades", "K")]);
+        expect(next?.remaining).toHaveLength(2);
+        expect(next?.taken).toEqual([c("spades", "K")]);
     });
 
-    it("returns null when a card is not held", () => {
-        const hand = [c("hearts", "7")];
-        expect(removeCards(hand, [c("spades", "K")])).toBeNull();
+    it("returns the hand's own copies, not the requested objects", () => {
+        const hand = [c("spades", "K")];
+        const forged = { type: "suited", suit: "spades", rank: "K", x: 1 };
+        expect(takeCards(hand, [forged])?.taken[0]).toBe(hand[0]);
+    });
+
+    it("returns null when a card is not held or malformed", () => {
+        const hand = [c("hearts", "7"), c("spades", "2")];
+        expect(takeCards(hand, [c("spades", "K")])).toBeNull();
+        expect(
+            takeCards(hand, [c("hearts", "7"), c("hearts", "7")]),
+        ).toBeNull();
+        expect(
+            takeCards(hand, [{ type: "suited", suit: "spades", rank: 2 }]),
+        ).toBeNull();
     });
 
     it("does not mutate the input hand", () => {
         const hand = [c("hearts", "7"), c("spades", "K")];
-        removeCards(hand, [c("hearts", "7")]);
+        takeCards(hand, [c("hearts", "7")]);
         expect(hand).toHaveLength(2);
     });
 });

@@ -1,6 +1,11 @@
 import type { CardDescriptor } from "@/lib/card/types";
-import { cardKey } from "@/lib/card/utils";
-import { playerName } from "../table/helpers";
+import {
+    cardKey,
+    isRank,
+    rankLabel,
+    SUIT_DISPLAY_ORDER,
+} from "@/lib/card/utils";
+import { playerName, seatChips, turnBanner } from "../table/helpers";
 import {
     registerTable,
     type TableContext,
@@ -15,36 +20,13 @@ import {
     RANK_VALUE,
 } from "./president";
 
-/** Suit tiebreak for hand order — keeps same-rank cards in a stable run. */
-const SUIT_ORDER: Record<string, number> = {
-    spades: 0,
-    hearts: 1,
-    clubs: 2,
-    diamonds: 3,
-};
-
-/** Hand sort key: Président strength (3 low → 2 high), suit as tiebreak — so
- * the hand reads low→high and same-rank cards sit together for easy combos. */
+/** Low → high, same-rank cards together for easy combos. */
 function handOrder(card: CardDescriptor): number {
     if (card.type !== "suited") return -1;
-    return RANK_VALUE[card.rank] * 10 + (SUIT_ORDER[card.suit] ?? 0);
+    return RANK_VALUE[card.rank] * 10 + SUIT_DISPLAY_ORDER[card.suit];
 }
 
-/** Court cards get their localized name ("Dame"), pips stay as digits. */
-function rankLabel(ctx: TableContext, rank: unknown): string {
-    const r = String(rank);
-    return r === "J" || r === "Q" || r === "K" || r === "A"
-        ? ctx.t(`rank_${r}`)
-        : r;
-}
-
-/**
- * Title for a clean finish. Canonical Président ladder, adjusted to the table
- * size (`total` ranked players): Président, Vice-Président, Neutre(s),
- * Vice-Trou du cul, Trou du cul.
- * Vice titles need a 4th seat; everyone between the vices is Neutre. With 6
- * players the two middle seats are both Neutre. `place` is 1-based.
- */
+/** Président ladder sized to the table: vice titles need a 4th seat, the middle is Neutre. */
 function rankTitle(ctx: TableContext, place: number, total: number): string {
     if (place === 1) return ctx.t("place_president");
     if (place === total) return ctx.t("place_asshole");
@@ -55,20 +37,17 @@ function rankTitle(ctx: TableContext, place: number, total: number): string {
     return ctx.t("place_neutral");
 }
 
-/** In-play badge title once a player has gone out (or was demoted on a 2) —
- * `null` while still holding cards. Same ladder as the game-over standings. */
+/** Title once out of the round (demoted ⇒ Trou du cul); `null` while holding cards. */
 function placeLabel(ctx: TableContext, p: PresidentPlayerView): string | null {
     if (p.demoted) return ctx.t("place_asshole");
     if (p.place === null) return null;
     return rankTitle(ctx, p.place, ctx.players.length);
 }
 
-/**
- * Président table — opponent seats on top, the framed trick zone in the
- * center (every play of the uncleared trick, each card skinned with its
- * player's deck style), the viewer's fan at the bottom, and legal combos +
- * pass as controls.
- */
+function payloadRank(ctx: TableContext, rank: unknown): string {
+    return isRank(rank) ? rankLabel(ctx.t, rank) : "?";
+}
+
 export const presidentTable = registerTable<PresidentView>({
     zones: [
         {
@@ -84,25 +63,20 @@ export const presidentTable = registerTable<PresidentView>({
     rankTitle: (rank, total, ctx) => rankTitle(ctx, rank, total),
 
     /**
-     * Optimistic prediction of the viewer's own play/pass: the chosen cards
-     * leave the hand and land on the trick immediately, no round-trip. The turn
-     * is blanked so `mapView` stops treating it as ours (the fan and Pass
-     * disable themselves) until the server reconciles. Trick-closing sweeps (a
-     * 2, a carré, the last opponent passing) are the server's to settle — those
-     * reconcile a beat later; the prediction only commits to the hand leaving.
+     * The played cards leave the hand and land on the trick; sweeps (a 2, a
+     * carré, the last pass) are left to the server.
      */
     predict(view, action, viewerId) {
         if (viewerId === null) return null;
         const a = action as PresidentAction;
         if (a.type !== "play" && a.type !== "pass") return null;
         const self = view.players.find((p) => p.playerId === viewerId);
-        // Only the player on turn can act — guard a stale click from desyncing.
         if (!self || view.currentPlayerId !== viewerId) return null;
 
         if (a.type === "pass") {
             return {
                 ...view,
-                currentPlayerId: "",
+                currentPlayerId: null,
                 players: view.players.map((p) =>
                     p.playerId === viewerId ? { ...p, passed: true } : p,
                 ),
@@ -112,27 +86,21 @@ export const presidentTable = registerTable<PresidentView>({
         const hand = self.hand;
         if (!hand) return null;
         const playedKeys = new Set(a.cards.map(cardKey));
-        // Every played card must really be in hand, or the click is stale.
         if (playedKeys.size !== a.cards.length) return null;
-        if (![...playedKeys].every((k) => hand.some((c) => cardKey(c) === k))) {
-            return null;
-        }
-        const first = a.cards[0];
+        // The hand's own copies, mirroring the server — never the action's.
+        const played = hand.filter((c) => playedKeys.has(cardKey(c)));
+        if (played.length !== playedKeys.size) return null;
+        const first = played[0];
         if (first?.type !== "suited") return null;
 
         const nextHand = hand.filter((c) => !playedKeys.has(cardKey(c)));
-        // Show the hand's own copies, mirroring the server (never the action's).
-        const played = hand.filter((c) => playedKeys.has(cardKey(c)));
-        // A fresh lead clears the just-won trick still on display; otherwise the
-        // play stacks onto the running pile.
-        const showingLast = view.pile.length === 0 && view.lastTrick.length > 0;
-        const basePile = showingLast ? [] : view.pile;
+        const pile = [...view.pile, { playerId: viewerId, cards: played }];
         return {
             ...view,
-            currentPlayerId: "",
-            combo: { rank: first.rank, count: a.cards.length },
-            pile: [...basePile, { playerId: viewerId, cards: played }],
-            lastTrick: showingLast ? [] : view.lastTrick,
+            currentPlayerId: null,
+            combo: { rank: first.rank, count: played.length },
+            pile,
+            displayTrick: { plays: pile, wonBy: null },
             players: view.players.map((p) =>
                 p.playerId === viewerId
                     ? { ...p, hand: nextHand, handCount: nextHand.length }
@@ -143,72 +111,48 @@ export const presidentTable = registerTable<PresidentView>({
 
     mapView(view, ctx) {
         const self = view.players.find((p) => p.playerId === ctx.viewerId);
-        const isYourTurn = !ctx.isOver && view.currentPlayerId === ctx.viewerId;
+        const banner = turnBanner(ctx, view.currentPlayerId);
+        const isYourTurn = banner.highlight;
 
-        const banner = ctx.isOver
-            ? ctx.t("game_over")
-            : isYourTurn
-              ? ctx.t("your_turn")
-              : self
-                ? ctx.t("waiting_for", {
-                      name: playerName(ctx, view.currentPlayerId),
-                  })
-                : ctx.t("spectating");
+        const seats = seatChips(
+            view.players,
+            ctx,
+            view.currentPlayerId,
+            (p) =>
+                placeLabel(ctx, p) ??
+                (p.passed
+                    ? ctx.t("passed")
+                    : ctx.t("cards_left", { n: p.handCount })),
+        );
 
-        const seats = view.players
-            .filter((p) => p.playerId !== ctx.viewerId)
-            .map((p) => {
-                const place = placeLabel(ctx, p);
-                return {
-                    playerId: p.playerId,
-                    name: p.name,
-                    handCount: p.handCount,
-                    isTurn: !ctx.isOver && p.playerId === view.currentPlayerId,
-                    status:
-                        place ??
-                        (p.passed
-                            ? ctx.t("passed")
-                            : ctx.t("cards_left", { n: p.handCount })),
-                };
-            });
-
-        // The whole uncleared trick stays on the table — every play visible,
-        // each card skinned with the deck style of the player who laid it. Once
-        // a trick is swept we keep showing it (view.lastTrick) until the next
-        // lead is laid, so a closing carré/2 is seen landing, not blinked away.
-        const showingLast = view.pile.length === 0 && view.lastTrick.length > 0;
-        const trickPlays = showingLast ? view.lastTrick : view.pile;
-        const topPlay = trickPlays.at(-1);
+        const { plays, wonBy } = view.displayTrick;
+        const top = plays.at(-1);
         const zones: TableZoneInstance[] = [
             {
                 key: "trick",
                 zone: "trick",
-                cards: trickPlays.flatMap((play) =>
+                cards: plays.flatMap((play) =>
                     play.cards.map((card) => ({
                         id: `trick:${cardKey(card)}`,
                         card,
                         ownerId: play.playerId,
                     })),
                 ),
-                caption: topPlay
-                    ? showingLast
-                        ? ctx.t("trick_won", {
-                              name: playerName(ctx, topPlay.playerId),
-                          })
-                        : playerName(ctx, topPlay.playerId)
-                    : undefined,
+                caption: wonBy
+                    ? ctx.t("trick_won", { name: playerName(ctx, wonBy) })
+                    : top
+                      ? playerName(ctx, top.playerId)
+                      : undefined,
                 emptyHint: ctx.t("in_play"),
             },
         ];
 
-        // The payload's legal actions came from this module — safe narrow.
+        // Legal actions come from this module — safe narrow.
         const legal = ctx.legalActions as readonly PresidentAction[];
 
-        // The hand is a combo picker: tap same-rank cards, then commit. Every
-        // legal play is offered as a (rank, count) combo — leading exposes each
-        // size 1…k, answering only the forced count. Cards of a rank with no
-        // legal play at any size are flagged illegal.
-        const plays: TableHandPlay[] = [];
+        // Combo picker: one (rank, count) entry per legal play; a rank with
+        // no legal play at any size is flagged illegal on your turn.
+        const handPlays: TableHandPlay[] = [];
         const seen = new Set<string>();
         const playableRanks = new Set<string>();
         for (const action of legal) {
@@ -220,7 +164,7 @@ export const presidentTable = registerTable<PresidentView>({
             const key = `${rank}:${action.cards.length}`;
             if (seen.has(key)) continue;
             seen.add(key);
-            plays.push({ group: rank, count: action.cards.length, action });
+            handPlays.push({ group: rank, count: action.cards.length, action });
         }
 
         if (self?.hand) {
@@ -238,22 +182,17 @@ export const presidentTable = registerTable<PresidentView>({
                         id: `hand:${cardKey(card)}`,
                         card,
                         group: playable ? rank : undefined,
-                        // Your turn but this rank can't be played at any size:
-                        // a blocked move, not an inert card — a click says why.
                         illegal: isYourTurn && !playable,
                     };
                 }),
                 badge: placeLabel(ctx, self) ?? undefined,
                 selection: isYourTurn
-                    ? { plays, playLabel: ctx.t("play") }
+                    ? { plays: handPlays, playLabel: ctx.t("play") }
                     : undefined,
             });
         }
 
-        // Pass stays: the verb you need when you can't or won't beat the trick,
-        // not a card to lay. Combos are built by tapping the hand, not proposed.
-        // It is shown to every seated player on every turn and simply greyed out
-        // when it isn't theirs to use — a stable bar, no appearing/disappearing.
+        // Pass is always shown to seated players, greyed out off-turn: a stable bar.
         const controls: TableControl[] = [];
         if (self) {
             const pass = legal.find((a) => a.type === "pass");
@@ -267,7 +206,7 @@ export const presidentTable = registerTable<PresidentView>({
         }
 
         return {
-            banner: { label: banner, highlight: isYourTurn },
+            banner,
             seats,
             zones,
             controls,
@@ -275,7 +214,7 @@ export const presidentTable = registerTable<PresidentView>({
                 ? ctx.t("revolution")
                 : view.equalLock && view.combo
                   ? ctx.t("or_nothing_status", {
-                        rank: rankLabel(ctx, view.combo.rank),
+                        rank: rankLabel(ctx.t, view.combo.rank),
                     })
                   : undefined,
         };
@@ -283,13 +222,10 @@ export const presidentTable = registerTable<PresidentView>({
 
     logLine(event, ctx) {
         const p = event.payload ?? {};
-        const name = playerName(
-            ctx,
-            typeof p.playerId === "string" ? p.playerId : null,
-        );
+        const name = playerName(ctx, p.playerId);
         switch (event.type) {
             case "played": {
-                const rank = rankLabel(ctx, p.rank);
+                const rank = payloadRank(ctx, p.rank);
                 const count = typeof p.count === "number" ? p.count : 1;
                 return count > 1
                     ? ctx.t("log_played_many", { name, rank, count })
@@ -300,7 +236,7 @@ export const presidentTable = registerTable<PresidentView>({
             case "or_nothing":
                 return ctx.t("log_or_nothing", {
                     name,
-                    rank: rankLabel(ctx, p.rank),
+                    rank: payloadRank(ctx, p.rank),
                 });
             case "finished": {
                 const place = typeof p.place === "number" ? p.place : 0;
@@ -316,12 +252,7 @@ export const presidentTable = registerTable<PresidentView>({
                     : ctx.t("log_counter_revolution");
             case "trick_cleared":
                 return ctx.t("log_trick_cleared", {
-                    name: playerName(
-                        ctx,
-                        typeof p.leadPlayerId === "string"
-                            ? p.leadPlayerId
-                            : null,
-                    ),
+                    name: playerName(ctx, p.leadPlayerId),
                 });
             case "game_over":
                 return ctx.t("game_over");

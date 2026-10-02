@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CardDescriptor, Rank } from "@/lib/card/types";
-import { GAME_TABLES, GAMES } from "@/lib/games";
+import { createGame } from "@/lib/engine/runner";
+import { GAMES, getGameTable } from "@/lib/games";
 import type { BatailleView } from "@/lib/games/bataille/bataille";
 import { batailleTable } from "@/lib/games/bataille/table";
 import {
@@ -9,6 +10,8 @@ import {
     type PresidentView,
 } from "@/lib/games/president/president";
 import { presidentTable } from "@/lib/games/president/table";
+import { solitaire } from "@/lib/games/solitaire/solitaire";
+import { solitaireTable } from "@/lib/games/solitaire/table";
 import type { TableContext } from "./types";
 
 function card(rank: Rank): CardDescriptor {
@@ -35,7 +38,7 @@ describe("game table catalog", () => {
     it("declares a table config for every registered game", () => {
         for (const id of Object.keys(GAMES)) {
             expect(
-                GAME_TABLES[id],
+                getGameTable(id),
                 `missing table config for "${id}"`,
             ).toBeDefined();
         }
@@ -117,7 +120,13 @@ describe("president table", () => {
             { playerId: "c", cards: [card("8")] },
             { playerId: "b", cards: [card("9")] },
         ],
-        lastTrick: [],
+        displayTrick: {
+            plays: [
+                { playerId: "c", cards: [card("8")] },
+                { playerId: "b", cards: [card("9")] },
+            ],
+            wonBy: null,
+        },
         finished: [],
         self: "a",
         players: [
@@ -218,6 +227,40 @@ describe("president table", () => {
         const carl = data.seats?.find((s) => s.playerId === "c");
         expect(bob?.status).toBe("passed");
         expect(carl?.status).toBe("place_asshole");
+    });
+
+    it("predicts a play without a nameless « waiting for ? » banner", () => {
+        const next = presidentTable.predict?.(view, legal[0], "a") as
+            | PresidentView
+            | null
+            | undefined;
+        if (!next) throw new Error("play not predicted");
+        expect(next.currentPlayerId).toBeNull();
+        expect(next.displayTrick.plays.at(-1)).toEqual({
+            playerId: "a",
+            cards: [card("J")],
+        });
+        const data = presidentTable.mapView(next, ctx());
+        expect(data.banner).toEqual({ label: "waiting", highlight: false });
+        expect(data.zones.find((z) => z.key === "hand")?.cards).toHaveLength(1);
+    });
+});
+
+describe("solitaire table", () => {
+    it("never tells a spectator it is their turn", () => {
+        const state = createGame(solitaire, [{ id: "a", name: "A", seat: 0 }], {
+            seed: 1,
+        });
+        const playing = solitaireTable.mapView(
+            solitaire.view(state, null),
+            ctx({ viewerId: null }),
+        );
+        expect(playing.banner).toEqual({
+            label: "spectating",
+            highlight: false,
+        });
+        const mine = solitaireTable.mapView(solitaire.view(state, "a"), ctx());
+        expect(mine.banner).toEqual({ label: "your_turn", highlight: true });
     });
 });
 

@@ -2,92 +2,50 @@ import { french52 } from "@/lib/card/decks";
 import { buildRankOrder, isSuited, suitColor } from "@/lib/card/rank";
 import {
     type CardDescriptor,
-    type Rank,
     SUITS,
     type Suit,
+    type SuitedCard,
 } from "@/lib/card/types";
+import { isSuit } from "@/lib/card/utils";
 import { buildDeck } from "@/lib/engine/deck";
-import type { Rng } from "@/lib/engine/rng";
-import { fail } from "@/lib/engine/rules";
+import { bindRules, defineRules, fail } from "@/lib/engine/rules";
 import type {
     ApplyResult,
     GameEvent,
     GameModule,
     GameRuleMode,
-    GameRuleToggle,
     GameState,
 } from "@/lib/engine/types";
 
-/**
- * Solitaire (Klondike) — the platform's first single-player module.
+/*
+ * Solitaire (Klondike) — the single-player proof. Its `view()` redacts the
+ * stock and face-down tableau cards to COUNTS even for their owner: a
+ * tampered client can never read the next draw.
  *
- * It proves the engine contract is not multiplayer-bound: the same
- * `apply(state, action)` reducer drives a solo game, with `currentPlayerId`
- * pinned to the lone seat. More importantly it exercises `view()` as
- * defense-in-depth: the face-down stock and the face-down tableau cards are
- * redacted to *counts* even for their owner, so a tampered client can never
- * read tomorrow's draw — the server is the only place the order exists.
- *
- * Rules modelled: build the four foundations up by suit A→K; build the seven
- * tableau columns down in alternating colours; only a King fills an empty
- * column; the stock deals to the waste and recycles (order preserved) when
- * exhausted. The game is won when all 52 cards reach the foundations.
- *
- * Variants (https://en.wikipedia.org/wiki/Klondike_(solitaire)) — Klondike has
- * no French-specific rulebook, so the default is the classic draw-one,
- * unlimited-redeal deal:
- * - `drawThree` — the stock turns three cards at a time (only the top of the
- *   waste plays), the harder Windows-style game.
- * - `limitedPasses` — « Vegas »: a single pass through the stock in draw-one,
- *   three passes (two redeals) in draw-three.
- *
- * Not every Klondike deal is winnable, and unlimited redeals mean a stuck board
- * never ends on its own — so the player may `resign`, closing the game as a
- * loss (phase "lost") and letting the room finish.
+ * Variants (https://en.wikipedia.org/wiki/Klondike_(solitaire)): `drawThree`
+ * turns three stock cards at a time; `limitedPasses` (« Vegas ») allows one
+ * pass in draw-one, three in draw-three. Unlimited redeals mean a stuck board
+ * never ends on its own, hence `resign`.
  */
 
-/** A→K low-to-high (Ace low here — each game owns its order; see `buildRankOrder`).
- *  The Cavalier never appears in a french52 deck, so it stays 0. */
-const RANKS: readonly Rank[] = [
-    "A",
-    "2",
-    "3",
-    "4",
-    "5",
-    "6",
-    "7",
-    "8",
-    "9",
-    "10",
-    "J",
-    "Q",
-    "K",
-];
+/** A → K: Ace low here. */
+const RANKS = french52.ranks;
 const ORDER = buildRankOrder(RANKS);
 
 const COLUMNS = 7;
-const FULL_FOUNDATION = 13;
+const FULL_FOUNDATION = RANKS.length;
 
-/** Table rules (see the module doc). */
-export interface SolitaireRules {
-    /** Turn three stock cards at a time instead of one. */
+interface SolitaireRules {
     readonly drawThree: boolean;
-    /** Vegas: one pass in draw-one, three passes in draw-three. */
     readonly limitedPasses: boolean;
 }
 
-export const DEFAULT_SOLITAIRE_RULES: SolitaireRules = {
+const DEFAULT_SOLITAIRE_RULES: SolitaireRules = {
     drawThree: false,
     limitedPasses: false,
 };
 
-export const SOLITAIRE_RULE_TOGGLES: readonly GameRuleToggle[] = [
-    { key: "drawThree", default: false },
-    { key: "limitedPasses", default: false },
-];
-
-/** Launch presets — classic draw-one first (the default). */
-export const SOLITAIRE_RULE_MODES: readonly GameRuleMode[] = [
+const SOLITAIRE_RULE_MODES: readonly GameRuleMode[] = [
     {
         key: "solitaire_classic",
         rules: { drawThree: false, limitedPasses: false },
@@ -110,22 +68,27 @@ function rulesOf(state: SolitaireState): SolitaireRules {
     return state.rules ?? DEFAULT_SOLITAIRE_RULES;
 }
 
-/** Cards turned per draw under the game's rules. */
 function drawSize(state: SolitaireState): number {
     return rulesOf(state).drawThree ? 3 : 1;
 }
 
-/** May the waste be turned back into the stock once more? */
 function canRecycle(state: SolitaireState): boolean {
     if (state.stock.length > 0 || state.waste.length === 0) return false;
     const rules = rulesOf(state);
     if (!rules.limitedPasses) return true;
-    // Vegas: 1 pass (0 redeals) in draw-one, 3 passes (2 redeals) in draw-three.
     const maxRedeals = rules.drawThree ? 2 : 0;
     return (state.redeals ?? 0) < maxRedeals;
 }
 
-/** One tableau column: hidden `down` cards under the visible `up` run. */
+function bySuit<T>(make: (suit: Suit) => T): Record<Suit, T> {
+    return {
+        spades: make("spades"),
+        hearts: make("hearts"),
+        diamonds: make("diamonds"),
+        clubs: make("clubs"),
+    };
+}
+
 export interface SolitaireColumn {
     readonly down: readonly CardDescriptor[];
     readonly up: readonly CardDescriptor[];
@@ -133,19 +96,17 @@ export interface SolitaireColumn {
 
 export interface SolitaireState extends GameState {
     readonly phase: "playing" | "won" | "lost";
-    /** Face-down draw pile — top is the LAST element. Hidden from everyone. */
+    /** Top is the LAST element. Hidden from everyone. */
     readonly stock: readonly CardDescriptor[];
-    /** Face-up discard — top (last) is the only playable waste card. */
+    /** Only the top (last) card plays. */
     readonly waste: readonly CardDescriptor[];
-    /** Four piles built up by suit, A→K. */
     readonly foundations: Readonly<Record<Suit, readonly CardDescriptor[]>>;
     readonly tableau: readonly SolitaireColumn[];
-    /** Total moves played — the score (fewer is better). */
+    /** The score (fewer is better). */
     readonly moves: number;
-    /** Table rules this game was dealt with. Absent on games recorded before
-     * rules existed — those used the classic rules, the default. */
+    /** Absent on games recorded before rules existed (= classic rules). */
     readonly rules?: SolitaireRules;
-    /** Waste → stock recycles so far (tracked only when rules are bound). */
+    /** Waste → stock recycles; tracked only when rules are bound. */
     readonly redeals?: number;
 }
 
@@ -167,7 +128,7 @@ export type SolitaireAction =
           readonly playerId: string;
           readonly from: number;
           readonly to: number;
-          /** How many face-up cards (counted from the bottom of the run). */
+          /** Face-up cards moved, counted from the bottom of the run. */
           readonly count: number;
       }
     | {
@@ -176,13 +137,8 @@ export type SolitaireAction =
           readonly suit: Suit;
           readonly column: number;
       }
-    /**
-     * Auto-complete the deal in one shot. Legal *only* when the win is already
-     * assured (see {@link isWinAssured}); the server still re-checks, so a
-     * tampered client can never use it to skip a genuinely unsolved board.
-     */
+    /** Legal only once the win is assured (re-checked server-side). */
     | { readonly type: "autoFinish"; readonly playerId: string }
-    /** Give up an unwinnable (or unwanted) deal — ends the game as a loss. */
     | { readonly type: "resign"; readonly playerId: string };
 
 export interface SolitaireColumnView {
@@ -201,19 +157,15 @@ export interface SolitaireView {
     readonly phase: SolitaireState["phase"];
     readonly turn: number;
     readonly moves: number;
-    /** Only the count leaks — the order stays server-side (anti-peek). */
+    /** Only the count leaks — the order stays server-side. */
     readonly stockCount: number;
     readonly waste: readonly CardDescriptor[];
     readonly foundations: readonly SolitaireFoundationView[];
     readonly tableau: readonly SolitaireColumnView[];
-    /** The viewer this projection was built for (`null` = spectator). */
     readonly self: string | null;
 }
 
-// ── Payload validation ────────────────────────────────────────────────────
-
-/** A real tableau column index — rejects `"length"`, `1.5`, `-1`, `"0"`…
- * (client payloads are untrusted; a bad key must fail, never throw). */
+/** Untrusted index: rejects `"length"`, `1.5`, `-1`, `"0"`… */
 function isColumn(value: unknown): value is number {
     return (
         typeof value === "number" &&
@@ -223,33 +175,23 @@ function isColumn(value: unknown): value is number {
     );
 }
 
-function isSuit(value: unknown): value is Suit {
-    return (
-        typeof value === "string" &&
-        (SUITS as readonly string[]).includes(value)
-    );
-}
-
-// ── Rule predicates ───────────────────────────────────────────────────────
-
-/** Can `card` land on its foundation right now? (Ace on empty, then up by suit.) */
+/** `card` narrowed when it can go up to its foundation now, else `null`. */
 function acceptsFoundation(
     foundations: SolitaireState["foundations"],
     card: CardDescriptor,
-): boolean {
-    if (!isSuited(card)) return false;
+): SuitedCard | null {
+    if (!isSuited(card)) return null;
     const top = foundations[card.suit].at(-1);
-    if (!top || !isSuited(top)) return ORDER[card.rank] === 1;
-    return ORDER[card.rank] === ORDER[top.rank] + 1;
+    if (!top || !isSuited(top)) return card.rank === "A" ? card : null;
+    return ORDER[card.rank] === ORDER[top.rank] + 1 ? card : null;
 }
 
-/** Can `card` (the bottom of a moved run) land on column `col`? */
+/** Can a run starting with `card` land on `col`? Only a King fills an empty column. */
 function acceptsTableau(col: SolitaireColumn, card: CardDescriptor): boolean {
     if (!isSuited(card)) return false;
+    // A non-empty column always shows a face-up card (we flip on empty).
     const parent = col.up.at(-1);
-    // An exposed `up` is always non-empty (we flip on empty), so no parent ⇒
-    // the column is truly empty: only a King may move there.
-    if (!parent) return ORDER[card.rank] === FULL_FOUNDATION;
+    if (!parent) return card.rank === "K";
     if (!isSuited(parent)) return false;
     return (
         suitColor(card.suit) !== suitColor(parent.suit) &&
@@ -257,7 +199,6 @@ function acceptsTableau(col: SolitaireColumn, card: CardDescriptor): boolean {
     );
 }
 
-/** A face-up run reads as a descending, alternating-colour sequence. */
 function isValidRun(cards: readonly CardDescriptor[]): boolean {
     for (let i = 1; i < cards.length; i++) {
         const prev = cards[i - 1];
@@ -274,29 +215,19 @@ function isValidRun(cards: readonly CardDescriptor[]): boolean {
 }
 
 /**
- * Is the rest of the game a foregone conclusion? In draw-one Klondike with
- * unlimited redeals, once no tableau card is still face-down every remaining
- * card is reachable (tableau tops are each column's lowest card; the whole
- * stock can be cycled freely to the waste), and the foundations only ever climb
- * — so greedily sending the lowest playable card up always completes. That is
- * exactly the gate for the one-click finish: the player has "already won", the
- * remaining moves are pure busywork, so we let them skip straight to the end.
- *
- * Crucially this is *not* a shortcut past an unsolved board: a hidden card means
- * an unknown future, so the win is not assured and the action stays illegal.
+ * With no face-down tableau card left (and, outside draw-one unlimited, an
+ * empty stock and waste), every remaining card is reachable and greedily
+ * sending the lowest one up always completes — the rest is busywork.
  */
 function isWinAssured(state: SolitaireState): boolean {
     if (state.phase !== "playing") return false;
     if (!state.tableau.every((col) => col.down.length === 0)) return false;
-    // The "whole stock is reachable" argument only holds for draw-one with
-    // unlimited redeals: three-at-a-time can bury a card behind the cadence,
-    // and a spent Vegas stock is gone. Otherwise demand an empty stock.
+    // Draw-three can bury a card behind the cadence; a spent Vegas stock is gone.
     const rules = rulesOf(state);
     if (!rules.drawThree && !rules.limitedPasses) return true;
     return state.stock.length === 0 && state.waste.length === 0;
 }
 
-/** A complete A→K foundation pile for `suit` (the finished state of each suit). */
 function fullFoundation(suit: Suit): CardDescriptor[] {
     return RANKS.map((rank) => ({ type: "suited", suit, rank }) as const);
 }
@@ -322,15 +253,21 @@ function withColumn(
     return next;
 }
 
-/**
- * Apply a validated field patch: bump move/turn counters, persist the RNG
- * cursor, and flip to "won" the moment every foundation is complete.
- */
+function withFoundationCard(
+    foundations: SolitaireState["foundations"],
+    card: SuitedCard,
+): SolitaireState["foundations"] {
+    return {
+        ...foundations,
+        [card.suit]: [...foundations[card.suit], card],
+    };
+}
+
+/** Count the move and flip to "won" once every foundation is complete. */
 function commit(
     state: SolitaireState,
     patch: Partial<SolitaireState>,
     events: GameEvent[],
-    rng: Rng,
 ): ApplyResult<SolitaireState> {
     const merged = { ...state, ...patch };
     const won = SUITS.every(
@@ -341,8 +278,6 @@ function commit(
         state: {
             ...merged,
             moves: state.moves + 1,
-            turn: state.turn + 1,
-            rngState: rng.state,
             phase: won ? "won" : "playing",
             currentPlayerId: won ? null : state.currentPlayerId,
         },
@@ -359,7 +294,7 @@ const base: Omit<
     deck: french52,
     minPlayers: 1,
     maxPlayers: 1,
-    ruleToggles: SOLITAIRE_RULE_TOGGLES,
+    ruleToggles: defineRules(DEFAULT_SOLITAIRE_RULES),
     ruleModes: SOLITAIRE_RULE_MODES,
 
     legalActions(state, playerId) {
@@ -368,12 +303,10 @@ const base: Omit<
 
         const acts: SolitaireAction[] = [];
 
-        // One-click finish — offered only when the win is already locked in.
         if (isWinAssured(state)) {
             acts.push({ type: "autoFinish", playerId });
         }
 
-        // Draw, or recycle the waste once the stock is empty (if allowed).
         if (state.stock.length > 0 || canRecycle(state)) {
             acts.push({ type: "draw", playerId });
         }
@@ -407,7 +340,7 @@ const base: Omit<
                 state.tableau.forEach((to, toIdx) => {
                     if (toIdx === fromIdx) return;
                     const toEmpty = to.up.length === 0 && to.down.length === 0;
-                    // Shuffling a lone King between empty columns is no progress.
+                    // A lone King hopping between empty columns is no progress.
                     if (toEmpty && movesWholeColumn) return;
                     if (acceptsTableau(to, bottom)) {
                         acts.push({
@@ -437,25 +370,17 @@ const base: Omit<
             });
         }
 
-        // Always available while playing: the way out of an unwinnable deal.
         acts.push({ type: "resign", playerId });
 
         return acts;
     },
 
-    apply(state, action, rng) {
-        if (state.phase !== "playing") {
-            return fail("game_over", "The game has already finished.");
-        }
-        if (state.players[0]?.id !== action.playerId) {
-            return fail("not_a_player", "Actor is not seated in this game.");
-        }
-
+    apply(state, action) {
+        const { type } = action;
         switch (action.type) {
             case "draw": {
                 if (state.stock.length > 0) {
-                    // Turn one (or three) cards face-up onto the waste, top of
-                    // the stock first — the last one turned is the playable top.
+                    // Top of the stock first: the last one turned is the playable top.
                     const n = Math.min(drawSize(state), state.stock.length);
                     const turned = state.stock.slice(-n).reverse();
                     return commit(
@@ -465,7 +390,6 @@ const base: Omit<
                             waste: [...state.waste, ...turned],
                         },
                         [{ type: "draw", payload: { count: n } }],
-                        rng,
                     );
                 }
                 if (!canRecycle(state)) {
@@ -476,7 +400,6 @@ const base: Omit<
                             : "No passes left through the stock.",
                     );
                 }
-                // Recycle: turn the waste back over, order preserved.
                 return commit(
                     state,
                     {
@@ -487,28 +410,24 @@ const base: Omit<
                             : { redeals: state.redeals + 1 }),
                     },
                     [{ type: "recycle" }],
-                    rng,
                 );
             }
 
             case "wasteToFoundation": {
-                const card = state.waste.at(-1);
-                if (!card) return fail("illegal_move", "The waste is empty.");
-                if (!acceptsFoundation(state.foundations, card)) {
+                const top = state.waste.at(-1);
+                if (!top) return fail("illegal_move", "The waste is empty.");
+                const card = acceptsFoundation(state.foundations, top);
+                if (!card) {
                     return fail("illegal_move", "Card cannot go up yet.");
                 }
-                if (!isSuited(card)) return fail("illegal_move", "Bad card.");
                 return commit(
                     state,
                     {
                         waste: state.waste.slice(0, -1),
-                        foundations: {
-                            ...state.foundations,
-                            [card.suit]: [
-                                ...state.foundations[card.suit],
-                                card,
-                            ],
-                        },
+                        foundations: withFoundationCard(
+                            state.foundations,
+                            card,
+                        ),
                     },
                     [
                         {
@@ -516,7 +435,6 @@ const base: Omit<
                             payload: { suit: card.suit, rank: card.rank },
                         },
                     ],
-                    rng,
                 );
             }
 
@@ -545,7 +463,6 @@ const base: Omit<
                             payload: { column: action.column },
                         },
                     ],
-                    rng,
                 );
             }
 
@@ -554,12 +471,12 @@ const base: Omit<
                     return fail("illegal_move", "No such column.");
                 }
                 const col = state.tableau[action.column];
-                const card = col.up.at(-1);
-                if (!card) return fail("illegal_move", "Empty column.");
-                if (!acceptsFoundation(state.foundations, card)) {
+                const top = col.up.at(-1);
+                if (!top) return fail("illegal_move", "Empty column.");
+                const card = acceptsFoundation(state.foundations, top);
+                if (!card) {
                     return fail("illegal_move", "Card cannot go up yet.");
                 }
-                if (!isSuited(card)) return fail("illegal_move", "Bad card.");
                 return commit(
                     state,
                     {
@@ -568,13 +485,10 @@ const base: Omit<
                             action.column,
                             flip({ ...col, up: col.up.slice(0, -1) }),
                         ),
-                        foundations: {
-                            ...state.foundations,
-                            [card.suit]: [
-                                ...state.foundations[card.suit],
-                                card,
-                            ],
-                        },
+                        foundations: withFoundationCard(
+                            state.foundations,
+                            card,
+                        ),
                     },
                     [
                         {
@@ -582,7 +496,6 @@ const base: Omit<
                             payload: { suit: card.suit, rank: card.rank },
                         },
                     ],
-                    rng,
                 );
             }
 
@@ -607,8 +520,6 @@ const base: Omit<
                 if (!isValidRun(run) || !acceptsTableau(to, run[0])) {
                     return fail("illegal_move", "Run cannot land there.");
                 }
-                // Moving a whole column (nothing hidden beneath) into an empty
-                // one changes nothing — refused, matching `legalActions`.
                 const toEmpty = to.up.length === 0 && to.down.length === 0;
                 if (
                     toEmpty &&
@@ -646,7 +557,6 @@ const base: Omit<
                             },
                         },
                     ],
-                    rng,
                 );
             }
 
@@ -684,24 +594,18 @@ const base: Omit<
                             payload: { column: action.column },
                         },
                     ],
-                    rng,
                 );
             }
 
             case "autoFinish": {
-                // Server-side re-check: the client may offer the button, but the
-                // truth lives here — a hidden card forbids the shortcut.
                 if (!isWinAssured(state)) {
                     return fail(
                         "illegal_move",
                         "The win is not assured — cards are still hidden.",
                     );
                 }
-                // Every card not yet up there (no down cards remain, so this is
-                // every loose card) climbs to its foundation. We emit one event
-                // per card, ordered low-to-high, so the board animates a quick
-                // cascade and the move counter ticks up for each — same score as
-                // playing it out by hand.
+                // One event per card, low to high, so the board animates a
+                // cascade and the score counts each move as if played by hand.
                 const remaining = [
                     ...state.stock,
                     ...state.waste,
@@ -723,19 +627,12 @@ const base: Omit<
                         ...state,
                         stock: [],
                         waste: [],
-                        foundations: {
-                            spades: fullFoundation("spades"),
-                            hearts: fullFoundation("hearts"),
-                            diamonds: fullFoundation("diamonds"),
-                            clubs: fullFoundation("clubs"),
-                        },
+                        foundations: bySuit(fullFoundation),
                         tableau: state.tableau.map(() => ({
                             down: [],
                             up: [],
                         })),
                         moves: state.moves + remaining.length,
-                        turn: state.turn + remaining.length,
-                        rngState: rng.state,
                         phase: "won",
                         currentPlayerId: null,
                     },
@@ -744,24 +641,15 @@ const base: Omit<
             }
 
             case "resign":
-                // Not a move: the counters stay as played, the deal just ends.
+                // Not a move: the counters stay as played.
                 return {
                     ok: true,
-                    state: {
-                        ...state,
-                        turn: state.turn + 1,
-                        rngState: rng.state,
-                        phase: "lost",
-                        currentPlayerId: null,
-                    },
+                    state: { ...state, phase: "lost", currentPlayerId: null },
                     events: [{ type: "resigned" }],
                 };
 
             default:
-                return fail(
-                    "illegal_action",
-                    `Unknown action "${(action as SolitaireAction).type}".`,
-                );
+                return fail("illegal_action", `Unknown action "${type}".`);
         }
     },
 
@@ -772,9 +660,7 @@ const base: Omit<
     outcome(state) {
         if (state.phase === "playing") return null;
         const player = state.players[0];
-        // A solo game has one ranking either way; what separates a win from a
-        // resignation is `winners`. A loss (empty winners) earns participation
-        // XP only, and ELO already skips single-human games.
+        // A resignation keeps the single ranking but lists no winner.
         return {
             rankings: [{ playerId: player.id, rank: 1, score: state.moves }],
             winners: state.phase === "won" ? [player.id] : [],
@@ -803,24 +689,14 @@ const base: Omit<
     },
 };
 
-/**
- * Build a Solitaire module bound to a rule set. Bound rules (and the redeal
- * counter Vegas needs) are stamped into the state so a saved game replays
- * identically. The unbound module stamps nothing — how games recorded before
- * rules existed were dealt, so their replays still match byte for byte.
- */
-export function createSolitaire(
+/** The unbound module stamps no rules — how pre-rules games were dealt, so they replay. */
+function createSolitaire(
     rules?: SolitaireRules,
 ): GameModule<SolitaireState, SolitaireAction, SolitaireView> {
     return {
         ...base,
         withRules(chosen) {
-            const pick = (key: keyof SolitaireRules): boolean =>
-                chosen[key] ?? DEFAULT_SOLITAIRE_RULES[key];
-            return createSolitaire({
-                drawThree: pick("drawThree"),
-                limitedPasses: pick("limitedPasses"),
-            });
+            return createSolitaire(bindRules(chosen, DEFAULT_SOLITAIRE_RULES));
         },
         setup(players, rng, seed, gameId) {
             const deck = rng.shuffle(buildDeck(french52));
@@ -843,12 +719,7 @@ export function createSolitaire(
                 rngState: rng.state,
                 stock: deck.slice(cursor),
                 waste: [],
-                foundations: {
-                    spades: [],
-                    hearts: [],
-                    diamonds: [],
-                    clubs: [],
-                },
+                foundations: bySuit(() => []),
                 tableau,
                 moves: 0,
                 ...(rules ? { rules, redeals: 0 } : {}),
