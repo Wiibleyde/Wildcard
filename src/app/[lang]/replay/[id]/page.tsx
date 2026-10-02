@@ -3,6 +3,7 @@ import type { Locale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 import { ReplayClient } from "@/components/game/ReplayClient";
 import { requireAuthUser } from "@/lib/auth/session";
+import { getPlayerStyles } from "@/lib/models/customization";
 import { getReplay } from "@/lib/models/replay";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -18,24 +19,24 @@ export default async function Page({
     const user = await requireAuthUser(lang, `/${lang}/replay/${id}`);
     const supabase = await createClient();
 
-    // Service-role re-derivation: secret state stays server-side; client gets only per-frame redacted views.
-    const admin = createAdminClient();
-    const result = await getReplay(admin, id, user.id);
-    if (!result.ok) notFound();
+    // Service-role re-derivation: the client only gets per-frame redacted views.
+    const result = await getReplay(createAdminClient(), id, user.id);
+    if (!result.ok) {
+        if (result.error === "db_error") {
+            throw new Error(`replay ${id} failed to load`);
+        }
+        notFound();
+    }
 
-    const { data: custom } = await supabase
-        .from("player_customizations")
-        .select("deck_style_id, board_style_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
+    const styles = await getPlayerStyles(supabase, user.id);
 
     return (
         <div className="min-h-screen px-4 xl:px-10 pt-6 pb-16">
             <ReplayClient
                 payload={result.payload}
                 currentUserId={user.id}
-                deckStyleId={custom?.deck_style_id ?? "free"}
-                boardStyleId={custom?.board_style_id ?? "green_felt"}
+                deckStyleId={styles.deckStyleId}
+                boardStyleId={styles.boardStyleId}
             />
         </div>
     );

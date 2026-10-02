@@ -8,32 +8,16 @@ export interface XpAwardRow {
 }
 
 export interface XpAwardOptions {
-    /** Module id — picks the game's XP weight. */
     readonly moduleId: string;
-    /** Players who forfeited by leaving — they earn nothing. */
+    /** Forfeiters earn nothing. */
     readonly excluded?: readonly string[];
-    /**
-     * Moves actually played before the end (logged actions; an out-of-band end
-     * adds none). A game over at the deal, or closed before anyone moved, is
-     * not a played game and earns no XP.
-     */
+    /** Moves actually played; an out-of-band end adds none. */
     readonly moveCount: number;
 }
 
 /**
- * XP grants for one finished game — **server-only**, applied by
- * `wildcard.settle_game` in the same transaction that marks the game settled
- * (exactly once, see `settleGame` in ./game.ts).
- *
- * Every human participant earns XP (participation + win bonus, weighted by the
- * game — see `computeXpAwards`); bots — and any id in `excluded` (a player who
- * forfeited by leaving) — earn nothing.
- *
- * Anti-farming: a game earns XP only if it was actually played and actually
- * won. No outcome (admin / reaper end), an outcome without winners (a solo
- * resign, a void deal) or zero moves (over at the deal, forfeited before the
- * first move) grants nothing — otherwise "start solitaire, resign, repeat"
- * would mint participation XP at request rate. ELO is unaffected by this rule.
+ * Anti-farming: no XP without an outcome, a winner and at least one move —
+ * otherwise "start solitaire, resign, repeat" would mint XP at request rate.
  */
 export function xpAwardsForGame(
     outcome: GameOutcome | null,

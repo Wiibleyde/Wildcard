@@ -1,4 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { ecaModuleIdFor, isEcaCoverImagePath, isUuid } from "@/lib/eca/id";
 import { isRecord } from "@/lib/eca/schema";
 import type { EcaDefinition } from "@/lib/eca/types";
@@ -10,11 +9,11 @@ import {
     validateEcaDefinition,
     validateEcaDefinitionForWrite,
 } from "@/lib/eca/validate";
+import type { AdminClient } from "@/lib/supabase/admin";
+import { CHECK_VIOLATION } from "@/lib/supabase/pgErrors";
 import { ecaImagesBucket, publicStorageUrl } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
 import { usernamesByIds } from "./identities";
-
-type Admin = SupabaseClient<Database>;
 
 /**
  * CRUD over `eca_games`. Writes run the write-time validator, reads the
@@ -49,8 +48,6 @@ export const MAX_ECA_GAMES_PER_OWNER = 20;
 
 /** Mirrors the DB CHECK. */
 const ECA_IMAGE_PATH_MAX = 2048;
-
-const CHECK_VIOLATION = "23514";
 
 export type EcaGameStatus = "draft" | "published";
 
@@ -141,7 +138,7 @@ function isValidImagePath(
 
 /** Best effort; only an exact cover path is ever removed (legacy rows may hold anything). */
 async function removeCoverObject(
-    admin: Admin,
+    admin: AdminClient,
     path: string | null,
     ownerId: string,
     gameId: string,
@@ -170,7 +167,7 @@ function withMeta(
 }
 
 export async function listEcaGames(
-    client: Admin,
+    client: AdminClient,
     ownerId: string,
 ): Promise<Result<{ games: readonly EcaGameSummary[] }>> {
     const { data, error } = await client
@@ -192,7 +189,7 @@ export async function listEcaGames(
 
 /** Owner in any status, anyone once published (the RLS select policy, re-enforced). */
 export async function getEcaGame(
-    admin: Admin,
+    admin: AdminClient,
     id: string,
     requesterId: string,
 ): Promise<Result<{ game: EcaGameRow }>> {
@@ -226,7 +223,7 @@ export async function getEcaGame(
 
 /** The per-owner cap is the race-safe DB trigger; its check_violation is `limit_reached`. */
 export async function createEcaGame(
-    admin: Admin,
+    admin: AdminClient,
     ownerId: string,
     input: unknown,
 ): Promise<Result<{ id: string }>> {
@@ -272,7 +269,7 @@ export async function createEcaGame(
     return { ok: true, id: data.id };
 }
 
-async function fetchOwnedRow(admin: Admin, id: string, ownerId: string) {
+async function fetchOwnedRow(admin: AdminClient, id: string, ownerId: string) {
     if (!isUuid(id)) return { ok: false, error: "not_found" } as const;
     const { data, error } = await admin
         .from("eca_games")
@@ -300,7 +297,7 @@ async function fetchOwnedRow(admin: Admin, id: string, ownerId: string) {
  * moderation-locked game stays editable but cannot be published.
  */
 export async function updateEcaGame(
-    admin: Admin,
+    admin: AdminClient,
     id: string,
     ownerId: string,
     patch: unknown,
@@ -434,7 +431,7 @@ const COMMUNITY_LIMIT = 48;
 
 /** Works with the RLS client: published rows are readable by any authenticated user. */
 export async function listPublishedEcaGames(
-    client: Admin,
+    client: AdminClient,
 ): Promise<PublishedEcaGame[]> {
     const { data, error } = await client
         .from("eca_games")
@@ -475,7 +472,7 @@ export async function listPublishedEcaGames(
 }
 
 export async function deleteEcaGame(
-    admin: Admin,
+    admin: AdminClient,
     id: string,
     ownerId: string,
 ): Promise<{ ok: true } | Failure> {

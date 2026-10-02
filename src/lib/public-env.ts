@@ -1,31 +1,18 @@
 /**
- * Runtime public configuration.
- *
- * The problem: `NEXT_PUBLIC_*` vars are **inlined at build time**. A single
- * image built once by CI (GitHub Actions) would freeze whatever values were
- * present at build — useless when the same image must run in dev / staging /
- * prod with different Supabase or Umami URLs.
- *
- * The fix: these values are **not** `NEXT_PUBLIC_*` and are never read by the
- * client bundle directly. Instead the server reads `process.env` at request
- * time and ships them to the browser as `window.__PUBLIC_ENV__` (see
- * {@link PublicEnvScript}). One image, configured at container start.
- *
- * Only public-safe values live here (anon key + public URLs). The service-role
- * key is server-only and must never appear in this object — see
- * `src/lib/supabase/env.ts`.
+ * Runtime public config. `NEXT_PUBLIC_*` would be frozen into the one CI-built
+ * image, so these plain keys are read from `process.env` per request and
+ * shipped to the browser as `window.__PUBLIC_ENV__`. Public-safe values only:
+ * never the service-role key.
  */
-
 export interface PublicEnv {
     readonly SUPABASE_URL: string;
     readonly SUPABASE_ANON_KEY: string;
-    /** Postgres schema of this deployment: `wildcard` (prod) or `wildcard_dev`. */
+    /** `wildcard` (prod) or `wildcard_dev`. */
     readonly SUPABASE_SCHEMA: string;
-    /** Domain of the shared session cookie (`.wiibleyde.dev`) — empty on localhost. */
+    /** `.wiibleyde.dev`; empty on localhost. */
     readonly COOKIE_DOMAIN: string;
-    /** Public origin of the app — the portal redirects back to it after login. */
     readonly APP_URL: string;
-    /** Portal origin (`https://auth.wiibleyde.dev`) — empty for local dev. */
+    /** Empty for local dev. */
     readonly PORTAL_URL: string;
     readonly UMAMI_URL: string;
     readonly UMAMI_WEBSITE_ID: string;
@@ -37,11 +24,7 @@ declare global {
     }
 }
 
-/**
- * Read the public env from `process.env` at runtime (server only). Plain,
- * non-prefixed keys → Next does not inline them, so they reflect the live
- * container environment, not the build.
- */
+/** Server only. */
 export function readPublicEnvFromProcess(): PublicEnv {
     return {
         SUPABASE_URL: process.env.SUPABASE_URL ?? "",
@@ -66,11 +49,6 @@ const EMPTY_PUBLIC_ENV: PublicEnv = {
     UMAMI_WEBSITE_ID: "",
 };
 
-/**
- * Isomorphic accessor. In the browser it reads `window.__PUBLIC_ENV__`,
- * published by {@link EnvBootstrap} before any deeper component renders; on the
- * server it reads live `process.env`.
- */
 export function publicEnv(): PublicEnv {
     if (typeof window !== "undefined") {
         return window.__PUBLIC_ENV__ ?? EMPTY_PUBLIC_ENV;

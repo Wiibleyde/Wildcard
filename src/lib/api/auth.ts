@@ -6,12 +6,7 @@ import type { AuthUser } from "@/lib/auth/session";
 import { getAppSettings } from "@/lib/models/settings";
 import type { Database } from "@/lib/supabase/types";
 
-/**
- * Authenticated route context: the caller and an RLS-scoped Supabase client
- * acting with their bearer token. Routes that mutate game state create the
- * service-role admin client themselves ({@link createAdminClient}) after the
- * identity check; routes that only touch the caller's own rows use `supabase`.
- */
+/** The caller and an RLS client acting with their bearer token. */
 export type AuthedRoute = {
     readonly ok: true;
     readonly user: AuthUser;
@@ -20,98 +15,62 @@ export type AuthedRoute = {
 
 type Denied = { readonly ok: false; readonly response: NextResponse };
 
-/** Methods that never change state — always allowed, even in maintenance. */
 const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
-/**
- * Resolve the authenticated user, or a 401 response, for an API route. Replaces
- * the `createClient → auth → 401` block that every route handler repeated
- * verbatim:
- *
- * ```ts
- * const auth = await requireUser(request);
- * if (!auth.ok) return auth.response;
- * // auth.user, auth.supabase
- * ```
- *
- * Identity comes **only** from the `Authorization: Bearer` header, never from
- * the session cookie (CSRF across `*.wiibleyde.dev`, see `@/lib/auth/bearer`).
- * A 401 carries the portal's error code (`unauthorized`, `token_expired`,
- * `session_revoked`) so `apiFetch` knows whether to refresh and retry.
- *
- * For a mutating method (POST/PUT/PATCH/DELETE) it also
- * enforces **maintenance mode**. The proxy's maintenance gate excludes `/api`
- * (its matcher skips it), so without this a non-admin with an open tab could
- * keep playing and creating rooms during maintenance. Reads stay open so open
- * pages degrade gracefully; admins are never locked out.
- *
- * Returning the error as a value (not throwing) keeps each handler a flat,
- * linear function with no try/catch ceremony.
- */
-export async function requireUser(
+function deny(
+    error: string,
+    status: number,
+    headers?: Record<string, string>,
+): Denied {
+    return {
+        ok: false,
+        response: NextResponse.json({ error }, { status, headers }),
+    };
+}
+
+async function authenticate(
     request: Request,
-): Promise<AuthedRoute | Denied> {
+    min: AppRole | null,
+): Promise<(AuthedRoute & { readonly role: AppRole | null }) | Denied> {
+    // Bearer only, never the cookie: it rides along on any same-site request (CSRF).
     const verified = await verifyBearer(request);
     if (!verified.ok) {
-        return {
-            ok: false,
-            response: NextResponse.json(
-                { error: verified.error },
-                {
-                    status: 401,
-                    headers: { "WWW-Authenticate": "Bearer" },
-                },
-            ),
-        };
+        return deny(verified.error, 401, { "WWW-Authenticate": "Bearer" });
     }
     const { user, supabase } = verified;
 
+    let role: AppRole | null = null;
+    const roleOf = async () => {
+        role ??= await getUserRole(supabase, user.id);
+        return role;
+    };
+
+    // The proxy's maintenance gate skips /api, so mutations are gated here.
     if (!READ_METHODS.has(request.method.toUpperCase())) {
         const settings = await getAppSettings(supabase);
-        if (
-            settings.maintenance &&
-            !roleAtLeast(await getUserRole(supabase, user.id), "admin")
-        ) {
-            return {
-                ok: false,
-                response: NextResponse.json(
-                    { error: "maintenance" },
-                    { status: 503, headers: { "Retry-After": "300" } },
-                ),
-            };
+        if (settings.maintenance && !roleAtLeast(await roleOf(), "admin")) {
+            return deny("maintenance", 503, { "Retry-After": "300" });
         }
     }
-
-    return { ok: true, user, supabase };
+    if (min !== null && !roleAtLeast(await roleOf(), min)) {
+        return deny("forbidden", 403);
+    }
+    return { ok: true, user, supabase, role };
 }
 
-/**
- * Like {@link requireUser}, but also enforces a minimum global role. Returns
- * 401 when signed out and 403 when signed in but under-privileged, so a route
- * stays a flat:
- *
- * ```ts
- * const auth = await requireRole(request, "moderator");
- * if (!auth.ok) return auth.response;
- * // auth.user, auth.supabase, auth.role
- * ```
- */
+/** 401 with the portal's code (`unauthorized`, `token_expired`, `session_revoked`), 503 in maintenance. */
+export async function requireUser(
+    request: Request,
+): Promise<AuthedRoute | Denied> {
+    return authenticate(request, null);
+}
+
+/** {@link requireUser} plus a minimum global role (403 `forbidden`). */
 export async function requireRole(
     request: Request,
     min: AppRole,
 ): Promise<(AuthedRoute & { readonly role: AppRole }) | Denied> {
-    const auth = await requireUser(request);
+    const auth = await authenticate(request, min);
     if (!auth.ok) return auth;
-
-    const role = await getUserRole(auth.supabase, auth.user.id);
-    if (!roleAtLeast(role, min)) {
-        return {
-            ok: false,
-            response: NextResponse.json(
-                { error: "Forbidden" },
-                { status: 403 },
-            ),
-        };
-    }
-    return { ...auth, role };
+    return { ...auth, role: auth.role ?? min };
 }

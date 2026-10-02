@@ -1,80 +1,83 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/supabase/types";
+import type { AdminClient } from "@/lib/supabase/admin";
+import { CHECK_VIOLATION } from "@/lib/supabase/pgErrors";
 
-type Admin = SupabaseClient<Database>;
-
-/** Per-account cap on pinned (never-expiring) replays. Mirrors the DB trigger. */
+/** Mirrors the DB trigger, which is the race-safe backstop. */
 export const MAX_PERSISTENT_REPLAYS = 5;
 
 export type PersistErrorCode = "not_participant" | "cap_reached" | "db_error";
 
-async function countPins(admin: Admin, userId: string): Promise<number> {
-    const { count } = await admin
+export const PERSIST_ERROR_STATUS: Record<PersistErrorCode, number> = {
+    not_participant: 403,
+    cap_reached: 409,
+    db_error: 500,
+};
+
+type PersistResult =
+    | { ok: true; count: number }
+    | { ok: false; error: PersistErrorCode; message?: string };
+
+async function pinCount(
+    admin: AdminClient,
+    userId: string,
+): Promise<PersistResult> {
+    const { count, error } = await admin
         .from("persistent_replays")
         .select("game_id", { count: "exact", head: true })
         .eq("user_id", userId);
-    return count ?? 0;
+    if (error) return { ok: false, error: "db_error", message: error.message };
+    return { ok: true, count: count ?? 0 };
 }
 
 /**
- * Pin / unpin a finished game's replay for a user. Pinning exempts its move log
- * from the 15-day retention sweep (the replay never expires); unpinning lets the
- * next sweep collect it again.
- *
- * The per-account cap of {@link MAX_PERSISTENT_REPLAYS} is checked here for a
- * clean error and enforced again by a race-safe DB trigger (the real backstop).
- *
- * Security: a user may only pin a game they actually sat in — participation is
- * read from the authoritative engine state (`game_states.state.players`), never
- * trusted from the request. Must run with the service-role `admin` client.
- *
- * Note: pinning only protects future sweeps. A game whose moves were already
- * pruned cannot be recovered — pin it within the 15-day window to keep it.
+ * Pin / unpin a finished game's replay (exempt from the 15-day sweep). Only a
+ * player who sat in the game may pin it, read from the engine state, never the
+ * request. Pinning cannot bring back an already pruned log.
  */
 export async function setPersistent(
-    admin: Admin,
+    admin: AdminClient,
     userId: string,
     gameId: string,
     persistent: boolean,
-): Promise<
-    { ok: true; count: number } | { ok: false; error: PersistErrorCode }
-> {
+): Promise<PersistResult> {
     if (!persistent) {
         const { error } = await admin
             .from("persistent_replays")
             .delete()
             .eq("user_id", userId)
             .eq("game_id", gameId);
-        if (error) return { ok: false, error: "db_error" };
-        return { ok: true, count: await countPins(admin, userId) };
+        if (error) {
+            return { ok: false, error: "db_error", message: error.message };
+        }
+        return pinCount(admin, userId);
     }
 
-    // Pinning: the game must be finished and the caller must have played in it.
-    // Participation comes from the authoritative engine state; the `games!inner`
-    // join restricts it to over games (only finished replays are pinnable, and
-    // only the sweep — which skips pinned games — ever touches a finished log).
-    const { data: seat } = await admin
+    const { data: seat, error: seatError } = await admin
         .from("game_states")
         .select("game_id, games!inner(is_over)")
         .eq("game_id", gameId)
         .eq("games.is_over", true)
         .contains("state", { players: [{ id: userId }] })
         .maybeSingle();
+    if (seatError) {
+        return { ok: false, error: "db_error", message: seatError.message };
+    }
     if (!seat) return { ok: false, error: "not_participant" };
 
-    // Already pinned → no-op. Returning early keeps re-pinning idempotent and
-    // avoids re-tripping the BEFORE INSERT cap trigger when the account already
-    // sits at the cap (this game is part of that count).
-    const { data: existing } = await admin
+    // Re-pinning is a no-op, so an account at the cap does not trip the trigger.
+    const { data: existing, error: existingError } = await admin
         .from("persistent_replays")
         .select("game_id")
         .eq("user_id", userId)
         .eq("game_id", gameId)
         .maybeSingle();
-    if (existing) return { ok: true, count: await countPins(admin, userId) };
+    if (existingError) {
+        return { ok: false, error: "db_error", message: existingError.message };
+    }
+    if (existing) return pinCount(admin, userId);
 
-    // Pre-check for a clean 409 before hitting the trigger.
-    if ((await countPins(admin, userId)) >= MAX_PERSISTENT_REPLAYS) {
+    const before = await pinCount(admin, userId);
+    if (!before.ok) return before;
+    if (before.count >= MAX_PERSISTENT_REPLAYS) {
         return { ok: false, error: "cap_reached" };
     }
 
@@ -82,11 +85,10 @@ export async function setPersistent(
         .from("persistent_replays")
         .upsert({ user_id: userId, game_id: gameId });
     if (error) {
-        // The cap trigger raises check_violation if a parallel pin beat us here.
-        return {
-            ok: false,
-            error: error.code === "23514" ? "cap_reached" : "db_error",
-        };
+        // A parallel pin beat us to the cap trigger.
+        return error.code === CHECK_VIOLATION
+            ? { ok: false, error: "cap_reached" }
+            : { ok: false, error: "db_error", message: error.message };
     }
-    return { ok: true, count: await countPins(admin, userId) };
+    return pinCount(admin, userId);
 }

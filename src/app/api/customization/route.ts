@@ -1,35 +1,31 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/api/auth";
-import { readJsonBody } from "@/lib/api/body";
 import { failureResponse } from "@/lib/api/respond";
+import { apiRoute } from "@/lib/api/route";
 import {
-    type CustomizationPatchErrorCode,
+    CUSTOMIZATION_ERROR_STATUS,
     parseCustomizationPatch,
     patchCustomization,
 } from "@/lib/models/customization";
 
-const HTTP_STATUS: Record<CustomizationPatchErrorCode, number> = {
-    nothing_to_update: 400,
-    deck_style_not_owned: 403,
-    board_style_not_owned: 403,
-    db_error: 500,
-};
-
-export async function PATCH(request: Request) {
-    const auth = await requireUser(request);
-    if (!auth.ok) return auth.response;
-
-    const parsed = await readJsonBody(request);
-    if (!parsed.ok) return parsed.response;
-    const patch = parseCustomizationPatch(parsed.body);
-    if (!patch) {
-        return NextResponse.json({ error: "invalid_body" }, { status: 400 });
-    }
-
-    const result = await patchCustomization(auth.supabase, auth.user.id, patch);
-    if (!result.ok) {
-        return failureResponse("customization.patch", result, HTTP_STATUS);
-    }
-
-    return NextResponse.json({ ok: true });
-}
+// RLS client on purpose: the ownership policy is the final authority.
+export const PATCH = apiRoute(
+    { body: true },
+    async ({ body, user, supabase }) => {
+        const patch = parseCustomizationPatch(body);
+        if (!patch) {
+            return NextResponse.json(
+                { error: "invalid_body" },
+                { status: 400 },
+            );
+        }
+        const result = await patchCustomization(supabase, user.id, patch);
+        if (!result.ok) {
+            return failureResponse(
+                "customization.patch",
+                result,
+                CUSTOMIZATION_ERROR_STATUS,
+            );
+        }
+        return NextResponse.json({ ok: true });
+    },
+);

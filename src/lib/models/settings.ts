@@ -8,20 +8,16 @@ export type AppSettings = {
 
 const DEFAULTS: AppSettings = { maintenance: false, maintenanceMessage: null };
 
-/**
- * Read the singleton `app_settings` row. Falls back to "not in maintenance"
- * when the row is missing or unreadable — a transient settings read failure
- * must never lock the whole site (fail open for availability; the privileged
- * write path is separately guarded).
- */
+/** Fails open: a settings read blip must never lock the whole site. */
 export async function getAppSettings(
     client: SupabaseClient<Database>,
 ): Promise<AppSettings> {
-    const { data } = await client
+    const { data, error } = await client
         .from("app_settings")
         .select("maintenance, maintenance_message")
         .eq("id", true)
         .maybeSingle();
+    if (error) console.error("[settings] read failed:", error.message);
     if (!data) return DEFAULTS;
     return {
         maintenance: data.maintenance,
@@ -29,17 +25,13 @@ export async function getAppSettings(
     };
 }
 
-/**
- * Toggle maintenance mode. Service-role only (callers must gate on an admin
- * role first — see `requireRole`). `message` is shown on the maintenance page;
- * `null` clears it.
- */
+/** Service-role only; the caller must have checked the admin role. */
 export async function setMaintenance(
     admin: SupabaseClient<Database>,
     maintenance: boolean,
     message: string | null,
     byUserId: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true } | { ok: false; error: "db_error"; message: string }> {
     const { error } = await admin
         .from("app_settings")
         .update({
@@ -49,6 +41,6 @@ export async function setMaintenance(
             updated_by: byUserId,
         })
         .eq("id", true);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: "db_error", message: error.message };
     return { ok: true };
 }

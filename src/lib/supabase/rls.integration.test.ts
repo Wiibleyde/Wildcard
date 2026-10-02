@@ -2,23 +2,9 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 /**
- * RLS — database defense in depth (« un joueur ≠ main adverse »).
- *
- * The engine's `view()` already redacts opponent hands in code. This suite
- * proves the layer *underneath* it: even a client that bypasses the API routes
- * and talks straight to PostgREST cannot read another player's hand, because
- * the secret state lives in `game_states`, a table with RLS enabled and **zero
- * policies → deny-all to every client key**. Only the service role (which
- * bypasses RLS) reads it. See `supabase/migrations/20260606120000_games.sql`.
- *
- * Integration test: it needs a live Supabase stack. It is **skipped** unless
- * SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SECRET_KEY are set, so the
- * default `vitest run` (and CI) stays a pure unit run. To run it locally:
- *
- *   bun run dev:up            # local Supabase (CLI), migrations applied
- *   bun run test:rls          # loads .env.local
- *
- * SUPABASE_SCHEMA selects the schema (default `wildcard`).
+ * The layer under `view()`: a client talking straight to PostgREST cannot read
+ * another player's hand (`game_states` has RLS and zero policies).
+ * Needs a live stack, skipped otherwise: `bun run dev:up && bun run test:rls`.
  */
 
 const url = process.env.SUPABASE_URL;
