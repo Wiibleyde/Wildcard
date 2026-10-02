@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
+import { apiFetch } from "@/lib/api/client";
 import { useTicketChannel } from "@/lib/realtime/useTicketChannel";
 
 /** Server ticket status, as returned by the matchmaking API. */
@@ -42,7 +43,7 @@ export function useMatchmaking(userId: string) {
                 if (!active.current) {
                     // Stale match — drop it (matched tickets hold a room_id, so
                     // this needs the unconditional clear) and stay put.
-                    fetch("/api/matchmaking?all=1", {
+                    apiFetch("/api/matchmaking?all=1", {
                         method: "DELETE",
                     }).catch(() => {});
                     setState({ phase: "idle" });
@@ -52,7 +53,7 @@ export function useMatchmaking(userId: string) {
                 navigating.current = true;
                 setState({ phase: "matched" });
                 // Consume the spent ticket, then walk into the game.
-                fetch("/api/matchmaking?all=1", { method: "DELETE" }).catch(
+                apiFetch("/api/matchmaking?all=1", { method: "DELETE" }).catch(
                     () => {},
                 );
                 router.push(`/game/${s.gameId}`);
@@ -78,7 +79,7 @@ export function useMatchmaking(userId: string) {
 
     const refresh = useCallback(async () => {
         try {
-            const res = await fetch("/api/matchmaking");
+            const res = await apiFetch("/api/matchmaking");
             if (res.ok) handleStatus((await res.json()) as ServerStatus);
         } catch {
             // Transient: the ticket channel's next doorbell/poll retries.
@@ -102,7 +103,7 @@ export function useMatchmaking(userId: string) {
                 since: Date.now(),
             });
             try {
-                const res = await fetch("/api/matchmaking", {
+                const res = await apiFetch("/api/matchmaking", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ moduleId }),
@@ -143,7 +144,9 @@ export function useMatchmaking(userId: string) {
         // landed in the click window it survives. Re-read the authoritative
         // status so we walk into that game (active stays true → handleStatus
         // navigates) instead of silently abandoning a live match.
-        await fetch("/api/matchmaking", { method: "DELETE" }).catch(() => {});
+        await apiFetch("/api/matchmaking", { method: "DELETE" }).catch(
+            () => {},
+        );
         await refresh().catch(() => {});
     }, [refresh]);
 
@@ -153,7 +156,7 @@ export function useMatchmaking(userId: string) {
             active.current = true;
             setState({ phase: "matched" });
             try {
-                const res = await fetch("/api/matchmaking/bots", {
+                const res = await apiFetch("/api/matchmaking/bots", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ moduleId }),
@@ -172,7 +175,7 @@ export function useMatchmaking(userId: string) {
                     return;
                 }
                 // Consume the now-spent ticket so a later /lobby visit can't rejoin.
-                fetch("/api/matchmaking?all=1", { method: "DELETE" }).catch(
+                apiFetch("/api/matchmaking?all=1", { method: "DELETE" }).catch(
                     () => {},
                 );
                 router.push(`/game/${data.gameId}`);

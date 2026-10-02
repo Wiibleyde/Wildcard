@@ -1,6 +1,7 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { useRouter } from "@/i18n/navigation";
+import { apiFetch } from "@/lib/api/client";
 
 const ROOM_ERROR_KEYS = new Set([
     "not_found",
@@ -61,7 +62,7 @@ export function useRoomAction() {
         return run(
             "create",
             () =>
-                fetch("/api/rooms", {
+                apiFetch("/api/rooms", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ moduleId, visibility }),
@@ -75,7 +76,7 @@ export function useRoomAction() {
         if (!normalized) return;
         return run(
             "join",
-            () => fetch(`/api/rooms/${normalized}/join`, { method: "POST" }),
+            () => apiFetch(`/api/rooms/${normalized}/join`, { method: "POST" }),
             () => normalized,
         );
     }

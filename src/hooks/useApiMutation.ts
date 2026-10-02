@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { apiFetch } from "@/lib/api/client";
 
 export type MutationStatus = "idle" | "pending" | "success" | "error";
 
@@ -18,7 +19,7 @@ export interface MutationHandle<TBody> {
 }
 
 export function useApiMutation<TBody = unknown>(
-    url: string,
+    url: `/api/${string}`,
     options: Options = {},
 ): MutationHandle<TBody> {
     const { method = "PATCH", successDuration = 0 } = options;
@@ -55,7 +56,7 @@ export function useApiMutation<TBody = unknown>(
             setError(null);
 
             try {
-                const res = await fetch(url, {
+                const res = await apiFetch(url, {
                     method,
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(body),

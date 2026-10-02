@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { GameButton } from "@/components/ui/GameButton";
+import { apiFetch } from "@/lib/api/client";
 
 /** One row of the moderation table — image already resolved to a public URL. */
 export interface AdminEcaGameView {
@@ -64,7 +65,7 @@ export function EcaGamesAdminPanel({ games, canManage }: Props) {
         setBusyId(game.id);
         setError(null);
         try {
-            const res = await fetch(`/api/admin/eca/${game.id}`, {
+            const res = await apiFetch(`/api/admin/eca/${game.id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ status: next }),
@@ -92,7 +93,7 @@ export function EcaGamesAdminPanel({ games, canManage }: Props) {
         setBusyId(game.id);
         setError(null);
         try {
-            const res = await fetch(`/api/admin/eca/${game.id}`, {
+            const res = await apiFetch(`/api/admin/eca/${game.id}`, {
                 method: "DELETE",
             });
             if (!res.ok) {

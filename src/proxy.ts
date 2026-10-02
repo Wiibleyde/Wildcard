@@ -2,6 +2,8 @@ import { type CookieOptions, createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import createMiddleware from "next-intl/middleware";
 import { getAppSettings } from "@/lib/models/settings";
+import { readPublicEnvFromProcess } from "@/lib/public-env";
+import { buildCsp, generateNonce } from "@/lib/security/csp";
 import {
     getServerSupabaseEnv,
     supabaseSharedOptions,
@@ -29,6 +31,23 @@ function localeFromPath(pathname: string): string {
 }
 
 export async function proxy(request: NextRequest) {
+    // ── Content Security Policy ──────────────────────────────────────────
+    // A fresh nonce per page request. Set on the *request* headers, Next.js
+    // reads it while rendering and stamps it on its own scripts (and next-intl
+    // forwards request headers on its rewrite/next responses); set on the
+    // *response*, the browser enforces it. Pages are dynamic (the layout reads
+    // the session cookie), so every render gets its own nonce.
+    const env = readPublicEnvFromProcess();
+    const nonce = generateNonce();
+    const csp = buildCsp(nonce, {
+        supabaseUrl: env.SUPABASE_URL,
+        portalUrl: env.PORTAL_URL,
+        umamiUrl: env.UMAMI_URL,
+        dev: process.env.NODE_ENV === "development",
+    });
+    request.headers.set("x-nonce", nonce);
+    request.headers.set("Content-Security-Policy", csp);
+
     const pendingCookies: PendingCookie[] = [];
 
     const { url, anonKey } = getServerSupabaseEnv();
@@ -51,11 +70,12 @@ export async function proxy(request: NextRequest) {
     const { data: claimsData } = await supabase.auth.getClaims();
     const userId = claimsData?.claims?.sub ?? null;
 
-    /** Carry the refreshed session cookies onto whatever response we return. */
+    /** Carry the refreshed session cookies and the CSP onto the response. */
     const withCookies = (response: NextResponse) => {
         for (const { name, value, options } of pendingCookies) {
             response.cookies.set(name, value, options);
         }
+        response.headers.set("Content-Security-Policy", csp);
         return response;
     };
 
@@ -81,7 +101,11 @@ export async function proxy(request: NextRequest) {
         if (!isAdmin) {
             const url = request.nextUrl.clone();
             url.pathname = `/${localeFromPath(pathname)}/maintenance`;
-            return withCookies(NextResponse.rewrite(url));
+            return withCookies(
+                NextResponse.rewrite(url, {
+                    request: { headers: request.headers },
+                }),
+            );
         }
     }
 
@@ -90,6 +114,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-    // Excludes: _next internals, API routes, static files
+    // Excludes: _next internals, API routes (JSON — no CSP needed, and they
+    // authenticate by bearer token, not by this cookie refresh), static files.
     matcher: ["/((?!_next|api|favicon\\.ico|.*\\..*).*)"],
 };

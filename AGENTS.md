@@ -1,7 +1,11 @@
 <!-- BEGIN:nextjs-agent-rules -->
+
 # This is NOT the Next.js you know
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
 <!-- END:nextjs-agent-rules -->
 
 # Wildcard — AGENTS.md
@@ -127,6 +131,18 @@ les modules officiels — c'est une séparation délibérée de conception.
 - RLS activé sur toutes les tables sensibles
 - Identité côté serveur : `auth.getClaims()` (JWT vérifié), jamais `getSession()`
   ni `user_metadata` — helpers dans `src/lib/auth/session.ts`
+- **Routes `/api` : `Authorization: Bearer` uniquement**, jamais le cookie de
+  session (CSRF entre sous-domaines same-site) — `requireUser(request)` /
+  `requireRole(request, min)` (`src/lib/api/auth.ts` → `src/lib/auth/bearer.ts`).
+  Côté client, **toujours `apiFetch`** (`src/lib/api/client.ts`), jamais
+  `fetch("/api/…")` nu. Codes 401 : `unauthorized`, `token_expired`,
+  `session_revoked` (mêmes que l'API du portal)
+- **Photo de profil, pseudo, amis : au portal** — aucun upload d'avatar dans
+  Wildcard ; affichage via `portalAvatarUrl()`, gestion des amis via
+  `src/lib/portal/api.ts` (`auth.wiibleyde.dev/api/v1`, jeton de l'utilisateur)
+- **CSP à nonce** (`src/lib/security/csp.ts`, posée par `src/proxy.ts`) :
+  aucun script inline ; tout texte utilisateur rendu comme texte, jamais
+  `dangerouslySetInnerHTML`
 - Migrations écrites avec le nom littéral `wildcard` (jamais `wildcard_dev`) ;
   tout nom partagé entre apps (trigger sur `auth.users`, bucket, policy storage)
   est préfixé `wildcard` — cf. `scripts/migrate.sh`

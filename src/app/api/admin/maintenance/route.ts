@@ -8,7 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // Admin-only: toggle site maintenance. Pages are locked out by the proxy, mutating API calls by
 // requireUser (src/lib/api/auth.ts); this route only flips the flag.
 export async function POST(request: Request) {
-    const auth = await requireRole("admin");
+    const auth = await requireRole(request, "admin");
     if (!auth.ok) return auth.response;
 
     const parsed = await readJsonObject(request);

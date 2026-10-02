@@ -7,7 +7,7 @@ import { NavAvatar } from "./NavAvatar";
 import { NavLinks } from "./NavLinks";
 
 type Props = {
-    profile: { username: string | null; avatar_url: string | null } | null;
+    username: string;
     avatarUrl: string | null;
     level: number;
     initial: string;
@@ -16,7 +16,7 @@ type Props = {
 };
 
 export function SidebarDesktop({
-    profile,
+    username,
     avatarUrl,
     level,
     initial,
@@ -46,7 +46,7 @@ export function SidebarDesktop({
                     <NavAvatar
                         avatarUrl={avatarUrl}
                         initial={initial}
-                        username={profile?.username ?? null}
+                        username={username}
                         sizePx={42}
                         initialClassName="text-lg"
                     />
@@ -55,7 +55,7 @@ export function SidebarDesktop({
                             className="truncate font-display text-lg leading-none"
                             style={{ color: "var(--cream)" }}
                         >
-                            {profile?.username ?? "—"}
+                            {username}
                         </p>
                         <p
                             className="mt-1 font-pixel text-wc-micro uppercase"

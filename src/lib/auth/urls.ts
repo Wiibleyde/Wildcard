@@ -21,13 +21,18 @@ export function absoluteAppUrl(path: string, fallbackOrigin?: string): string {
     return new URL(path, base).toString();
 }
 
+/** Portal URL `<portal><route>?next=<absolute app URL of path>`. */
+function portalWithNext(portal: string, route: string, path: string): string {
+    return `${portal}${route}?next=${encodeURIComponent(absoluteAppUrl(path))}`;
+}
+
 /** Where to send a signed-out visitor so they come back to `path`. */
 export function loginUrl(path: string, lang: string): string {
     const portal = publicEnv().PORTAL_URL;
     if (!portal) {
         return `/${lang}/dev-login?next=${encodeURIComponent(path)}`;
     }
-    return `${portal}/login?next=${encodeURIComponent(absoluteAppUrl(path))}`;
+    return portalWithNext(portal, "/login", path);
 }
 
 /**
@@ -38,11 +43,36 @@ export function loginUrl(path: string, lang: string): string {
 export function loginHref(path: string): string {
     const portal = publicEnv().PORTAL_URL;
     if (!portal) return `/dev-login?next=${encodeURIComponent(path)}`;
-    return `${portal}/login?next=${encodeURIComponent(absoluteAppUrl(path))}`;
+    return portalWithNext(portal, "/login", path);
 }
 
-/** Portal account page (pseudo, avatar, linked accounts) — null without portal. */
+/** Portal sign-up, coming back to `path` — null without portal (dev). */
+export function signupUrl(path: string): string | null {
+    const portal = publicEnv().PORTAL_URL;
+    return portal ? portalWithNext(portal, "/signup", path) : null;
+}
+
+/**
+ * Portal "forgotten password" page — null without portal. Password reset is
+ * the portal's: the recovery mail always lands on `auth.wiibleyde.dev/reset`,
+ * so the app never calls `resetPasswordForEmail` itself.
+ */
+export function forgotPasswordUrl(): string | null {
+    const portal = publicEnv().PORTAL_URL;
+    return portal ? `${portal}/forgot` : null;
+}
+
+/**
+ * Portal account page (pseudo, profile picture, friends, blocks, linked
+ * accounts) — the portal root. Null without portal.
+ */
 export function accountUrl(): string | null {
     const portal = publicEnv().PORTAL_URL;
-    return portal ? `${portal}/account` : null;
+    return portal ? `${portal}/` : null;
+}
+
+/** Base of the portal's JSON API (`/api/v1`) — null without portal. */
+export function portalApiUrl(): string | null {
+    const portal = publicEnv().PORTAL_URL;
+    return portal ? `${portal.replace(/\/$/, "")}/api/v1` : null;
 }

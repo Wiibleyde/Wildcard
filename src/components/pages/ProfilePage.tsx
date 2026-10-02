@@ -9,12 +9,11 @@ import {
 import { ProfileXPCard } from "@/components/profile/ProfileXPCard";
 import { Link } from "@/i18n/navigation";
 import { requireAuthUser } from "@/lib/auth/session";
-import { accountUrl } from "@/lib/auth/urls";
+import { accountUrl, forgotPasswordUrl } from "@/lib/auth/urls";
 import { getGameModule } from "@/lib/games";
 import { ecaNamesByModuleIds } from "@/lib/games/resolve";
-import { identityOf, PORTAL_AVATAR_BUCKET } from "@/lib/models/identities";
+import { identityOf, portalAvatarUrl } from "@/lib/models/identities";
 import { createClient } from "@/lib/supabase/server";
-import { publicStorageUrl } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
 import { levelForXp } from "@/lib/xp/xp";
 
@@ -66,11 +65,11 @@ export async function ProfilePage({ lang }: { lang: string }) {
           )
         : null;
 
-    const avatarUrl = identity.avatarPath
-        ? publicStorageUrl(PORTAL_AVATAR_BUCKET, identity.avatarPath)
-        : null;
-    // Pseudo, avatar and linked accounts are managed on the portal.
+    const avatarUrl = portalAvatarUrl(identity.avatarPath);
+    // Pseudo, profile picture, friends and linked accounts belong to the
+    // portal account: Wildcard only displays them and links there.
     const manageUrl = accountUrl();
+    const forgotUrl = forgotPasswordUrl();
 
     return (
         <div className="min-h-screen px-4 xl:px-10 pt-6 md:pt-10 pb-16">
@@ -168,18 +167,59 @@ export async function ProfilePage({ lang }: { lang: string }) {
                             </p>
                         </div>
                         {manageUrl && (
-                            <a
-                                href={manageUrl}
-                                className="wc-btn px-4 py-2 text-sm shrink-0 text-center"
+                            <div className="flex shrink-0 flex-col items-stretch gap-2">
+                                <a
+                                    href={manageUrl}
+                                    className="wc-btn px-4 py-2 text-sm text-center"
+                                    style={{
+                                        background: "var(--gold)",
+                                        color: "var(--ink)",
+                                    }}
+                                >
+                                    {t("account_manage")}
+                                </a>
+                                {forgotUrl && (
+                                    <a
+                                        href={forgotUrl}
+                                        className="text-center text-xs font-bold underline"
+                                        style={{ color: "var(--muted)" }}
+                                    >
+                                        {t("account_forgot")}
+                                    </a>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <Link
+                        href="/profile/friends"
+                        className="panel-d lift group p-6 flex items-center justify-between gap-4"
+                    >
+                        <div className="min-w-0">
+                            <h2
+                                className="stamp mb-2"
                                 style={{
-                                    background: "var(--gold)",
+                                    background: "var(--green)",
                                     color: "var(--ink)",
                                 }}
                             >
-                                {t("account_manage")}
-                            </a>
-                        )}
-                    </div>
+                                {t("friends")}
+                            </h2>
+                            <p
+                                className="text-sm font-semibold"
+                                style={{ color: "var(--muted)" }}
+                            >
+                                {t("friends_desc")}
+                            </p>
+                        </div>
+                        <span
+                            className="font-display text-2xl shrink-0 transition-transform group-hover:translate-x-1"
+                            style={{ color: "var(--green)" }}
+                            aria-hidden="true"
+                        >
+                            →
+                        </span>
+                    </Link>
 
                     <Link
                         href="/profile/history"

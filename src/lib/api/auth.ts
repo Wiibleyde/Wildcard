@@ -1,14 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { verifyBearer } from "@/lib/auth/bearer";
 import { type AppRole, getUserRole, roleAtLeast } from "@/lib/auth/roles";
 import type { AuthUser } from "@/lib/auth/session";
 import { getAppSettings } from "@/lib/models/settings";
-import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 
 /**
- * Authenticated route context: the signed-in user and their RLS-scoped
- * (cookie-session) Supabase client. Routes that mutate game state create the
+ * Authenticated route context: the caller and an RLS-scoped Supabase client
+ * acting with their bearer token. Routes that mutate game state create the
  * service-role admin client themselves ({@link createAdminClient}) after the
  * identity check; routes that only touch the caller's own rows use `supabase`.
  */
@@ -34,7 +34,12 @@ const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
  * // auth.user, auth.supabase
  * ```
  *
- * Pass the `request`: for a mutating method (POST/PUT/PATCH/DELETE) it also
+ * Identity comes **only** from the `Authorization: Bearer` header, never from
+ * the session cookie (CSRF across `*.wiibleyde.dev`, see `@/lib/auth/bearer`).
+ * A 401 carries the portal's error code (`unauthorized`, `token_expired`,
+ * `session_revoked`) so `apiFetch` knows whether to refresh and retry.
+ *
+ * For a mutating method (POST/PUT/PATCH/DELETE) it also
  * enforces **maintenance mode**. The proxy's maintenance gate excludes `/api`
  * (its matcher skips it), so without this a non-admin with an open tab could
  * keep playing and creating rooms during maintenance. Reads stay open so open
@@ -44,27 +49,24 @@ const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
  * linear function with no try/catch ceremony.
  */
 export async function requireUser(
-    request?: Request,
+    request: Request,
 ): Promise<AuthedRoute | Denied> {
-    const supabase = await createClient();
-    // Verified JWT claims (see getAuthUser) — no round trip to the auth server.
-    const { data } = await supabase.auth.getClaims();
-    const claims = data?.claims;
-    if (!claims?.sub) {
+    const verified = await verifyBearer(request);
+    if (!verified.ok) {
         return {
             ok: false,
             response: NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 401 },
+                { error: verified.error },
+                {
+                    status: 401,
+                    headers: { "WWW-Authenticate": "Bearer" },
+                },
             ),
         };
     }
-    const user: AuthUser = {
-        id: claims.sub,
-        email: typeof claims.email === "string" ? claims.email : null,
-    };
+    const { user, supabase } = verified;
 
-    if (request && !READ_METHODS.has(request.method.toUpperCase())) {
+    if (!READ_METHODS.has(request.method.toUpperCase())) {
         const settings = await getAppSettings(supabase);
         if (
             settings.maintenance &&
@@ -89,15 +91,16 @@ export async function requireUser(
  * stays a flat:
  *
  * ```ts
- * const auth = await requireRole("moderator");
+ * const auth = await requireRole(request, "moderator");
  * if (!auth.ok) return auth.response;
  * // auth.user, auth.supabase, auth.role
  * ```
  */
 export async function requireRole(
+    request: Request,
     min: AppRole,
 ): Promise<(AuthedRoute & { readonly role: AppRole }) | Denied> {
-    const auth = await requireUser();
+    const auth = await requireUser(request);
     if (!auth.ok) return auth;
 
     const role = await getUserRole(auth.supabase, auth.user.id);

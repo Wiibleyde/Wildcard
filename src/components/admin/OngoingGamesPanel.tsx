@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { GameButton } from "@/components/ui/GameButton";
 import { usePollingWithClock } from "@/hooks/usePollingWithClock";
+import { apiFetch } from "@/lib/api/client";
 import type { OngoingGame } from "@/lib/models/admin";
 import { GameRow } from "./GameRow";
 
@@ -45,7 +46,7 @@ export function OngoingGamesPanel({ games, canEnd }: Props) {
         setEndingId(game.gameId);
         setEndError(null);
         try {
-            const res = await fetch(`/api/admin/games/${game.gameId}/end`, {
+            const res = await apiFetch(`/api/admin/games/${game.gameId}/end`, {
                 method: "POST",
             });
             if (!res.ok) {

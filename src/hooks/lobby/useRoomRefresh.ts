@@ -6,6 +6,7 @@ import type {
     SpectatorRow,
 } from "@/components/lobby/room/types";
 import { useRouter } from "@/i18n/navigation";
+import { apiFetch } from "@/lib/api/client";
 import { type GameRuleToggle, resolveRuleToggles } from "@/lib/engine/types";
 import { usernamesByIds } from "@/lib/models/identities";
 import { useRoomChannel } from "@/lib/realtime/useRoomChannel";
@@ -138,7 +139,7 @@ export function useRoomRefresh({
                 // The join may seat us as a spectator (full table) or fail
                 // (started / gone): the refresh below reads the role the server
                 // actually recorded instead of assuming "player".
-                await fetch(`/api/rooms/${code}/join`, {
+                await apiFetch(`/api/rooms/${code}/join`, {
                     method: "POST",
                 }).catch(() => null);
             }

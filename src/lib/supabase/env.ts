@@ -73,11 +73,15 @@ export function getSupabaseSchema(): "wildcard" {
  *   breaking the session on every *.wiibleyde.dev app at once.
  * - `domain` — `.wiibleyde.dev` in prod so the refreshed cookie replaces the
  *   portal's one; unset on localhost (the browser would drop it).
+ * - `detectSessionInUrl: false` — the portal owns the OAuth/magic-link
+ *   callback; this app must never try to consume a `?code=` / `#access_token`
+ *   that happens to be in one of its URLs.
  */
 export function supabaseSharedOptions() {
     const { COOKIE_DOMAIN: domain } = publicEnv();
     return {
         db: { schema: getSupabaseSchema() },
+        auth: { detectSessionInUrl: false },
         cookieEncoding: "raw" as const,
         cookieOptions: {
             name: getSupabaseStorageKey(),

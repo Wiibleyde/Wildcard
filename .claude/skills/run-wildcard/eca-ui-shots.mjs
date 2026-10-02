@@ -84,6 +84,8 @@ async function auth() {
         body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
     });
     const session = await res.json();
+    // API routes authenticate by bearer token, not by the session cookie.
+    globalThis.__wcToken = session.access_token;
     let captured = [];
     const sb = createServerClient(SB, env.SUPABASE_ANON_KEY, {
         cookieEncoding: "raw",
@@ -155,7 +157,17 @@ async function shot(route, name, w, h) {
 }
 
 // A live ECA game for the mobile + 2K board shots.
-const api = ctx.request;
+// API routes authenticate by bearer token, not by the session cookie.
+const withAuth = (o = {}) => ({
+    ...o,
+    headers: { ...o.headers, authorization: `Bearer ${globalThis.__wcToken}` },
+});
+const api = {
+    get: (url, o) => ctx.request.get(url, withAuth(o)),
+    post: (url, o) => ctx.request.post(url, withAuth(o)),
+    patch: (url, o) => ctx.request.patch(url, withAuth(o)),
+    delete: (url, o) => ctx.request.delete(url, withAuth(o)),
+};
 const room = await (
     await api.post(`${BASE}/api/rooms`, {
         data: {

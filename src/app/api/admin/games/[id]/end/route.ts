@@ -7,11 +7,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // Force-end a live game. Dashboard is moderator-reachable, but only admins may abort, so the role is
 // re-checked server-side (defense in depth) before the service-role write.
 export async function POST(
-    _request: Request,
+    request: Request,
     ctx: { params: Promise<{ id: string }> },
 ) {
     const { id } = await ctx.params;
-    const auth = await requireRole("admin");
+    const auth = await requireRole(request, "admin");
     if (!auth.ok) return auth.response;
 
     const admin = createAdminClient();
