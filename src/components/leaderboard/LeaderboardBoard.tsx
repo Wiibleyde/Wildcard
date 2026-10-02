@@ -1,6 +1,6 @@
 import { useTranslations } from "next-intl";
 import { Avatar } from "@/components/ui/Avatar";
-import { portalAvatarUrl } from "@/lib/models/identities";
+import { nameTag, portalAvatarUrl } from "@/lib/models/identities";
 import type { LeaderboardGame } from "@/lib/models/leaderboard";
 
 function rankColor(position: number): string {
@@ -61,6 +61,11 @@ export function LeaderboardBoard({
                             {game.entries.map((entry, index) => {
                                 const position = index + 1;
                                 const isViewer = entry.userId === viewerId;
+                                const name =
+                                    entry.username ??
+                                    tCommon("player_fallback", {
+                                        tag: nameTag(entry.userId),
+                                    });
                                 return (
                                     <li
                                         key={entry.userId}
@@ -91,7 +96,7 @@ export function LeaderboardBoard({
                                         <div className="min-w-0 flex-1">
                                             <p className="flex items-center gap-2 truncate text-sm font-bold text-wc-ink">
                                                 <span className="truncate">
-                                                    {entry.username}
+                                                    {name}
                                                 </span>
                                                 {isViewer && (
                                                     <span

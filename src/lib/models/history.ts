@@ -7,7 +7,8 @@ import type { AdminClient } from "@/lib/supabase/admin";
 export interface MatchPlayer {
     readonly id: string;
     readonly name: string;
-    readonly isBot: boolean;
+    /** 1-based bot number, rendered localized; `null` for humans. */
+    readonly botNumber: number | null;
     readonly isWinner: boolean;
     readonly isYou: boolean;
 }
@@ -53,7 +54,10 @@ export async function getMatchHistory(
 
     return data.map((row) => {
         const winners = new Set(row.winner_ids);
-        const bots = new Set(row.bot_ids);
+        const botNumber = (id: string) => {
+            const index = row.bot_ids.indexOf(id);
+            return index === -1 ? null : index + 1;
+        };
         const seats = [...(fromJson<Player[] | null>(row.players) ?? [])].sort(
             (a, b) => a.seat - b.seat,
         );
@@ -79,7 +83,7 @@ export async function getMatchHistory(
             players: seats.map((p) => ({
                 id: p.id,
                 name: p.name,
-                isBot: bots.has(p.id),
+                botNumber: botNumber(p.id),
                 isWinner: winners.has(p.id),
                 isYou: p.id === userId,
             })),

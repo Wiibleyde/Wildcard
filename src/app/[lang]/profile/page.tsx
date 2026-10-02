@@ -7,7 +7,7 @@ import { requireAuthUser } from "@/lib/auth/session";
 import { accountUrl, forgotPasswordUrl } from "@/lib/auth/urls";
 import { getGameModule } from "@/lib/games";
 import { ecaNamesByModuleIds } from "@/lib/games/resolve";
-import { identityOf, portalAvatarUrl } from "@/lib/models/identities";
+import { identityOf, nameTag, portalAvatarUrl } from "@/lib/models/identities";
 import { createClient } from "@/lib/supabase/server";
 
 export async function generateMetadata({
@@ -63,10 +63,14 @@ export default async function Page({
     }));
 
     const createdAt = profileRes.data?.created_at;
+    const tCommon = await getTranslations("common");
 
     return (
         <ProfileView
-            name={identity.name}
+            name={
+                identity.name ??
+                tCommon("player_fallback", { tag: nameTag(user.id) })
+            }
             avatarUrl={portalAvatarUrl(identity.avatarPath)}
             xp={xpRes.data?.xp ?? 0}
             memberSince={createdAt ? new Date(createdAt) : null}

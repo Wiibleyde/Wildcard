@@ -3,7 +3,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Link } from "@/i18n/navigation";
 import { getUserRole, roleAtLeast } from "@/lib/auth/roles";
 import type { AuthUser } from "@/lib/auth/session";
-import { identityOf, portalAvatarUrl } from "@/lib/models/identities";
+import { identityOf, nameTag, portalAvatarUrl } from "@/lib/models/identities";
 import { createClient } from "@/lib/supabase/server";
 import { levelForXp } from "@/lib/xp/xp";
 import { Brand } from "./Brand";
@@ -14,20 +14,23 @@ import { SidebarDesktop } from "./SidebarDesktop";
 export async function AppNav({ user }: { user: AuthUser }) {
     const supabase = await createClient();
 
-    const [identity, xpRes, role, tProfile] = await Promise.all([
+    const [identity, xpRes, role, tProfile, tCommon] = await Promise.all([
         identityOf(supabase, user.id),
         supabase.from("player_xp").select("xp").eq("user_id", user.id).single(),
         getUserRole(supabase, user.id),
         getTranslations("profile"),
+        getTranslations("common"),
     ]);
     const canModerate = roleAtLeast(role, "moderator");
     const level = levelForXp(xpRes.data?.xp ?? 0);
     const avatarUrl = portalAvatarUrl(identity.avatarPath);
+    const username =
+        identity.name ?? tCommon("player_fallback", { tag: nameTag(user.id) });
 
     return (
         <>
             <SidebarDesktop
-                username={identity.name}
+                username={username}
                 avatarUrl={avatarUrl}
                 level={level}
                 canModerate={canModerate}
@@ -48,7 +51,7 @@ export async function AppNav({ user }: { user: AuthUser }) {
 
                         <Link href="/profile">
                             <Avatar
-                                name={identity.name}
+                                name={username}
                                 avatarUrl={avatarUrl}
                                 size={32}
                             />

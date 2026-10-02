@@ -1,6 +1,5 @@
 import { gameCatalog, getGameModule } from "@/lib/games";
 import { ecaNamesByModuleIds } from "@/lib/games/resolve";
-import { fallbackName } from "@/lib/models/identities";
 import type { createClient } from "@/lib/supabase/server";
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -9,7 +8,8 @@ export const LEADERBOARD_TOP_N = 50;
 
 export interface LeaderboardEntry {
     readonly userId: string;
-    readonly username: string;
+    /** `null` without a portal pseudo. */
+    readonly username: string | null;
     /** Portal avatar path — see `portalAvatarUrl`. */
     readonly avatarPath: string | null;
     readonly rating: number;
@@ -43,7 +43,7 @@ export async function getLeaderboard(
         byModule.set(row.module_id, list);
         list.push({
             userId: row.user_id,
-            username: row.username ?? fallbackName(row.user_id),
+            username: row.username,
             avatarPath: row.avatar_url,
             rating: row.rating,
             gamesPlayed: row.games_played,

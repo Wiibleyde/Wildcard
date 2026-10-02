@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, readApiJson } from "@/lib/api/client";
 import { isRecord } from "@/lib/eca/schema";
 
 type PostResult =
@@ -16,8 +16,7 @@ export async function postJson(
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
         });
-        // A proxy error page is not JSON.
-        const parsed: unknown = await res.json().catch(() => null);
+        const parsed = await readApiJson<unknown>(res);
         const data = isRecord(parsed) ? parsed : {};
         if (res.ok) return { ok: true, data };
         return {

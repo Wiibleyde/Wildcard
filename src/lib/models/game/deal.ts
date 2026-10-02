@@ -9,7 +9,7 @@ import {
 } from "@/lib/engine/types";
 import { toJson } from "@/lib/json";
 import { recordGameStarted } from "@/lib/metrics/registry";
-import { usernamesByIds } from "@/lib/models/identities";
+import { nameTag, usernamesByIds } from "@/lib/models/identities";
 import type { AdminClient } from "@/lib/supabase/admin";
 import { advanceBots } from "./bots";
 import { settleGame } from "./settle";
@@ -61,9 +61,11 @@ export async function dealGame(
         admin,
         rows.map((s) => s.user_id),
     );
+    // Names are frozen into the state, which every locale replays: store
+    // locale-neutral fallbacks. Bot `n` = 1 + its index in `bot_ids`.
     const humans: Player[] = rows.map((s) => ({
         id: s.user_id,
-        name: nameOf.get(s.user_id) ?? "Joueur",
+        name: nameOf.get(s.user_id) ?? `#${nameTag(s.user_id)}`,
         seat: s.seat,
     }));
 
@@ -80,7 +82,7 @@ export async function dealGame(
         const seat = nextFreeSeat(takenSeats);
         takenSeats.push(seat);
         botIds.push(id);
-        bots.push({ id, name: `Ordinateur ${i + 1}`, seat });
+        bots.push({ id, name: `Bot ${i + 1}`, seat });
     }
 
     const players = [...humans, ...bots];

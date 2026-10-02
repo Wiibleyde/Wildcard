@@ -65,9 +65,11 @@ export function CommunityGames({ games, busy, busyModuleId, onHost }: Props) {
                                     })}
                                 </span>
                             </div>
-                            <p className="text-xs font-semibold text-wc-ink-soft">
-                                {t("community_by", { name: g.ownerName })}
-                            </p>
+                            {g.ownerName && (
+                                <p className="text-xs font-semibold text-wc-ink-soft">
+                                    {t("community_by", { name: g.ownerName })}
+                                </p>
+                            )}
                             {g.description && (
                                 <p className="line-clamp-2 text-xs font-semibold text-wc-ink-soft">
                                     {g.description}

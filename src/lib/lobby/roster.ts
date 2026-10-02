@@ -30,9 +30,10 @@ function isSeatedPlayer(row: MemberRow): row is MemberRow & { seat: number } {
 export function splitRoster(
     rows: readonly MemberRow[],
     nameOf: ReadonlyMap<string, string>,
-    fallbackName: string,
+    /** Localized name for a member without a portal pseudo. */
+    fallbackName: (userId: string) => string,
 ): { seats: SeatRow[]; spectators: SpectatorRow[] } {
-    const username = (id: string) => nameOf.get(id) ?? fallbackName;
+    const username = (id: string) => nameOf.get(id) ?? fallbackName(id);
     return {
         seats: rows.filter(isSeatedPlayer).map((r) => ({
             userId: r.user_id,

@@ -14,7 +14,7 @@ describe("splitRoster", () => {
                 { user_id: "b", seat: null, role: "spectator" },
             ],
             names,
-            "?",
+            (id) => `?${id}`,
         );
         expect(seats).toEqual([{ userId: "a", seat: 0, username: "Alice" }]);
         expect(spectators).toEqual([{ userId: "b", username: "Bob" }]);
@@ -27,9 +27,9 @@ describe("splitRoster", () => {
                 { user_id: "c", seat: 1, role: "player" },
             ],
             names,
-            "?",
+            (id) => `?${id}`,
         );
-        expect(seats).toEqual([{ userId: "c", seat: 1, username: "?" }]);
+        expect(seats).toEqual([{ userId: "c", seat: 1, username: "?c" }]);
         expect(spectators).toEqual([]);
     });
 });
