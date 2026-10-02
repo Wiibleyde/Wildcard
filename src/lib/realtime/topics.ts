@@ -26,3 +26,8 @@ export function roomTopic(roomId: string): string {
 export function ticketTopic(userId: string): string {
     return `mm:${userId}`;
 }
+
+/** Own `player_xp` row, watched on the game-over screen. */
+export function xpTopic(userId: string): string {
+    return `xp-gameover:${userId}`;
+}

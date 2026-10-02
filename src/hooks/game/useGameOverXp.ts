@@ -1,7 +1,9 @@
 "use client";
 
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { xpTopic } from "@/lib/realtime/topics";
+import { useAuthedChannel } from "@/lib/realtime/useAuthedChannel";
 import { createClient } from "@/lib/supabase/client";
 import { getSupabaseSchema } from "@/lib/supabase/env";
 import { levelForXp } from "@/lib/xp/xp";
@@ -16,6 +18,9 @@ export interface GameOverXpState {
     readonly leveledUp: boolean;
 }
 
+/** A one-shot screen: no status banner, so channel status is ignored. */
+const ignoreStatus = (): void => {};
+
 /**
  * `gained` is the server-settled award; only the post-award total is read
  * here, keeping the max of a fetch, a delayed re-fetch and the Realtime
@@ -23,14 +28,34 @@ export interface GameOverXpState {
  */
 export function useGameOverXp(userId: string, gained: number): GameOverXpState {
     const [after, setAfter] = useState<number | null>(null);
+    const bump = useCallback(
+        (xp: number) =>
+            setAfter((cur) => (cur === null ? xp : Math.max(cur, xp))),
+        [],
+    );
+
+    const build = useCallback(
+        (channel: RealtimeChannel) =>
+            channel.on(
+                "postgres_changes",
+                {
+                    event: "UPDATE",
+                    schema: getSupabaseSchema(),
+                    table: "player_xp",
+                    filter: `user_id=eq.${userId}`,
+                },
+                (payload) => {
+                    const xp = (payload.new as { xp?: number }).xp;
+                    if (typeof xp === "number") bump(xp);
+                },
+            ),
+        [userId, bump],
+    );
+    useAuthedChannel(xpTopic(userId), build, ignoreStatus);
 
     useEffect(() => {
         const supabase = createClient();
         let active = true;
-        let channel: RealtimeChannel | null = null;
-        const bump = (xp: number) =>
-            setAfter((cur) => (cur === null ? xp : Math.max(cur, xp)));
-
         const fetchXp = async () => {
             const { data } = await supabase
                 .from("player_xp")
@@ -39,44 +64,13 @@ export function useGameOverXp(userId: string, gained: number): GameOverXpState {
                 .single();
             if (active && data) bump(data.xp);
         };
-
-        const subscribe = async () => {
-            // Without the user's token the socket joins as `anon` and RLS drops every change.
-            const {
-                data: { session },
-            } = await supabase.auth.getSession();
-            if (!active) return;
-            if (session?.access_token) {
-                supabase.realtime.setAuth(session.access_token);
-            }
-            channel = supabase
-                .channel(`xp-gameover:${userId}`)
-                .on(
-                    "postgres_changes",
-                    {
-                        event: "UPDATE",
-                        schema: getSupabaseSchema(),
-                        table: "player_xp",
-                        filter: `user_id=eq.${userId}`,
-                    },
-                    (payload) => {
-                        const xp = (payload.new as { xp?: number }).xp;
-                        if (active && typeof xp === "number") bump(xp);
-                    },
-                )
-                .subscribe();
-        };
-
-        void subscribe();
         void fetchXp();
         const retry = setTimeout(() => void fetchXp(), 700);
-
         return () => {
             active = false;
             clearTimeout(retry);
-            if (channel) void supabase.removeChannel(channel);
         };
-    }, [userId]);
+    }, [userId, bump]);
 
     if (after === null) {
         return {
