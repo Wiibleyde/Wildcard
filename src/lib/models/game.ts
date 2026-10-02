@@ -285,6 +285,7 @@ function buildClientPayload(
         outcome = resolveEndOutcome(facts);
         end = describeEnd({
             ...facts,
+            moduleId: meta.moduleId,
             outcome,
             botIds: meta.botIds,
             version: meta.version,
@@ -715,6 +716,7 @@ export async function settleGame(
             game.botIds,
         );
         const xp = xpAwardsForGame(outcome, game.botIds, {
+            moduleId: game.moduleId,
             excluded: forfeited,
             moveCount: game.moveCount,
         });

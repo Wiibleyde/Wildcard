@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GameOutcome } from "@/lib/engine/types";
-import { PARTICIPATION_XP, WIN_XP } from "@/lib/xp/xp";
+import { PARTICIPATION_XP, WIN_XP_PER_OPPONENT } from "@/lib/xp/xp";
 import { xpAwardsForGame } from "./xp";
 
 const twoPlayers: GameOutcome = {
@@ -13,14 +13,24 @@ const twoPlayers: GameOutcome = {
 
 describe("xpAwardsForGame", () => {
     it("grants participation + win bonus for a played, won game", () => {
-        expect(xpAwardsForGame(twoPlayers, [], { moveCount: 12 })).toEqual([
-            { user_id: "alice", amount: PARTICIPATION_XP + WIN_XP },
+        expect(
+            xpAwardsForGame(twoPlayers, [], {
+                moduleId: "president",
+                moveCount: 12,
+            }),
+        ).toEqual([
+            {
+                user_id: "alice",
+                amount: PARTICIPATION_XP + WIN_XP_PER_OPPONENT,
+            },
             { user_id: "bob", amount: PARTICIPATION_XP },
         ]);
     });
 
     it("grants nothing without an outcome (admin / reaper close)", () => {
-        expect(xpAwardsForGame(null, [], { moveCount: 12 })).toEqual([]);
+        expect(
+            xpAwardsForGame(null, [], { moduleId: "president", moveCount: 12 }),
+        ).toEqual([]);
     });
 
     it("grants nothing when the outcome has no winner (solo resign)", () => {
@@ -28,11 +38,21 @@ describe("xpAwardsForGame", () => {
             rankings: [{ playerId: "alice", rank: 1 }],
             winners: [],
         };
-        expect(xpAwardsForGame(resigned, [], { moveCount: 1 })).toEqual([]);
+        expect(
+            xpAwardsForGame(resigned, [], {
+                moduleId: "president",
+                moveCount: 1,
+            }),
+        ).toEqual([]);
     });
 
     it("grants nothing for a game nobody played (over at the deal)", () => {
-        expect(xpAwardsForGame(twoPlayers, [], { moveCount: 0 })).toEqual([]);
+        expect(
+            xpAwardsForGame(twoPlayers, [], {
+                moduleId: "president",
+                moveCount: 0,
+            }),
+        ).toEqual([]);
     });
 
     it("skips bots and the forfeiter", () => {
@@ -46,9 +66,16 @@ describe("xpAwardsForGame", () => {
         };
         expect(
             xpAwardsForGame(forfeit, ["bot-1"], {
+                moduleId: "president",
                 excluded: ["bob"],
                 moveCount: 3,
             }),
-        ).toEqual([{ user_id: "alice", amount: PARTICIPATION_XP + WIN_XP }]);
+        ).toEqual([
+            // 3 seats → 2 opponents; bob (human, forfeited) keeps it a human game.
+            {
+                user_id: "alice",
+                amount: PARTICIPATION_XP + 2 * WIN_XP_PER_OPPONENT,
+            },
+        ]);
     });
 });
