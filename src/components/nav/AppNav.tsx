@@ -2,9 +2,8 @@ import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getUserRole, roleAtLeast } from "@/lib/auth/roles";
 import type { AuthUser } from "@/lib/auth/session";
-import { identityOf, PORTAL_AVATAR_BUCKET } from "@/lib/models/identities";
+import { identityOf, portalAvatarUrl } from "@/lib/models/identities";
 import { createClient } from "@/lib/supabase/server";
-import { publicStorageUrl } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
 import { levelForXp } from "@/lib/xp/xp";
 import { Brand } from "./Brand";
@@ -31,20 +30,14 @@ export async function AppNav({ user }: { user: AuthUser }) {
     const xp = xpRow?.xp ?? 0;
     const level = levelForXp(xp);
 
-    const avatarUrl = identity.avatarPath
-        ? publicStorageUrl(PORTAL_AVATAR_BUCKET, identity.avatarPath)
-        : null;
-
+    // Profile picture from the portal account — no avatar storage here.
+    const avatarUrl = portalAvatarUrl(identity.avatarPath);
     const initial = identity.name[0]?.toUpperCase() ?? "?";
-    const profile = {
-        username: identity.name,
-        avatar_url: identity.avatarPath,
-    };
 
     return (
         <>
             <SidebarDesktop
-                profile={profile}
+                username={identity.name}
                 avatarUrl={avatarUrl}
                 level={level}
                 initial={initial}

@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { apiFetch } from "@/lib/api/client";
 import type { MatchHistoryEntry } from "@/lib/models/history";
 import { MAX_PERSISTENT_REPLAYS } from "@/lib/models/persistence";
 
@@ -32,7 +33,7 @@ export function useGamePinning(entries: readonly MatchHistoryEntry[]) {
             return copy;
         });
         try {
-            const res = await fetch(`/api/games/${gameId}/persist`, {
+            const res = await apiFetch(`/api/games/${gameId}/persist`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ persistent: next }),

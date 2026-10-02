@@ -38,6 +38,21 @@ Choix défendables :
   le profil de jeu de chaque nouveau compte (et un backfill ceux qui existaient).
 - **Identité vérifiée** : `auth.getClaims()` (JWT ES256 vérifié contre le JWKS),
   jamais `getSession()`.
+- **API authentifiée par jeton, pas par cookie** : le cookie du portal part
+  avec toute requête *same-site* — et tous les `*.wiibleyde.dev` sont
+  same-site, donc `SameSite=Lax` n'arrête pas une page d'une app voisine. Les
+  routes `/api` n'acceptent que `Authorization: Bearer <access_token>`
+  (signature, `iss`, `aud`, `exp`), plus un contrôle de révocation auprès de
+  GoTrue mis en cache 15 s par `session_id` (`src/lib/auth/bearer.ts`). Le
+  client (`apiFetch`) rafraîchit et rejoue une fois sur `token_expired`, renvoie
+  au login sur `session_revoked`.
+- **Amis et photo de profil au portal** : Wildcard n'a aucun stockage
+  d'avatar ; la page `/profile/friends` parle à l'API du portal
+  (`auth.wiibleyde.dev/api/v1`) avec le jeton de l'utilisateur — la RLS du
+  portal décide, jamais une clé de service.
+- **CSP stricte** : nonce par requête (`src/proxy.ts`), aucun script inline
+  autorisé, `connect-src` limité à l'app, Supabase, le portal et Umami — une XSS
+  sur une app volerait la session de toutes.
 
 ---
 
@@ -128,7 +143,7 @@ wildcard/
 │   ├── app/[lang]/           # Toutes les pages (i18n) — dont dev-login (dev only)
 │   ├── dictionaries/         # fr.json (source de vérité) + en.json
 │   ├── lib/
-│   │   ├── auth/             # session (getClaims), URLs du portal, rôles
+│   │   ├── auth/             # session (getClaims), bearer API, URLs du portal, rôles
 │   │   ├── models/identities.ts  # pseudo/avatar via le portal
 │   │   └── supabase/         # clients (schéma, cookie partagé), types
 │   └── proxy.ts              # Refresh de session + maintenance + i18n
@@ -193,7 +208,11 @@ Gérée par le **portal** (`auth.wiibleyde.dev`) : email/mot de passe et Discord
 
 - Visiteur non connecté sur une page protégée → `auth.wiibleyde.dev/login?next=<URL Wildcard>`
   (le portal accepte tout `https://*.wiibleyde.dev`), retour connecté.
-- Pseudo, avatar, comptes liés : `auth.wiibleyde.dev/account` (lien depuis le profil).
+- Inscription : `auth.wiibleyde.dev/signup?next=…` ; mot de passe oublié :
+  `auth.wiibleyde.dev/forgot` (le reset appartient au portal).
+- Pseudo, photo de profil, amis, blocages, comptes liés : `auth.wiibleyde.dev/`
+  (lien depuis le profil). Amis aussi gérables dans l'app (`/profile/friends`,
+  via l'API du portal).
 - Déconnexion : met fin à la session sur **toutes** les apps (cookie partagé).
 - Admin : `update wildcard.user_roles set role = 'admin' where user_id = (select id from auth.users where email = '…');`
 

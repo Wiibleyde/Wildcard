@@ -47,7 +47,8 @@
         "login": "Connexion",
         "logout": "Déconnexion",
         "profile": "Mon profil",
-        "admin": "Admin"
+        "admin": "Admin",
+        "signup": "Créer un compte"
     },
     "common": {
         "loading": "Chargement...",
@@ -97,9 +98,12 @@
         "ratings_played": "parties",
         "ratings_wins": "V",
         "account_title": "Compte",
-        "account_desc": "Ton pseudo, ton avatar et tes comptes liés se gèrent sur ton compte wiibleyde.dev, partagé entre toutes les apps.",
+        "account_desc": "Ton pseudo, ta photo de profil, tes amis et tes comptes liés appartiennent à ton compte wiibleyde.dev, partagé entre toutes les apps.",
         "account_manage": "Gérer mon compte",
-        "account_dev": "Dev local : pas de portal, l'identité vient des comptes seedés."
+        "account_dev": "Dev local : pas de portal, l'identité vient des comptes seedés.",
+        "account_forgot": "Mot de passe oublié",
+        "friends": "Amis",
+        "friends_desc": "Ajouter, accepter ou bloquer des joueurs — la même liste sur toutes les apps"
     },
     "leaderboard": {
         "title": "Classement",
@@ -721,6 +725,46 @@
             "conflicting_verdict": "Une règle « joue une carte » doit contenir une seule action « acceptée » ou « refusée ».",
             "reject_with_effects": "Une carte refusée ne change rien : « La carte est refusée » doit être la seule action de la règle.",
             "unreachable_rule": "Cette règle ne s'appliquera jamais : une règle sans condition plus haut attrape toutes les cartes. Déplace-la au-dessus."
+        }
+    },
+    "friends": {
+        "title": "Amis",
+        "subtitle": "Ta liste d'amis wiibleyde.dev : la même ici et sur le portail.",
+        "back_to_profile": "Profil",
+        "loading": "Chargement des amis...",
+        "retry": "Réessayer",
+        "dev_unavailable": "Dev local : pas de portail, la liste d'amis n'est pas disponible.",
+        "no_pseudo": "Sans pseudo",
+        "add_label": "Ajouter un ami",
+        "add_placeholder": "Pseudo exact",
+        "add_hint": "Pas de recherche : il faut le pseudo exact. L'amitié est réciproque une fois qu'il t'ajoute aussi.",
+        "add": "Ajouter",
+        "friends_title": "Amis",
+        "friends_empty": "Aucun ami pour l'instant.",
+        "incoming_title": "Demandes reçues",
+        "incoming_empty": "Aucune demande reçue.",
+        "outgoing_title": "En attente",
+        "outgoing_empty": "Aucune demande envoyée.",
+        "blocks_title": "Bloqués",
+        "blocks_empty": "Personne n'est bloqué.",
+        "accept": "Accepter",
+        "refuse": "Refuser",
+        "cancel": "Annuler",
+        "remove": "Retirer",
+        "block": "Bloquer",
+        "unblock": "Débloquer",
+        "block_title": "Bloquer ce joueur ?",
+        "block_confirm": "{name} ne pourra plus t'ajouter, et vos liens d'amitié seront supprimés.",
+        "remove_confirm": "Retirer {name} de tes amis ?",
+        "errors": {
+            "invalid_pseudo": "Pseudo invalide : 3 à 24 caractères parmi lettres, chiffres, « . », « _ » et « - ».",
+            "self": "Tu ne peux pas t'ajouter toi-même.",
+            "not_found": "Aucun compte avec ce pseudo.",
+            "already_friend": "Déjà dans ta liste.",
+            "rate_limited": "Trop d'actions d'un coup, réessaie dans quelques minutes.",
+            "unauthorized": "Session expirée, reconnecte-toi.",
+            "network": "Portail injoignable, vérifie ta connexion.",
+            "generic": "Une erreur est survenue, réessaie."
         }
     }
 }

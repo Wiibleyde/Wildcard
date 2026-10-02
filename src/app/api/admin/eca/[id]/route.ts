@@ -22,7 +22,7 @@ export async function PATCH(
     ctx: { params: Promise<{ id: string }> },
 ) {
     const { id } = await ctx.params;
-    const auth = await requireRole("admin");
+    const auth = await requireRole(request, "admin");
     if (!auth.ok) return auth.response;
 
     // `{ status }` only — the shared default cap is ample.
@@ -51,11 +51,11 @@ export async function PATCH(
 }
 
 export async function DELETE(
-    _request: Request,
+    request: Request,
     ctx: { params: Promise<{ id: string }> },
 ) {
     const { id } = await ctx.params;
-    const auth = await requireRole("admin");
+    const auth = await requireRole(request, "admin");
     if (!auth.ok) return auth.response;
 
     const admin = createAdminClient();

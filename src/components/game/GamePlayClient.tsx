@@ -9,6 +9,7 @@ import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { GameButton } from "@/components/ui/GameButton";
 import { useTransientNotice } from "@/hooks/game/useTransientNotice";
 import { useRouter } from "@/i18n/navigation";
+import { apiFetch } from "@/lib/api/client";
 import { BOARD_THEMES } from "@/lib/board/themes";
 import { greenFeltTheme } from "@/lib/board/themes/green_felt";
 import { THEMES } from "@/lib/card/themes";
@@ -178,7 +179,7 @@ export function GamePlayClient({
     // Pull the full redacted payload and show it at once (resync path).
     const refetchFull = useCallback(
         async (force = false) => {
-            const res = await fetch(`/api/games/${initial.gameId}`, {
+            const res = await apiFetch(`/api/games/${initial.gameId}`, {
                 cache: "no-store",
             });
             if (!res.ok) {
@@ -207,7 +208,7 @@ export function GamePlayClient({
             try {
                 while (wantedRef.current > versionRef.current) {
                     const before = versionRef.current;
-                    const res = await fetch(
+                    const res = await apiFetch(
                         `/api/games/${initial.gameId}?since=${before}`,
                         { cache: "no-store" },
                     );
@@ -260,7 +261,7 @@ export function GamePlayClient({
                 return;
             }
             try {
-                const res = await fetch(
+                const res = await apiFetch(
                     `/api/games/${initial.gameId}/version`,
                     { cache: "no-store" },
                 );
@@ -314,7 +315,7 @@ export function GamePlayClient({
             }
 
             try {
-                const res = await fetch(
+                const res = await apiFetch(
                     `/api/games/${initial.gameId}/actions`,
                     {
                         method: "POST",
@@ -400,7 +401,7 @@ export function GamePlayClient({
             if (payload.roomCode) {
                 setPending(true);
                 try {
-                    const res = await fetch(
+                    const res = await apiFetch(
                         `/api/rooms/${encodeURIComponent(payload.roomCode)}/leave`,
                         { method: "POST" },
                     );

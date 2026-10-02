@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { ReconnectingBanner } from "@/components/realtime/ReconnectingBanner";
 import { useRoomRefresh } from "@/hooks/lobby/useRoomRefresh";
 import { useRouter } from "@/i18n/navigation";
+import { apiFetch } from "@/lib/api/client";
 import {
     type GameRuleMode,
     type GameRuleToggle,
@@ -144,7 +145,7 @@ export function RoomClient({
                 return () => setBotCount(previous);
             },
             () =>
-                fetch(`/api/rooms/${code}/bots`, {
+                apiFetch(`/api/rooms/${code}/bots`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ count: clamped }),
@@ -172,7 +173,7 @@ export function RoomClient({
                 return () => setRules(previous);
             },
             () =>
-                fetch(`/api/rooms/${code}/rules`, {
+                apiFetch(`/api/rooms/${code}/rules`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ rules: next }),
@@ -206,7 +207,7 @@ export function RoomClient({
         setBusy(true);
         setError(null);
         try {
-            const res = await fetch(`/api/rooms/${code}/start`, {
+            const res = await apiFetch(`/api/rooms/${code}/start`, {
                 method: "POST",
             });
             const data = (await res.json().catch(() => ({}))) as {
@@ -230,7 +231,7 @@ export function RoomClient({
         setBusy(true);
         setError(null);
         try {
-            const res = await fetch(`/api/rooms/${code}/leave`, {
+            const res = await apiFetch(`/api/rooms/${code}/leave`, {
                 method: "POST",
             });
             if (!res.ok) {
@@ -251,7 +252,7 @@ export function RoomClient({
         setBusy(true);
         setError(null);
         try {
-            const res = await fetch(`/api/rooms/${code}/role`, {
+            const res = await apiFetch(`/api/rooms/${code}/role`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ role: next }),

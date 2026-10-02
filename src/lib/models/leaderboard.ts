@@ -11,7 +11,7 @@ export const LEADERBOARD_TOP_N = 50;
 export interface LeaderboardEntry {
     readonly userId: string;
     readonly username: string;
-    /** Raw `profiles.avatar_url` path (bucket-relative), or null. */
+    /** Portal avatar path (`portal.profiles.avatar_path`), or null — see `portalAvatarUrl`. */
     readonly avatarPath: string | null;
     readonly rating: number;
     readonly gamesPlayed: number;
@@ -28,7 +28,7 @@ export interface LeaderboardGame {
  * Per-game ELO standings, best rating first. Delegates ranking to the
  * `leaderboard` SQL function, which uses a window function over the publicly
  * readable `player_elo` rows (RLS allows SELECT to everyone) joined to
- * `profiles` for the display name + avatar, and returns only the top `topN` per
+ * the portal's `profiles` for the pseudo + profile picture, and returns only the top `topN` per
  * module — the whole table never crosses the wire. Ratings are written
  * server-side from each game's `outcome()` (see {@link recordEloForGame}); this
  * is a pure read-only projection — the browser can never forge a rating here.

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { publicStorageUrl } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
 
 /**
@@ -15,7 +16,19 @@ export interface PlayerIdentity {
 }
 
 /** Public bucket the portal stores avatars in (`<uid>/<uuid>.<ext>`). */
-export const PORTAL_AVATAR_BUCKET = "avatars";
+const PORTAL_AVATAR_BUCKET = "avatars";
+
+/**
+ * Browser-loadable URL of a portal profile picture, or null. Wildcard has no
+ * profile-picture storage of its own: photos are uploaded on the portal
+ * (account page or `PUT /api/v1/me/avatar`, which checks the bytes and deletes
+ * the previous one). A new photo is a new path, so the URL is immutable.
+ */
+export function portalAvatarUrl(avatarPath: string | null): string | null {
+    return avatarPath
+        ? publicStorageUrl(PORTAL_AVATAR_BUCKET, avatarPath)
+        : null;
+}
 
 /**
  * Name shown for a player who never picked a pseudo on the portal: "Joueur"

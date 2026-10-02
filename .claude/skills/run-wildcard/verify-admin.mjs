@@ -51,6 +51,8 @@ async function authCookies(email, password, username) {
     });
     if (!res.ok) throw new Error(`login ${res.status}: ${await res.text()}`);
     const session = await res.json();
+    // API routes authenticate by bearer token, not by the session cookie.
+    globalThis.__wcToken = session.access_token;
     let captured = [];
     const sb = createServerClient(SB, env.SUPABASE_ANON_KEY, {
         cookieEncoding: "raw",
@@ -89,7 +91,10 @@ await adminCtx.addCookies(
 
 // Seed one live game so the dashboard isn't empty.
 async function apost(ctx, path, data) {
-    const res = await ctx.request.post(`${BASE}${path}`, data ? { data } : {});
+    const res = await ctx.request.post(`${BASE}${path}`, {
+        ...(data ? { data } : {}),
+        headers: { authorization: `Bearer ${globalThis.__wcToken}` },
+    });
     return { status: res.status(), body: await res.json().catch(() => ({})) };
 }
 // VISIBLE text only — page.content() embeds the whole i18n dictionary (via

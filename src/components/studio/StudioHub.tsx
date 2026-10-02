@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { GameButton } from "@/components/ui/GameButton";
 import { useRouter } from "@/i18n/navigation";
+import { apiFetch } from "@/lib/api/client";
 import { CRAZY_EIGHTS_LIKE, MINIMAL_VALID } from "@/lib/eca/fixtures";
 import { ecaModuleIdFor } from "@/lib/eca/id";
 import type { EcaDefinition } from "@/lib/eca/types";
@@ -108,7 +109,7 @@ export function StudioHub({ games }: Props) {
             if (definition.meta.description !== undefined) {
                 payload.description = definition.meta.description;
             }
-            const res = await fetch("/api/studio/games", {
+            const res = await apiFetch("/api/studio/games", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
@@ -144,7 +145,7 @@ export function StudioHub({ games }: Props) {
         setLaunching(game.id);
         setError(null);
         try {
-            const res = await fetch("/api/rooms", {
+            const res = await apiFetch("/api/rooms", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -183,7 +184,7 @@ export function StudioHub({ games }: Props) {
         setDeleting(game.id);
         setError(null);
         try {
-            const res = await fetch(`/api/studio/games/${game.id}`, {
+            const res = await apiFetch(`/api/studio/games/${game.id}`, {
                 method: "DELETE",
             });
             if (!res.ok) {

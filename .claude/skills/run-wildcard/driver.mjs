@@ -63,6 +63,8 @@ async function authCookies() {
     });
     if (!res.ok) throw new Error(`login ${res.status}: ${await res.text()}`);
     const session = await res.json();
+    // API routes authenticate by bearer token, not by the session cookie.
+    globalThis.__wcToken = session.access_token;
 
     // Let @supabase/ssr serialize the session into its own cookie format
     let captured = [];
@@ -99,7 +101,10 @@ const ctx = await browser.newContext();
 await ctx.addCookies(await authCookies());
 
 async function post(path, data) {
-    const res = await ctx.request.post(`${BASE}${path}`, data ? { data } : {});
+    const res = await ctx.request.post(`${BASE}${path}`, {
+        ...(data ? { data } : {}),
+        headers: { authorization: `Bearer ${globalThis.__wcToken}` },
+    });
     const body = await res.json().catch(() => ({}));
     if (!res.ok())
         throw new Error(`${path} -> ${res.status()} ${JSON.stringify(body)}`);

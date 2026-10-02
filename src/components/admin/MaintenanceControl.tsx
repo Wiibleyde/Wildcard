@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { GameButton } from "@/components/ui/GameButton";
+import { apiFetch } from "@/lib/api/client";
 
 type Props = {
     initialEnabled: boolean;
@@ -40,7 +41,7 @@ export function MaintenanceControl({ initialEnabled, initialMessage }: Props) {
         setSaving(true);
         setError(null);
         try {
-            const res = await fetch("/api/admin/maintenance", {
+            const res = await apiFetch("/api/admin/maintenance", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

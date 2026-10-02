@@ -9,6 +9,7 @@ import {
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import { useRouter } from "@/i18n/navigation";
+import { apiFetch } from "@/lib/api/client";
 import type { EcaDefinition } from "@/lib/eca/types";
 import {
     type EcaValidationError,
@@ -191,7 +192,7 @@ export function useEcaEditor(initialGame: StudioGameDetail) {
         if (!accepted) return;
         setDeleting(true);
         setLocalError(null);
-        const res = await fetch(`/api/studio/games/${initialGame.id}`, {
+        const res = await apiFetch(`/api/studio/games/${initialGame.id}`, {
             method: "DELETE",
         });
         if (!res.ok) {

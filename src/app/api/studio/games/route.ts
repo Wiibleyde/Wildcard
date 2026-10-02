@@ -12,8 +12,8 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /** List the caller's own studio games (summaries, newest edit first). */
-export async function GET() {
-    const auth = await requireUser();
+export async function GET(request: Request) {
+    const auth = await requireUser(request);
     if (!auth.ok) return auth.response;
 
     const admin = createAdminClient();

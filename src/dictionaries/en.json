@@ -47,7 +47,8 @@
         "login": "Login",
         "logout": "Logout",
         "profile": "My profile",
-        "admin": "Admin"
+        "admin": "Admin",
+        "signup": "Sign up"
     },
     "common": {
         "loading": "Loading...",
@@ -97,9 +98,12 @@
         "ratings_played": "games",
         "ratings_wins": "W",
         "account_title": "Account",
-        "account_desc": "Your pseudo, avatar and linked accounts are managed on your wiibleyde.dev account, shared across every app.",
+        "account_desc": "Your username, profile picture, friends and linked accounts belong to your wiibleyde.dev account, shared across every app.",
         "account_manage": "Manage my account",
-        "account_dev": "Local dev: no portal, identity comes from the seeded accounts."
+        "account_dev": "Local dev: no portal, identity comes from the seeded accounts.",
+        "account_forgot": "Forgot password",
+        "friends": "Friends",
+        "friends_desc": "Add, accept or block players — the same list on every app"
     },
     "leaderboard": {
         "title": "Leaderboard",
@@ -721,6 +725,46 @@
             "conflicting_verdict": "A “plays a card” rule must contain exactly one “accepted” or “rejected” action.",
             "reject_with_effects": "A rejected card changes nothing: “The card is rejected” must be the rule's only action.",
             "unreachable_rule": "This rule can never apply: a rule without conditions above it catches every card. Move it above."
+        }
+    },
+    "friends": {
+        "title": "Friends",
+        "subtitle": "Your wiibleyde.dev friend list: the same here and on the portal.",
+        "back_to_profile": "Profile",
+        "loading": "Loading friends...",
+        "retry": "Retry",
+        "dev_unavailable": "Local dev: no portal, the friend list is unavailable.",
+        "no_pseudo": "No username",
+        "add_label": "Add a friend",
+        "add_placeholder": "Exact username",
+        "add_hint": "No search: you need the exact username. The friendship is mutual once they add you back.",
+        "add": "Add",
+        "friends_title": "Friends",
+        "friends_empty": "No friends yet.",
+        "incoming_title": "Requests",
+        "incoming_empty": "No incoming requests.",
+        "outgoing_title": "Pending",
+        "outgoing_empty": "No sent requests.",
+        "blocks_title": "Blocked",
+        "blocks_empty": "Nobody is blocked.",
+        "accept": "Accept",
+        "refuse": "Decline",
+        "cancel": "Cancel",
+        "remove": "Remove",
+        "block": "Block",
+        "unblock": "Unblock",
+        "block_title": "Block this player?",
+        "block_confirm": "{name} won't be able to add you anymore, and your friend links will be removed.",
+        "remove_confirm": "Remove {name} from your friends?",
+        "errors": {
+            "invalid_pseudo": "Invalid username: 3 to 24 letters, digits, \".\", \"_\" or \"-\".",
+            "self": "You can't add yourself.",
+            "not_found": "No account with that username.",
+            "already_friend": "Already in your list.",
+            "rate_limited": "Too many actions at once, try again in a few minutes.",
+            "unauthorized": "Session expired, please sign in again.",
+            "network": "Portal unreachable, check your connection.",
+            "generic": "Something went wrong, please try again."
         }
     }
 }

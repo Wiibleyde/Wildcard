@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { CheckIcon, UploadIcon } from "@/components/profile/AvatarIcons";
 import { useGameImageUpload } from "@/hooks/studio/useGameImageUpload";
+import { CheckIcon, UploadIcon } from "./UploadIcons";
 
 interface Props {
     readonly ownerId: string;

@@ -111,6 +111,8 @@ async function authCookiesAndUser() {
     });
     if (!res.ok) throw new Error(`login ${res.status}: ${await res.text()}`);
     const session = await res.json();
+    // API routes authenticate by bearer token, not by the session cookie.
+    globalThis.__wcToken = session.access_token;
 
     let captured = [];
     const sb = createServerClient(SB, env.SUPABASE_ANON_KEY, {
@@ -173,7 +175,10 @@ const ctx = await browser.newContext();
 await ctx.addCookies(cookies);
 
 async function post(path, data) {
-    const res = await ctx.request.post(`${BASE}${path}`, data ? { data } : {});
+    const res = await ctx.request.post(`${BASE}${path}`, {
+        ...(data ? { data } : {}),
+        headers: { authorization: `Bearer ${globalThis.__wcToken}` },
+    });
     const body = await res.json().catch(() => ({}));
     if (!res.ok())
         throw new Error(`${path} -> ${res.status()} ${JSON.stringify(body)}`);

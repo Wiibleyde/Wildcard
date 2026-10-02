@@ -1,8 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { NavAvatar } from "@/components/nav/NavAvatar";
-import { PORTAL_AVATAR_BUCKET } from "@/lib/models/identities";
+import { portalAvatarUrl } from "@/lib/models/identities";
 import type { LeaderboardGame } from "@/lib/models/leaderboard";
-import { publicStorageUrl } from "@/lib/supabase/storage";
 
 /** Medal tint for the podium; everyone below shares a muted cream badge. */
 function rankColor(position: number): string {
@@ -76,12 +75,9 @@ export async function LeaderboardBoard({
                             {game.entries.map((entry, index) => {
                                 const position = index + 1;
                                 const isViewer = entry.userId === viewerId;
-                                const avatarUrl = entry.avatarPath
-                                    ? publicStorageUrl(
-                                          PORTAL_AVATAR_BUCKET,
-                                          entry.avatarPath,
-                                      )
-                                    : null;
+                                const avatarUrl = portalAvatarUrl(
+                                    entry.avatarPath,
+                                );
                                 const initial =
                                     entry.username?.[0]?.toUpperCase() ?? "?";
 

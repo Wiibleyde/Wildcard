@@ -15,8 +15,8 @@ import { getSupabaseEnv, getSupabaseSchema } from "./env";
  * Pair with `unoptimized` on the `<Image>`: the Next image optimizer runs inside
  * the container, where it can neither reach `localhost:54321` (that's the app
  * container, not Kong) nor optimize an upstream that resolves to a private IP.
- * Avatars are small user uploads from a public bucket — the browser fetches them
- * directly, no server round-trip.
+ * Portal profile pictures and studio covers are small images in public
+ * buckets — the browser fetches them directly, no server round-trip.
  */
 export function publicStorageUrl(bucket: string, path: string): string {
     const { url } = getSupabaseEnv();
