@@ -3,10 +3,10 @@
 import { useRef, useState } from "react";
 import { BOUNDED_MQ, useBoundedMeasure } from "@/hooks/game/useBoundedMeasure";
 import { tableTilt } from "@/lib/board/styles";
-import { CARD_WIDTH_CLASS } from "@/lib/card/sizes";
-import { CARD_PX_ESTIMATE, type TableZoneProps, ZoneCard } from "../TableZone";
+import { CARD_PX_ESTIMATE, CARD_WIDTH_CLASS } from "@/lib/card/sizes";
+import { type TableZoneProps, ZoneCard } from "./ZoneCard";
 
-// As the trick pile grows, the overlap tightens to keep every card within the available width.
+// The overlap tightens as the pile grows so every card stays within the width.
 export function CardRow({ instance, template, ctx }: TableZoneProps) {
     const size = template.cardSize ?? "md";
     const ref = useRef<HTMLDivElement>(null);
@@ -25,10 +25,9 @@ export function CardRow({ instance, template, ctx }: TableZoneProps) {
             const heightMode = window.matchMedia(BOUNDED_MQ).matches;
             let cardW: number;
             if (heightMode) {
-                // Cap trick cards to the center region so a grown pile never climbs into the seats.
+                // Bounded by the center region so a grown pile never climbs into the seats.
                 const region = el.closest<HTMLElement>("[data-center-region]");
                 const regionH = region?.clientHeight ?? 0;
-                // Reserve for the caption, status line, gaps and frame padding.
                 const cardH = Math.max(56, Math.min(210, regionH - 100));
                 cardW = Math.round((cardH * 5) / 7);
             } else {
@@ -37,7 +36,7 @@ export function CardRow({ instance, template, ctx }: TableZoneProps) {
             }
             const avail = el.clientWidth;
             if (cardW <= 0) return;
-            // Natural step = a 1.4rem (22.4px) overlap; tighten so cardW + (n-1)·step ≤ avail, floored at 0 (cards may fully stack).
+            // Natural overlap is 1.4rem (22.4px); tighten until it fits, possibly fully stacked.
             const natural = cardW - 22.4;
             const maxStep = n > 1 ? (avail - cardW) / (n - 1) : natural;
             const step = Math.max(0, Math.min(natural, maxStep));

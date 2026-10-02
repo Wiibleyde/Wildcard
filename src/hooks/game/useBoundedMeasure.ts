@@ -2,22 +2,17 @@
 
 import { type DependencyList, type RefObject, useEffect, useRef } from "react";
 
-/** The `lg:` breakpoint — the board becomes height-bounded at this width. */
+/** From `lg:` the board is height-bounded. */
 export const BOUNDED_MQ = "(min-width: 1024px)";
 
-/**
- * Re-runs the caller's `measure` on mount, on every ResizeObserver tick, and on
- * `lg:` breakpoint flip. `extraTargets` are observed too, so a card re-measures
- * when its container resizes.
- */
+/** Runs `measure` on mount, on resize of `ref` / `extraTargets`, and on the `lg:` flip. */
 export function useBoundedMeasure<T extends HTMLElement>(
     ref: RefObject<T | null>,
     measure: () => void,
     deps: DependencyList,
     extraTargets?: (el: T) => Iterable<HTMLElement | null>,
 ): void {
-    // `measure`/`extraTargets` are fresh closures each render; read them through
-    // refs so the effect only re-subscribes when the caller's `deps` change.
+    // Fresh closures each render: read through refs so only `deps` re-subscribe.
     const measureRef = useRef(measure);
     measureRef.current = measure;
     const extraRef = useRef(extraTargets);
@@ -42,6 +37,5 @@ export function useBoundedMeasure<T extends HTMLElement>(
             ro.disconnect();
             mq.removeEventListener("change", run);
         };
-        // The caller's `deps` drive re-subscription; `ref` is stable.
     }, [ref, ...deps]);
 }

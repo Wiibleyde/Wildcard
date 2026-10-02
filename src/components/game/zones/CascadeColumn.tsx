@@ -3,18 +3,19 @@
 import { useRef, useState } from "react";
 import { BOUNDED_MQ, useBoundedMeasure } from "@/hooks/game/useBoundedMeasure";
 import { CARD_WIDTH_CLASS } from "@/lib/card/sizes";
-import { type TableZoneProps, ZoneCard } from "../TableZone";
+import { type TableZoneProps, ZoneCard } from "./ZoneCard";
 
-/** Peek a cascaded card shows above the next, as a fraction of card width (card height = 140% of width). */
+/** Visible peek of a covered card, as a fraction of card width (height = 1.4 × width). */
 const CASCADE_PEEK = { up: 1.4 - 0.96, down: 1.4 - 1.22 };
 
-// Height-bounded at `lg`: a long column compresses its overlap to fit; below `lg` the page scrolls and natural spacing is kept.
+// At `lg` a long column compresses its overlap to fit; below, the page scrolls.
 export function CascadeColumn({ instance, template, ctx }: TableZoneProps) {
     const ref = useRef<HTMLDivElement>(null);
     const cards = instance.cards;
     const [fit, setFit] = useState(1);
 
-    // `instance.cards` is a fresh array each render: read via ref and key the effect on a stable face-down signature, else the state-setting ResizeObserver loops forever.
+    // `instance.cards` is a fresh array each render: keyed on a stable signature
+    // instead, or the state-setting ResizeObserver loops forever.
     const cardsRef = useRef(cards);
     cardsRef.current = cards;
     const faceKey = cards.map((c) => (c.faceDown ? "1" : "0")).join("");
@@ -38,9 +39,8 @@ export function CascadeColumn({ instance, template, ctx }: TableZoneProps) {
                 (cur[i - 1].faceDown ? CASCADE_PEEK.down : CASCADE_PEEK.up) *
                 cardW;
         const room = el.clientHeight - cardH;
-        // Only ever compress, never spread past the natural overlap.
         const next = peeks > 0 ? Math.max(0.12, Math.min(1, room / peeks)) : 1;
-        // Skip no-op updates so the ResizeObserver re-measure can't feed back into an endless render loop.
+        // Skip no-op updates, or the re-measure feeds back into a render loop.
         setFit((prev) => (Math.abs(prev - next) < 0.005 ? prev : next));
     }, [faceKey]);
 

@@ -2,10 +2,7 @@
 
 import { type RefObject, useEffect, useRef } from "react";
 
-/**
- * Pass the feed array itself as `dep` so the effect runs each time it grows —
- * an unused dep would be stripped and the effect would only run once on mount.
- */
+// `dep` is the feed itself, so the effect re-runs each time it grows.
 export function useAutoScroll<T extends HTMLElement>(
     dep: unknown,
 ): RefObject<T | null> {

@@ -5,7 +5,6 @@ import { GameButton, type GameButtonVariant } from "@/components/ui/GameButton";
 import { CARD_WIDTH_CLASS } from "@/lib/card/sizes";
 import type { CardTheme } from "@/lib/card/types";
 import { cardKey } from "@/lib/card/utils";
-import type { GameAction } from "@/lib/engine/types";
 import type { TableControl } from "@/lib/games/table/types";
 
 const BUTTON_VARIANT: Record<
@@ -21,14 +20,14 @@ interface TableControlsProps {
     controls: readonly TableControl[];
     deckTheme: CardTheme;
     pending: boolean;
-    onAction: (action: GameAction) => void;
+    onControl: (control: TableControl) => void;
 }
 
 export function TableControls({
     controls,
     deckTheme,
     pending,
-    onAction,
+    onControl,
 }: TableControlsProps) {
     if (controls.length === 0) return null;
 
@@ -40,7 +39,7 @@ export function TableControls({
                     size="sm"
                     variant={BUTTON_VARIANT[control.variant ?? "primary"]}
                     disabled={pending || control.disabled}
-                    onClick={() => onAction(control.action)}
+                    onClick={() => onControl(control)}
                     className="xl:text-sm"
                 >
                     {control.cards?.map((card) => (

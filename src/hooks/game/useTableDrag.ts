@@ -11,42 +11,46 @@ import type { CardDescriptor } from "@/lib/card/types";
 import type { GameAction } from "@/lib/engine/types";
 import type { TableCardItem } from "@/lib/games/table/types";
 
-/** Vertical gap between cards in a dragged run clone (px), matching cascades. */
+/** Vertical gap (px) between cards of a dragged run, matching cascades. */
 export const CLONE_OFFSET = 14;
 
-/** One card rendered in the floating drag clone. */
 export interface DragStackCard {
     readonly id: string;
     readonly card: CardDescriptor;
     readonly ownerId?: string;
 }
 
-/** Live drag: which cards left the board, the clone, and where it may land. */
+// Only what changes once per drag lives in state; the per-frame clone
+// position is written straight to the DOM so zones don't re-render at 60fps.
 export interface DragState {
-    /** Source-card ids hidden while the clone is in flight. */
     readonly hiddenIds: readonly string[];
-    /** The cards drawn in the floating clone (top-to-bottom). */
     readonly stack: readonly DragStackCard[];
-    /** Legal drops, by destination zone key. */
     readonly targets: ReadonlyArray<{
         readonly zoneKey: string;
         readonly action: GameAction;
     }>;
-    /** Clone top-left in viewport px. */
-    readonly x: number;
-    readonly y: number;
-    /** Grab point inside the card, so the clone tracks the cursor naturally. */
-    readonly offsetX: number;
-    readonly offsetY: number;
+    readonly originX: number;
+    readonly originY: number;
     readonly cardW: number;
     readonly cardH: number;
 }
 
+export type BeginDrag = (
+    item: TableCardItem,
+    clientX: number,
+    clientY: number,
+    rect: DOMRect,
+) => void;
+
 interface DragOptions {
     onAction: (action: GameAction) => void;
     pending: boolean;
-    /** The board surface — the clone is clamped inside it. */
+    /** The clone is clamped inside this element. */
     boundsRef: RefObject<HTMLElement | null>;
+}
+
+export function cloneTransform(x: number, y: number): string {
+    return `translate3d(${x}px, ${y}px, 0)`;
 }
 
 function hitTest(
@@ -63,46 +67,35 @@ function hitTest(
 
 export function useTableDrag({ onAction, pending, boundsRef }: DragOptions): {
     dragging: DragState | null;
-    beginDrag: (
-        item: TableCardItem,
-        clientX: number,
-        clientY: number,
-        rect: DOMRect,
-    ) => void;
+    beginDrag: BeginDrag;
+    cloneRef: RefObject<HTMLDivElement | null>;
 } {
     const [dragging, setDragging] = useState<DragState | null>(null);
+    const cloneRef = useRef<HTMLDivElement>(null);
+    const grabRef = useRef({ x: 0, y: 0 });
 
-    // Latest values for the window listeners without re-binding them each move.
+    // Latest values for the window listeners without re-binding them.
     const stateRef = useRef(dragging);
     stateRef.current = dragging;
     const cfg = useRef({ onAction, pending });
     cfg.current = { onAction, pending };
 
-    const beginDrag = useCallback(
-        (
-            item: TableCardItem,
-            clientX: number,
-            clientY: number,
-            rect: DOMRect,
-        ) => {
-            if (cfg.current.pending || !item.dropTargets?.length) return;
-            const stack: DragStackCard[] = item.dragStack
-                ? [...item.dragStack]
-                : [{ id: item.id, card: item.card, ownerId: item.ownerId }];
-            setDragging({
-                hiddenIds: stack.map((s) => s.id),
-                stack,
-                targets: item.dropTargets,
-                offsetX: clientX - rect.left,
-                offsetY: clientY - rect.top,
-                x: rect.left,
-                y: rect.top,
-                cardW: rect.width,
-                cardH: rect.height,
-            });
-        },
-        [],
-    );
+    const beginDrag: BeginDrag = useCallback((item, clientX, clientY, rect) => {
+        if (cfg.current.pending || !item.dropTargets?.length) return;
+        const stack: DragStackCard[] = item.dragStack
+            ? [...item.dragStack]
+            : [{ id: item.id, card: item.card, ownerId: item.ownerId }];
+        grabRef.current = { x: clientX - rect.left, y: clientY - rect.top };
+        setDragging({
+            hiddenIds: stack.map((s) => s.id),
+            stack,
+            targets: item.dropTargets,
+            originX: rect.left,
+            originY: rect.top,
+            cardW: rect.width,
+            cardH: rect.height,
+        });
+    }, []);
 
     const active = dragging !== null;
     useEffect(() => {
@@ -110,19 +103,18 @@ export function useTableDrag({ onAction, pending, boundsRef }: DragOptions): {
 
         const move = (e: PointerEvent) => {
             e.preventDefault();
-            setDragging((d) => {
-                if (!d) return d;
-                let x = e.clientX - d.offsetX;
-                let y = e.clientY - d.offsetY;
-                const b = boundsRef.current?.getBoundingClientRect();
-                if (b) {
-                    const stackH =
-                        d.cardH + (d.stack.length - 1) * CLONE_OFFSET;
-                    x = Math.max(b.left, Math.min(x, b.right - d.cardW));
-                    y = Math.max(b.top, Math.min(y, b.bottom - stackH));
-                }
-                return { ...d, x, y };
-            });
+            const d = stateRef.current;
+            const el = cloneRef.current;
+            if (!d || !el) return;
+            let x = e.clientX - grabRef.current.x;
+            let y = e.clientY - grabRef.current.y;
+            const b = boundsRef.current?.getBoundingClientRect();
+            if (b) {
+                const stackH = d.cardH + (d.stack.length - 1) * CLONE_OFFSET;
+                x = Math.max(b.left, Math.min(x, b.right - d.cardW));
+                y = Math.max(b.top, Math.min(y, b.bottom - stackH));
+            }
+            el.style.transform = cloneTransform(x, y);
         };
         const drop = (e: PointerEvent) => {
             const d = stateRef.current;
@@ -142,5 +134,5 @@ export function useTableDrag({ onAction, pending, boundsRef }: DragOptions): {
         };
     }, [active, boundsRef]);
 
-    return { dragging, beginDrag };
+    return { dragging, beginDrag, cloneRef };
 }
