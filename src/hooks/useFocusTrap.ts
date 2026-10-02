@@ -11,12 +11,7 @@ function focusablesIn(root: HTMLElement): HTMLElement[] {
     );
 }
 
-/**
- * Modal focus management: while `active`, focus moves into `containerRef`
- * (the container itself, so a destructive default isn't one stray Enter away),
- * Tab / Shift+Tab cycle inside it, and on deactivation focus returns to the
- * element that opened the modal.
- */
+/** Focuses the container itself (a destructive default stays one Tab away, not one Enter), cycles Tab inside, restores the opener on close. */
 export function useFocusTrap(
     active: boolean,
     containerRef: RefObject<HTMLElement | null>,
