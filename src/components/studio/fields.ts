@@ -12,7 +12,7 @@ export const fieldStyle: CSSProperties = {
 };
 
 /** Secondary text on cream panels. */
-export const mutedTextStyle: CSSProperties = { color: "#5a5340" };
+export const mutedTextStyle: CSSProperties = { color: "var(--ink-soft)" };
 
 export const labelClass = "text-xs font-bold uppercase tracking-widest";
 

@@ -55,7 +55,6 @@ export function supabaseSharedOptions() {
     };
 }
 
-/** Server-only service-role key. */
 export function getServiceRoleKey(): string {
     const key = process.env.SUPABASE_SECRET_KEY;
     if (!key) {

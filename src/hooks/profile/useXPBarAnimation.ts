@@ -1,11 +1,8 @@
 "use client";
 
-import { useGSAP } from "@gsap/react";
-import gsap from "gsap";
 import { useRef } from "react";
+import { gsap, useGSAP } from "@/lib/gsap";
 import { tweenCount } from "@/lib/gsap/textTween";
-
-gsap.registerPlugin(useGSAP);
 
 export function useXPBarAnimation(xp: number, progress: number) {
     const containerRef = useRef<HTMLDivElement>(null);

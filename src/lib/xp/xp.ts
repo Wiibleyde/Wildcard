@@ -1,9 +1,6 @@
 import { isEcaModuleId } from "@/lib/eca/id";
 
-/**
- * XP rewards playing, not beating rated humans: additive, never zero-sum.
- * Pure — the server derives awards from the engine outcome and persists them.
- */
+// XP rewards playing, not beating rated humans: additive, never zero-sum.
 
 export const PARTICIPATION_XP = 50;
 
@@ -76,7 +73,6 @@ export function xpBreakdown(xp: number): {
     };
 }
 
-/** Shorthand for `xpBreakdown(xp).progress`. */
 export function xpProgress(xp: number): number {
     return xpBreakdown(xp).progress;
 }
@@ -96,10 +92,6 @@ export interface XpGameFacts {
     readonly excluded?: readonly string[];
 }
 
-/**
- * (PARTICIPATION_XP + winBonus) × weight, with
- * winBonus = WIN_XP_PER_OPPONENT × max(1, seats − 1) × (BOT_ONLY_WIN_FACTOR if no other human).
- */
 export function computeXpAwards({
     moduleId,
     rankings,
