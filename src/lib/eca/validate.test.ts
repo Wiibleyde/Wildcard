@@ -108,6 +108,17 @@ describe("validateEcaDefinition — meta", () => {
             "invalid_name",
         );
         expect(errorsOf(withMeta({ name: 7 }))).toContain("invalid_name");
+        expect(errorsOf(withMeta({ name: "   " }))).toContain("invalid_name");
+    });
+
+    it("trims names on rebuild", () => {
+        const result = validateEcaDefinition({
+            ...base,
+            meta: { ...base.meta, name: "  Mon jeu " },
+            rules: [{ ...baseRule, name: " Règle  " }],
+        });
+        expect(result.ok && result.definition.meta.name).toBe("Mon jeu");
+        expect(result.ok && result.definition.rules[0].name).toBe("Règle");
     });
 
     it("invalid_description: rejects over-long descriptions", () => {
@@ -154,17 +165,17 @@ describe("validateEcaDefinition — setup & turn", () => {
         );
     });
 
-    it("invalid_hand_size: rejects a deal that does not fit the deck", () => {
+    it("deal_exceeds_deck: rejects a deal that does not fit the deck", () => {
         // french32: 9 cards × 4 players = 36 > 32.
-        expect(errorsOf(withSetup({ handSize: 9 }))).toContain(
-            "invalid_hand_size",
-        );
+        expect(errorsOf(withSetup({ handSize: 9 }))).toEqual([
+            "deal_exceeds_deck",
+        ]);
         // 8 × 4 = 32 fits exactly…
         expect(validateEcaDefinition(withSetup({ handSize: 8 })).ok).toBe(true);
         // …but not with a start discard on top.
         expect(
             errorsOf(withSetup({ handSize: 8, startDiscard: true })),
-        ).toContain("invalid_hand_size");
+        ).toContain("deal_exceeds_deck");
     });
 
     it("invalid_start_discard: rejects a non-boolean flag", () => {
@@ -230,25 +241,15 @@ describe("validateEcaDefinition — rules", () => {
         expect(
             errorsOf(withRules([{ ...baseRule, name: "x".repeat(61) }])),
         ).toContain("invalid_rule_name");
+        expect(errorsOf(withRules([{ ...baseRule, name: "  " }]))).toContain(
+            "invalid_rule_name",
+        );
     });
 
     it("invalid_event: rejects unknown events", () => {
         expect(
             errorsOf(withRules([{ ...baseRule, event: "cardDrawn" }])),
         ).toContain("invalid_event");
-    });
-
-    it("no_accepting_rule: rejects a game where no card is ever playable", () => {
-        expect(
-            errorsOf(
-                withRules([
-                    {
-                        ...baseRule,
-                        effects: [{ type: "rejectCard" }],
-                    },
-                ]),
-            ),
-        ).toContain("no_accepting_rule");
     });
 });
 
@@ -575,6 +576,55 @@ describe("validateEcaDefinitionForWrite — size caps", () => {
         expect(
             writeErrorsOf(withRules([cardPlayed("r", [long], [ACCEPT])])),
         ).toEqual(["literal_too_long"]);
+    });
+});
+
+describe("validateEcaDefinitionForWrite — semantic lints", () => {
+    const reject = withRules([
+        { ...baseRule, effects: [{ type: "rejectCard" }] },
+    ]);
+
+    it("no_accepting_rule: a write needs at least one accepting rule", () => {
+        expect(writeErrorsOf(reject)).toContain("no_accepting_rule");
+        // Structural read stays tolerant.
+        expect(validateEcaDefinition(reject).ok).toBe(true);
+    });
+
+    it("constant_condition: two literals or the same operand twice", () => {
+        const literals = {
+            lhs: { kind: "literal", value: 1 },
+            op: "eq",
+            rhs: { kind: "literal", value: 1 },
+        };
+        const played = { kind: "card", source: "playedCard", prop: "rank" };
+        const same = { lhs: played, op: "eq", rhs: played };
+        for (const condition of [literals, same]) {
+            expect(
+                writeErrorsOf(
+                    withRules([cardPlayed("r", [condition], [ACCEPT])]),
+                ),
+            ).toEqual(["constant_condition"]);
+        }
+    });
+
+    it("literal_out_of_range: a number no card value or count can reach", () => {
+        const value = { kind: "card", source: "playedCard", prop: "value" };
+        const condition = (n: number) => ({
+            lhs: value,
+            op: "gt",
+            rhs: { kind: "literal", value: n },
+        });
+        // french32 values run 0..7.
+        expect(
+            writeErrorsOf(
+                withRules([cardPlayed("r", [condition(8)], [ACCEPT])]),
+            ),
+        ).toEqual(["literal_out_of_range"]);
+        expect(
+            validateEcaDefinitionForWrite(
+                withRules([cardPlayed("r", [condition(7)], [ACCEPT])]),
+            ).ok,
+        ).toBe(true);
     });
 });
 
