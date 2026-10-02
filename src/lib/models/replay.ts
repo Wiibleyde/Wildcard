@@ -60,6 +60,20 @@ function canonical(value: unknown): unknown {
     return value;
 }
 
+/**
+ * The runner owns `turn` and `rngState`: legacy rows may carry a stale cursor
+ * or a turn counted by a module's old rules, neither of which is a divergence.
+ */
+export function matchesRecorded(
+    replayed: GameState,
+    recorded: GameState,
+): boolean {
+    return sameJson(
+        { ...replayed, rngState: null, turn: null },
+        { ...recorded, rngState: null, turn: null },
+    );
+}
+
 function isCompleteLog(seqs: readonly number[]): boolean {
     return seqs.every((seq, i) => seq === i + 1);
 }
@@ -150,15 +164,11 @@ export async function getReplay(
         diverged = true;
         console.error(`[replay] game ${gameId}: module threw:`, err);
     }
-    // The RNG cursor is ignored: older games may carry a stale one.
     if (
         !expired &&
         !diverged &&
         lastState &&
-        !sameJson(
-            { ...lastState, rngState: null },
-            { ...finalState, rngState: null },
-        )
+        !matchesRecorded(lastState, finalState)
     ) {
         diverged = true;
         console.error(
