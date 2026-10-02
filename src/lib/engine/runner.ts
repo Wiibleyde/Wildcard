@@ -42,25 +42,8 @@ export function persistedRules(
 export function createGame<S extends GameState, A extends GameAction, V>(
     module: GameModule<S, A, V>,
     players: readonly Player[],
-    options?: CreateGameOptions,
-): S;
-/** @deprecated Positional form — pass `{ seed, gameId }` instead. */
-export function createGame<S extends GameState, A extends GameAction, V>(
-    module: GameModule<S, A, V>,
-    players: readonly Player[],
-    seed: GameSeed | undefined,
-    gameId?: string,
-): S;
-export function createGame<S extends GameState, A extends GameAction, V>(
-    module: GameModule<S, A, V>,
-    players: readonly Player[],
-    seedOrOptions?: GameSeed | CreateGameOptions,
-    gameId?: string,
+    options: CreateGameOptions = {},
 ): S {
-    const options: CreateGameOptions =
-        typeof seedOrOptions === "object"
-            ? seedOrOptions
-            : { seed: seedOrOptions, gameId };
     const bound = withGameRules(module, options.rules);
     if (
         players.length < bound.minPlayers ||
@@ -136,17 +119,12 @@ export interface ReplayDivergence<A extends GameAction> {
     readonly error: RuleViolation;
 }
 
-/** @deprecated The string form (a bare gameId) — pass `{ gameId }` instead. */
-type LegacyReplayOptions = string;
-
 function openReplay<S extends GameState, A extends GameAction, V>(
     module: GameModule<S, A, V>,
     players: readonly Player[],
     seed: GameSeed,
-    options: ReplayOptions | LegacyReplayOptions = {},
+    { gameId, rules }: ReplayOptions = {},
 ): { bound: GameModule<S, A, V>; opening: S } {
-    const { gameId, rules }: ReplayOptions =
-        typeof options === "string" ? { gameId: options } : options;
     const bound = withGameRules(module, rules);
     return { bound, opening: createGame(bound, players, { seed, gameId }) };
 }
@@ -160,7 +138,7 @@ export function* replayFrames<S extends GameState, A extends GameAction, V>(
     players: readonly Player[],
     seed: GameSeed,
     actions: readonly A[],
-    options?: ReplayOptions | LegacyReplayOptions,
+    options?: ReplayOptions,
 ): Generator<ReplayFrame<S, A>, ReplayDivergence<A> | null, void> {
     const { bound, opening } = openReplay(module, players, seed, options);
     let state = opening;
@@ -186,7 +164,7 @@ export function replay<S extends GameState, A extends GameAction, V>(
     players: readonly Player[],
     seed: GameSeed,
     actions: readonly A[],
-    options?: ReplayOptions | LegacyReplayOptions,
+    options?: ReplayOptions,
 ): S {
     const { bound, opening } = openReplay(module, players, seed, options);
     return actions.reduce((state, action, index) => {

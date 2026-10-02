@@ -3,7 +3,7 @@ import type { CardDescriptor, Rank } from "@/lib/card/types";
 import { cardKey, isCardDescriptor } from "@/lib/card/utils";
 import { buildDeck } from "@/lib/engine/deck";
 import type { Rng } from "@/lib/engine/rng";
-import { fail, seatOrder } from "@/lib/engine/rules";
+import { fail, rankByScore, seatAfter, seatOrder } from "@/lib/engine/rules";
 import type {
     ApplyResult,
     GameEvent,
@@ -148,16 +148,6 @@ function canPassNow(state: EcaState, actorId: string): boolean {
     return !hasPlayableCard(state, actorId) && !canDrawNow(state);
 }
 
-function neighborOf(
-    players: readonly Player[],
-    fromId: string,
-    direction: 1 | -1,
-): string {
-    const order = seatOrder(players);
-    const index = order.findIndex((p) => p.id === fromId);
-    return order[(index + direction + order.length) % order.length].id;
-}
-
 /** Draws what is available; an empty pile reshuffles the discard minus its top. */
 function drawInto(
     draft: Draft,
@@ -221,7 +211,9 @@ function applyEffects(
                 const targetId =
                     effect.target === "actor"
                         ? actorId
-                        : neighborOf(players, actorId, draft.direction);
+                        : (seatAfter(players, actorId, {
+                              direction: draft.direction,
+                          }) ?? actorId);
                 drawInto(draft, targetId, effect.count, definition, rng);
                 break;
             }
@@ -243,15 +235,24 @@ function applyEffects(
     }
 }
 
+/** Seat order: ranking sorts stably, so ties stay in seat order. */
+function handSizes(
+    hands: Readonly<Record<string, readonly CardDescriptor[]>>,
+    players: readonly Player[],
+): { playerId: string; score: number }[] {
+    return seatOrder(players).map((p) => ({
+        playerId: p.id,
+        score: hands[p.id]?.length ?? 0,
+    }));
+}
+
 /** Ties share the win. */
 function endByFewestCards(draft: Draft, players: readonly Player[]): void {
     draft.ended = true;
-    const counts = seatOrder(players).map((p) => ({
-        id: p.id,
-        count: draft.hands[p.id]?.length ?? 0,
-    }));
-    const fewest = Math.min(...counts.map((c) => c.count));
-    draft.winnerIds = counts.filter((c) => c.count === fewest).map((c) => c.id);
+    const { winners } = rankByScore(handSizes(draft.hands, players), {
+        higherIsBetter: false,
+    });
+    draft.winnerIds = [...winners];
 }
 
 /** One seat past `fromId`, consuming pendingSkips on the players passed. */
@@ -347,17 +348,15 @@ function completeAdvance(
     return runTurnChain(draft, players, definition, current, rng);
 }
 
-/** `rngState` always comes from the live rng: the replay invariant in one place. */
+/** `turn` and `rngState` are written back by the runner's `dispatch`. */
 function finalize(
     state: EcaState,
     draft: Draft,
     currentPlayerId: string | null,
     hasDrawnThisTurn: boolean,
     consecutivePasses: number,
-    rng: Rng,
 ): ApplyResult<EcaState> {
-    const turn = state.turn + 1;
-    if (!draft.ended && turn >= ECA_TURN_LIMIT) {
+    if (!draft.ended && state.turn + 1 >= ECA_TURN_LIMIT) {
         endByFewestCards(draft, state.players);
     }
     if (draft.ended) {
@@ -372,8 +371,6 @@ function finalize(
             ...state,
             phase: draft.ended ? "done" : "playing",
             currentPlayerId: draft.ended ? null : currentPlayerId,
-            turn,
-            rngState: rng.state,
             hands: draft.hands,
             drawPile: draft.drawPile,
             discardPile: draft.discardPile,
@@ -534,7 +531,7 @@ export function createEcaModule(
                         );
                     }
                     // playAgain is a fresh go: the actor may draw again.
-                    return finalize(state, draft, current, false, 0, rng);
+                    return finalize(state, draft, current, false, 0);
                 }
 
                 case "drawCard": {
@@ -553,7 +550,6 @@ export function createEcaModule(
                         state.currentPlayerId,
                         true,
                         0,
-                        rng,
                     );
                 }
 
@@ -576,7 +572,7 @@ export function createEcaModule(
                             !drawAvailable(state))
                     ) {
                         endByFewestCards(draft, state.players);
-                        return finalize(state, draft, null, false, passes, rng);
+                        return finalize(state, draft, null, false, passes);
                     }
                     const current = completeAdvance(
                         draft,
@@ -585,7 +581,7 @@ export function createEcaModule(
                         action.playerId,
                         rng,
                     );
-                    return finalize(state, draft, current, false, passes, rng);
+                    return finalize(state, draft, current, false, passes);
                 }
 
                 default:
@@ -600,36 +596,20 @@ export function createEcaModule(
         outcome(state) {
             if (state.phase !== "done") return null;
 
+            // Winners rank first even holding more cards (an endGame effect decides).
             const winners = [...state.winnerIds];
-            const others = seatOrder(state.players)
-                .map((p) => p.id)
-                .filter((id) => !winners.includes(id))
-                .map((id) => ({ id, count: state.hands[id]?.length ?? 0 }))
-                .sort((a, b) => a.count - b.count);
-
             const rankings = winners.map((playerId) => ({
                 playerId,
                 rank: 1,
                 score: state.hands[playerId]?.length ?? 0,
             }));
-            // Competition ranking: ties share a rank, the next rank skips past them.
-            let previousCount = -1;
-            let previousRank = 1;
-            others.forEach((entry, index) => {
-                const rank =
-                    index > 0 && entry.count === previousCount
-                        ? previousRank
-                        : winners.length + index + 1;
-                previousCount = entry.count;
-                previousRank = rank;
-                rankings.push({
-                    playerId: entry.id,
-                    rank,
-                    score: entry.count,
-                });
-            });
-
-            return { rankings, winners };
+            const others = rankByScore(
+                handSizes(state.hands, state.players).filter(
+                    (e) => !winners.includes(e.playerId),
+                ),
+                { higherIsBetter: false },
+            ).rankings.map((r) => ({ ...r, rank: r.rank + winners.length }));
+            return { rankings: [...rankings, ...others], winners };
         },
 
         view(state, viewerId) {
