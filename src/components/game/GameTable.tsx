@@ -6,6 +6,7 @@ import { useCardLabel } from "@/components/card/Card";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { buildLogLines } from "@/hooks/game/logLines";
 import { useClickToMove } from "@/hooks/game/useClickToMove";
+import { usePlayerNames } from "@/hooks/game/usePlayerNames";
 import { useTableCardAnimations } from "@/hooks/game/useTableCardAnimations";
 import { useTableDrag } from "@/hooks/game/useTableDrag";
 import { BOARD_RADIUS, buildSurfaceStyle } from "@/lib/board/styles";
@@ -59,6 +60,7 @@ export function GameTable({
     chat,
 }: GameTableProps) {
     const t = useTranslations("game");
+    const { players, nameOf } = usePlayerNames(payload.players, payload.botIds);
     const labelOf = useCardLabel();
     // Tables build their keys at runtime; narrow to the namespace's keys here only.
     type GameKey = Parameters<typeof t>[0];
@@ -72,18 +74,12 @@ export function GameTable({
     const ctx: TableContext = useMemo(
         () => ({
             viewerId: payload.viewerId,
-            players: payload.players,
+            players,
             legalActions: payload.legalActions,
             isOver: payload.isOver,
             t: text,
         }),
-        [
-            payload.viewerId,
-            payload.players,
-            payload.legalActions,
-            payload.isOver,
-            text,
-        ],
+        [payload.viewerId, players, payload.legalActions, payload.isOver, text],
     );
     const data: TableData = useMemo(
         () => table.mapView(payload.view, ctx),
@@ -308,7 +304,7 @@ export function GameTable({
                         <GameOverOverlay
                             outcome={payload.outcome}
                             end={payload.end}
-                            players={payload.players}
+                            nameOf={nameOf}
                             currentUserId={currentUserId}
                             titleOf={
                                 table.rankTitle

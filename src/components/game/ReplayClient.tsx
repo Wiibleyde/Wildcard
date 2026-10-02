@@ -3,9 +3,9 @@
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
 import { GameTable } from "@/components/game/GameTable";
-import { findPlayerName } from "@/components/game/playerName";
 import { GameButton } from "@/components/ui/GameButton";
 import { replayBoard } from "@/hooks/game/gamePayload";
+import { usePlayerNames } from "@/hooks/game/usePlayerNames";
 import { useReplayPlayback } from "@/hooks/game/useReplayPlayback";
 import { Link } from "@/i18n/navigation";
 import { getBoardTheme } from "@/lib/board/themes";
@@ -76,7 +76,7 @@ function ReplayPlayer({
     table,
 }: Props & { table: AnyGameTableConfig }) {
     const t = useTranslations("replay");
-    const tGame = useTranslations("game");
+    const { nameOf } = usePlayerNames(payload.players, payload.botIds);
     const last = payload.steps.length - 1;
     const { index, playing, togglePlay, step, seek } = useReplayPlayback(
         last,
@@ -107,11 +107,7 @@ function ReplayPlayer({
                     >
                         {payload.interruptedBy === "forfeit"
                             ? t("forfeit_ended", {
-                                  name:
-                                      findPlayerName(
-                                          payload.players,
-                                          payload.forfeitedBy,
-                                      ) ?? tGame("unknown_player"),
+                                  name: nameOf(payload.forfeitedBy),
                               })
                             : payload.interruptedBy === "abandoned"
                               ? t("abandoned_ended")

@@ -50,6 +50,8 @@ export interface GameClientPayload {
     readonly outcome: GameOutcome | null;
     readonly end: GameEndInfo | null;
     readonly players: readonly GamePlayer[];
+    /** Bot `n` is 1 + its index here: names are localized client-side. */
+    readonly botIds: readonly string[];
     readonly log: readonly GameLogEntry[];
     /** `null` = spectator. */
     readonly viewerId: string | null;
@@ -181,6 +183,7 @@ export function buildClientPayload(
         outcome,
         end,
         players,
+        botIds: meta.botIds,
         log,
         viewerId,
     };

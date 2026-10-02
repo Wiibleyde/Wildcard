@@ -4,10 +4,10 @@ import { useTranslations } from "next-intl";
 import { type SyntheticEvent, useId, useState } from "react";
 import { GameButton } from "@/components/ui/GameButton";
 import { useAutoScroll } from "@/hooks/game/useAutoScroll";
+import { usePlayerNames } from "@/hooks/game/usePlayerNames";
 import { useTransientNotice } from "@/hooks/game/useTransientNotice";
 import type { GamePlayer } from "@/lib/models/game";
 import { MAX_CHAT_LENGTH, useGameChat } from "@/lib/realtime/useGameChat";
-import { findPlayerName } from "./playerName";
 import { RailPanel } from "./RailPanel";
 
 interface GameChatProps {
@@ -16,6 +16,7 @@ interface GameChatProps {
     /** Stamped on sent messages: spectators are absent from `players`. */
     currentUserName: string;
     players: readonly GamePlayer[];
+    botIds: readonly string[];
     /** Stops persisting and wipes the reload cache. */
     isOver: boolean;
 }
@@ -25,10 +26,11 @@ export function GameChat({
     currentUserId,
     currentUserName,
     players,
+    botIds,
     isOver,
 }: GameChatProps) {
     const t = useTranslations("chat");
-    const tGame = useTranslations("game");
+    const { nameOf } = usePlayerNames(players, botIds);
     const { messages, send } = useGameChat(
         gameId,
         currentUserId,
@@ -88,9 +90,7 @@ export function GameChat({
                                 >
                                     {mine
                                         ? t("you")
-                                        : m.name ||
-                                          (findPlayerName(players, m.userId) ??
-                                              tGame("unknown_player"))}
+                                        : m.name || nameOf(m.userId)}
                                 </span>
                                 <span className="text-wc-muted">: </span>
                                 <span className="wrap-break-word">

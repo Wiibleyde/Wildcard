@@ -161,6 +161,7 @@ export function GamePlayClient({
                         currentUserId={currentUserId}
                         currentUserName={currentUserName}
                         players={payload.players}
+                        botIds={payload.botIds}
                         isOver={payload.isOver}
                     />
                 }

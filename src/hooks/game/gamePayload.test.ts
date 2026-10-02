@@ -17,6 +17,7 @@ const head: GameClientPayload = {
     outcome: { winners: ["a"], rankings: [] },
     end: null,
     players: [],
+    botIds: [],
     log: [1, 2, 3].map((seq) => ({ seq, actorId: "a", events: [] })),
     viewerId: "a",
 };
@@ -45,6 +46,7 @@ describe("replayBoard", () => {
         moduleId: "bataille",
         viewerId: "a",
         players: [],
+        botIds: [],
         steps: [0, 1, 2].map((i) => ({
             view: { at: i },
             phase: "play",

@@ -157,6 +157,7 @@ export function PreviewPage({ deckId, boardId, backHref }: Props) {
             outcome: null,
             end: null,
             players,
+            botIds: [],
             log: [],
             viewerId: PREVIEW_SELF,
         };

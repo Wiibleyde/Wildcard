@@ -466,7 +466,6 @@
         "tarot_log_slam": "{name} announces a slam!",
         "tarot_log_handful": "{name} shows a {level}",
         "xp_unit": "XP",
-        "unknown_player": "Unknown player",
         "hand_play": "{n, plural, one {{label}} other {{label} ×#}}",
         "zone_empty": "empty spot",
         "danger_title": "Irreversible action",

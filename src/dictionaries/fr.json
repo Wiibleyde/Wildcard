@@ -466,7 +466,6 @@
         "tarot_log_slam": "{name} annonce le chelem !",
         "tarot_log_handful": "{name} montre une {level}",
         "xp_unit": "XP",
-        "unknown_player": "Joueur inconnu",
         "hand_play": "{n, plural, one {{label}} other {{label} ×#}}",
         "zone_empty": "emplacement vide",
         "danger_title": "Action définitive",

@@ -35,7 +35,7 @@ export function actionErrorKey(
 
 type BoardBase = Pick<
     GameClientPayload,
-    "gameId" | "moduleId" | "roomCode" | "players" | "viewerId"
+    "gameId" | "moduleId" | "roomCode" | "players" | "botIds" | "viewerId"
 >;
 
 interface BoardFrame extends GameFrame {
@@ -54,6 +54,7 @@ function boardAt(
         moduleId: base.moduleId,
         roomCode: base.roomCode,
         players: base.players,
+        botIds: base.botIds,
         viewerId: base.viewerId,
         version: frame.version,
         phase: frame.phase,

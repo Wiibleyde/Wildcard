@@ -4,20 +4,10 @@ import { useTranslations } from "next-intl";
 import { GameButton } from "@/components/ui/GameButton";
 import { BOARD_RADIUS } from "@/lib/board/styles";
 import type { GameOutcome } from "@/lib/engine/types";
-import type { GamePlayer } from "@/lib/models/game";
 import type { GameEndInfo } from "@/lib/models/gameEnd";
 import { GameOverXp } from "./GameOverXp";
-import { findPlayerName } from "./playerName";
 
 type GameT = ReturnType<typeof useTranslations<"game">>;
-
-function nameOf(
-    t: GameT,
-    players: readonly GamePlayer[],
-    userId: string | null,
-): string {
-    return findPlayerName(players, userId) ?? t("unknown_player");
-}
 
 export function TurnBanner({
     label,
@@ -56,13 +46,13 @@ function gameOverTitle(
     t: GameT,
     outcome: GameOutcome | null,
     end: GameEndInfo | null,
-    players: readonly GamePlayer[],
+    nameOf: (userId: string | null) => string,
     currentUserId: string,
     won: boolean,
 ): string {
     if (end?.reason === "forfeit") {
         if (end.forfeitedBy === currentUserId) return t("you_forfeited");
-        const name = nameOf(t, players, end.forfeitedBy);
+        const name = nameOf(end.forfeitedBy);
         return won ? t("forfeit_win", { name }) : t("forfeit_by", { name });
     }
     if (end?.reason === "abandoned") return t("game_abandoned");
@@ -70,21 +60,21 @@ function gameOverTitle(
     if (outcome.winners.length === 0) return t("game_no_winner");
     if (won) return t("you_win");
     return t("winner", {
-        name: nameOf(t, players, outcome.winners[0] ?? null),
+        name: nameOf(outcome.winners[0] ?? null),
     });
 }
 
 export function GameOverOverlay({
     outcome,
     end,
-    players,
+    nameOf,
     currentUserId,
     titleOf,
 }: {
     outcome: GameOutcome | null;
     /** `null` on a replay frame: no settlement shown. */
     end: GameEndInfo | null;
-    players: readonly GamePlayer[];
+    nameOf: (userId: string | null) => string;
     currentUserId: string;
     titleOf?: (rank: number, total: number) => string | null;
 }) {
@@ -110,7 +100,7 @@ export function GameOverOverlay({
                 className="font-display text-4xl xl:text-5xl"
                 style={{ color: won ? "var(--green)" : "var(--gold)" }}
             >
-                {gameOverTitle(t, outcome, end, players, currentUserId, won)}
+                {gameOverTitle(t, outcome, end, nameOf, currentUserId, won)}
             </h2>
 
             {outcome && outcome.rankings.length > 0 && (
@@ -145,7 +135,7 @@ export function GameOverOverlay({
                                         className="truncate font-display text-base"
                                         style={{ color: "var(--ink)" }}
                                     >
-                                        {nameOf(t, players, r.playerId)}
+                                        {nameOf(r.playerId)}
                                     </span>
                                 </span>
                                 {title ? (

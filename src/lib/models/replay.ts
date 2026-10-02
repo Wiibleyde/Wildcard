@@ -29,6 +29,7 @@ export interface ReplayPayload {
     readonly moduleId: string;
     readonly viewerId: string | null;
     readonly players: readonly GamePlayer[];
+    readonly botIds: readonly string[];
     /** Frame 0 = initial deal, then one per logged action. */
     readonly steps: readonly ReplayStep[];
     /** Set when the game was closed out of band before a terminal position. */
@@ -194,6 +195,7 @@ export async function getReplay(
             moduleId: meta.module_id,
             viewerId,
             players: await playersOf(admin, finalState),
+            botIds: meta.bot_ids,
             steps,
             // A legacy row (null reason) keeps the old "admin" label.
             // A non-terminal natural end is flagged `diverged` above instead.
