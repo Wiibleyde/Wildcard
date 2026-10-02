@@ -5,7 +5,6 @@ export const greenFeltTheme: BoardTheme = {
     name: "Tapis vert",
     tier: "common",
     surface: {
-        // Flat felt + the app's tactile dot grid — no radial vignette slop
         background: [
             "radial-gradient(rgba(255,255,255,0.05) 1.4px, transparent 1.5px) 0 0 / 22px 22px",
             "radial-gradient(rgba(0,0,0,0.16) 1.4px, transparent 1.5px) 11px 11px / 22px 22px",

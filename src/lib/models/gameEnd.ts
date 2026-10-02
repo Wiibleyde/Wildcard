@@ -5,29 +5,20 @@ import { xpAwardsForGame } from "./xp";
 export type { GameEndReason };
 
 /**
- * How a finished game ended, as shipped to the client next to the outcome.
- * Pure data, derived from the persisted `games` row (`end_reason`,
- * `forfeited_by`, `winner_ids`) — an out-of-band end (forfeit / admin /
- * reaper) never touches the secret state, so `module.outcome(state)` alone
- * cannot describe it.
+ * How a finished game ended, from the persisted row: an out-of-band end never
+ * touches the state, so `module.outcome(state)` cannot describe it.
  */
 export interface GameEndInfo {
-    /** `null` = ended by legacy code before `end_reason` existed. */
+    /** `null` = legacy row ended before `end_reason` existed. */
     readonly reason: GameEndReason | null;
-    /** Who walked out (reason `forfeit`). */
     readonly forfeitedBy: string | null;
-    /**
-     * XP the settlement granted the viewer (same rule as `settleGame`); `null`
-     * for a spectator. 0 = participated but earned nothing.
-     */
+    /** XP the settlement granted the viewer; `null` for a spectator. */
     readonly xpGained: number | null;
 }
 
 /**
- * Rebuild standings from the stored `winner_ids` when the state never reached
- * a terminal position (forfeit): winners share rank 1, everyone else shares
- * the next rank, the forfeiter last — competition ranking, so in a 3-seat
- * game with two winners the forfeiter is rank 3 (last), not 2.
+ * Standings from stored winners (forfeit): winners share rank 1, the others
+ * the next rank, the forfeiter last (competition ranking).
  */
 export function outcomeFromWinners(
     playerIds: readonly string[],
@@ -53,31 +44,20 @@ export function outcomeFromWinners(
             rank: seatedWinners.length + others.length + 1,
         });
     }
-    return {
-        rankings,
-        winners: seatedWinners,
-    };
+    return { rankings, winners: seatedWinners };
 }
 
 export interface EndFacts {
-    /** `games.end_reason` (null on a legacy row). */
     readonly reason: GameEndReason | null;
-    /** `module.isOver(state)` — the recorded state is a finished position. */
+    /** `module.isOver(state)`. */
     readonly terminal: boolean;
-    /** `module.outcome(state)` (only meaningful when `terminal`). */
     readonly stateOutcome: GameOutcome | null;
     readonly playerIds: readonly string[];
     readonly winnerIds: readonly string[];
     readonly forfeitedBy: string | null;
 }
 
-/**
- * The outcome a finished game is settled and displayed with:
- *   - the module's own outcome when the state is terminal (natural end);
- *   - none for an admin force-end or a reaper close;
- *   - otherwise (forfeit, or a legacy out-of-band end) the standings rebuilt
- *     from the stored winners.
- */
+/** Module outcome for a natural end, none for admin/reaper, else rebuilt from winners. */
 export function resolveEndOutcome(facts: EndFacts): GameOutcome | null {
     if (facts.terminal) return facts.stateOutcome;
     if (facts.reason === "admin" || facts.reason === "abandoned") return null;
@@ -88,15 +68,11 @@ export function resolveEndOutcome(facts: EndFacts): GameOutcome | null {
     );
 }
 
-/**
- * Moves actually played. Every logged action bumps `version` by one; an
- * out-of-band end (forfeit / admin / reaper) bumps it once more without a move.
- */
+/** Each logged action bumps `version`; an out-of-band end bumps it once more. */
 export function playedMoves(version: number, terminal: boolean): number {
     return terminal ? version : Math.max(0, version - 1);
 }
 
-/** The viewer-facing {@link GameEndInfo} for a finished game. */
 export function describeEnd(
     facts: EndFacts & {
         readonly moduleId: string;

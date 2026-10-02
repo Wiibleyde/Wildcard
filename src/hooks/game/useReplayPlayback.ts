@@ -15,35 +15,32 @@ export function useReplayPlayback(
     last: number,
     intervalMs: number,
 ): ReplayPlayback {
-    // Open on the final frame (the result), then let the viewer rewind.
+    // Opens on the result; the viewer rewinds from there.
     const [index, setIndex] = useState(last);
-    const [playing, setPlaying] = useState(false);
+    const [wantsPlay, setWantsPlay] = useState(false);
+    const playing = wantsPlay && index < last;
 
     useEffect(() => {
         if (!playing) return;
-        if (index >= last) {
-            setPlaying(false);
-            return;
-        }
-        const id = window.setTimeout(
+        const id = window.setInterval(
             () => setIndex((i) => Math.min(i + 1, last)),
             intervalMs,
         );
-        return () => window.clearTimeout(id);
-    }, [playing, index, last, intervalMs]);
+        return () => window.clearInterval(id);
+    }, [playing, last, intervalMs]);
 
     const togglePlay = () => {
         if (!playing && index >= last) setIndex(0);
-        setPlaying((p) => !p);
+        setWantsPlay(!playing);
     };
 
     const step = (delta: number) => {
-        setPlaying(false);
+        setWantsPlay(false);
         setIndex((i) => Math.min(Math.max(i + delta, 0), last));
     };
 
     const seek = (frame: number) => {
-        setPlaying(false);
+        setWantsPlay(false);
         setIndex(Math.min(Math.max(frame, 0), last));
     };
 

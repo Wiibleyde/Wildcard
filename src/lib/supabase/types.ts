@@ -616,6 +616,29 @@ export type Database = {
         };
         Views: Record<string, never>;
         Functions: {
+            create_game: {
+                Args: {
+                    p_game_id: string;
+                    p_room_id: string;
+                    p_module_id: string;
+                    p_phase: string;
+                    p_current_player_id: string | null;
+                    p_is_over: boolean;
+                    p_winner_ids: string[];
+                    p_bot_ids: string[];
+                    p_state: Record<string, unknown>;
+                };
+                /** The new game's `created_at`. */
+                Returns: string;
+            };
+            can_equip_deck_style: {
+                Args: { p_style_id: string };
+                Returns: boolean;
+            };
+            can_equip_board_style: {
+                Args: { p_style_id: string };
+                Returns: boolean;
+            };
             commit_game_step: {
                 Args: {
                     p_game_id: string;

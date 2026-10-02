@@ -7,11 +7,6 @@ import { ECA_RULES_MAX } from "@/lib/eca/validate";
 import { type DraftRule, newDraftRule } from "./draft";
 import { RuleCard } from "./RuleCard";
 
-/**
- * The ordered rule stack. Order is the priority order — the first matching
- * rule wins — so reordering is a first-class edit, not cosmetics.
- */
-
 interface Props {
     readonly rules: readonly DraftRule[];
     readonly deckId: EcaDeckId;

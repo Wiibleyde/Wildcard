@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import { useCallback, useEffect, useState } from "react";
+import { xpTopic } from "@/lib/realtime/topics";
+import { useAuthedChannel } from "@/lib/realtime/useAuthedChannel";
 import { createClient } from "@/lib/supabase/client";
 import { getSupabaseSchema } from "@/lib/supabase/env";
 import { levelForXp } from "@/lib/xp/xp";
 
 export interface GameOverXpState {
-    /** True once we know the post-award total — gate the animation on this. */
     readonly ready: boolean;
     readonly gained: number;
     readonly before: number;
@@ -16,41 +18,25 @@ export interface GameOverXpState {
     readonly leveledUp: boolean;
 }
 
+/** A one-shot screen: no status banner, so channel status is ignored. */
+const ignoreStatus = (): void => {};
+
 /**
- * Resolve the viewer's XP just after a game ends.
- *
- * `gained` is computed by the caller from the outcome (deterministic — same
- * constants the server uses), so we only need the authoritative *total* to
- * derive `before`/`after` and any level-up. We learn it two ways and keep the
- * larger (Math.max), which always lands on the post-award value:
- *
- * - an immediate fetch (the award is awaited in the server finish path, so it
- *   is almost always committed before this mounts), plus a delayed re-fetch as
- *   a backstop for the rare case the commit lands a hair later;
- * - a Realtime subscription on the player's `player_xp` row, which fires the
- *   instant the award commits and corrects a fetch that raced ahead of it.
+ * `gained` is the server-settled award; only the post-award total is read
+ * here, keeping the max of a fetch, a delayed re-fetch and the Realtime
+ * UPDATE so a read that raced ahead of the award commit self-corrects.
  */
 export function useGameOverXp(userId: string, gained: number): GameOverXpState {
     const [after, setAfter] = useState<number | null>(null);
+    const bump = useCallback(
+        (xp: number) =>
+            setAfter((cur) => (cur === null ? xp : Math.max(cur, xp))),
+        [],
+    );
 
-    useEffect(() => {
-        const supabase = createClient();
-        let active = true;
-        const bump = (xp: number) =>
-            setAfter((cur) => (cur === null ? xp : Math.max(cur, xp)));
-
-        const fetchXp = async () => {
-            const { data } = await supabase
-                .from("player_xp")
-                .select("xp")
-                .eq("user_id", userId)
-                .single();
-            if (active && data) bump(data.xp);
-        };
-
-        const channel = supabase
-            .channel(`xp-gameover:${userId}`)
-            .on(
+    const build = useCallback(
+        (channel: RealtimeChannel) =>
+            channel.on(
                 "postgres_changes",
                 {
                     event: "UPDATE",
@@ -60,22 +46,31 @@ export function useGameOverXp(userId: string, gained: number): GameOverXpState {
                 },
                 (payload) => {
                     const xp = (payload.new as { xp?: number }).xp;
-                    if (active && typeof xp === "number") bump(xp);
+                    if (typeof xp === "number") bump(xp);
                 },
-            )
-            .subscribe();
+            ),
+        [userId, bump],
+    );
+    useAuthedChannel(xpTopic(userId), build, ignoreStatus);
 
+    useEffect(() => {
+        const supabase = createClient();
+        let active = true;
+        const fetchXp = async () => {
+            const { data } = await supabase
+                .from("player_xp")
+                .select("xp")
+                .eq("user_id", userId)
+                .single();
+            if (active && data) bump(data.xp);
+        };
         void fetchXp();
-        // Backstop: catch an award that committed in the gap between subscribe
-        // and the first fetch (so its Realtime event was missed).
         const retry = setTimeout(() => void fetchXp(), 700);
-
         return () => {
             active = false;
             clearTimeout(retry);
-            void supabase.removeChannel(channel);
         };
-    }, [userId]);
+    }, [userId, bump]);
 
     if (after === null) {
         return {

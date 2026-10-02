@@ -4,19 +4,20 @@ import { useTranslations } from "next-intl";
 import { type SyntheticEvent, useId, useState } from "react";
 import { GameButton } from "@/components/ui/GameButton";
 import { useAutoScroll } from "@/hooks/game/useAutoScroll";
+import { usePlayerNames } from "@/hooks/game/usePlayerNames";
 import { useTransientNotice } from "@/hooks/game/useTransientNotice";
 import type { GamePlayer } from "@/lib/models/game";
 import { MAX_CHAT_LENGTH, useGameChat } from "@/lib/realtime/useGameChat";
-import { nameOf } from "./GameChrome";
+import { RailPanel } from "./RailPanel";
 
 interface GameChatProps {
     gameId: string;
     currentUserId: string;
-    /** Viewer's own display name — stamped on the messages they send so
-     * spectators (absent from `players`) still show a name, not "?". */
+    /** Stamped on sent messages: spectators are absent from `players`. */
     currentUserName: string;
     players: readonly GamePlayer[];
-    /** Game finished — stops persisting and wipes the reload cache. */
+    botIds: readonly string[];
+    /** Stops persisting and wipes the reload cache. */
     isOver: boolean;
 }
 
@@ -25,9 +26,11 @@ export function GameChat({
     currentUserId,
     currentUserName,
     players,
+    botIds,
     isOver,
 }: GameChatProps) {
     const t = useTranslations("chat");
+    const { nameOf } = usePlayerNames(players, botIds);
     const { messages, send } = useGameChat(
         gameId,
         currentUserId,
@@ -35,7 +38,6 @@ export function GameChat({
         isOver,
     );
     const [draft, setDraft] = useState("");
-    // A rejected send must not vanish silently — surface why in the composer.
     const [notice, showNotice] = useTransientNotice<
         "rate_limited" | "disconnected"
     >();
@@ -48,34 +50,20 @@ export function GameChat({
         if (result === "sent") {
             setDraft("");
         } else if (result === "rate_limited") {
-            // Input keeps its text so nothing is lost.
             showNotice("rate_limited", 1500);
         } else if (result === "disconnected") {
             showNotice("disconnected", 2500);
         }
-        // "empty" / "too_long" can't occur — the input guards both.
+        // "empty" / "too_long" can't occur: the input guards both.
     };
 
     return (
-        <section
-            className="panel-d flex h-56 flex-col overflow-hidden p-3 lg:h-auto lg:min-h-0 lg:w-60 lg:flex-2 lg:self-stretch xl:w-72 xl:p-4 2xl:w-80"
-            aria-label={t("title")}
+        <RailPanel
+            title={t("title")}
+            stamp={t("badge")}
+            tone="blue"
+            className="h-56 lg:flex-2"
         >
-            <div className="mb-2 flex items-center gap-2">
-                <h2 className="font-display text-lg leading-none text-wc-cream">
-                    {t("title")}
-                </h2>
-                <span
-                    className="stamp"
-                    style={{
-                        background: "var(--blue)",
-                        color: "var(--accent-ink)",
-                    }}
-                >
-                    {t("badge")}
-                </span>
-            </div>
-
             <ol
                 ref={listRef}
                 className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1 text-xs xl:text-sm"
@@ -102,7 +90,7 @@ export function GameChat({
                                 >
                                     {mine
                                         ? t("you")
-                                        : m.name || nameOf(players, m.userId)}
+                                        : m.name || nameOf(m.userId)}
                                 </span>
                                 <span className="text-wc-muted">: </span>
                                 <span className="wrap-break-word">
@@ -139,9 +127,7 @@ export function GameChat({
                     {t("send")}
                 </GameButton>
             </form>
-            {/* Always mounted (live region) with a reserved line, so the
-                notice is announced and visible even while the draft is kept,
-                without the panel jumping. */}
+            {/* Always-mounted live region with a reserved line: announced, and the panel never jumps. */}
             <output
                 id={noticeId}
                 aria-live="polite"
@@ -150,6 +136,6 @@ export function GameChat({
             >
                 {notice ? t(notice) : ""}
             </output>
-        </section>
+        </RailPanel>
     );
 }

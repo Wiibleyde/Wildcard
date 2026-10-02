@@ -1,85 +1,80 @@
-import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { useApiErrorLabel } from "@/hooks/useApiErrorLabel";
 import { useRouter } from "@/i18n/navigation";
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, readApiJson } from "@/lib/api/client";
+import { normalizeRoomCode } from "@/lib/models/roomCode";
 
-const ROOM_ERROR_KEYS = new Set([
-    "not_found",
-    "room_full",
-    "already_started",
-    "rate_limited",
-    "maintenance",
-    "payload_too_large",
-]);
+type Busy = { action: "join" } | { action: "create"; moduleId: string };
 
-type Action = "create" | "join";
+export interface RoomActionHandle {
+    readonly busy: Busy | null;
+    /** Module whose room is being created — only that card shows "creating". */
+    readonly busyModuleId: string | null;
+    readonly error: string | null;
+    readonly createRoom: (moduleId: string) => Promise<void>;
+    readonly joinRoom: (code: string) => Promise<void>;
+}
 
-export function useRoomAction() {
-    const t = useTranslations("lobby");
+export function useRoomAction(): RoomActionHandle {
+    const errorLabel = useApiErrorLabel();
     const router = useRouter();
-    const [busy, setBusy] = useState<Action | null>(null);
+    const [busy, setBusy] = useState<Busy | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    function describeError(errorCode: unknown): string {
-        if (typeof errorCode === "string" && ROOM_ERROR_KEYS.has(errorCode)) {
-            return t(`error_${errorCode}` as "error_not_found");
-        }
-        return t("error_generic");
-    }
-
     async function run(
-        action: Action,
+        next: Busy,
         request: () => Promise<Response>,
-        codeFromData: (data: { code?: string }) => string,
+        codeFromData: (data: { code?: string } | null) => string,
     ) {
-        setBusy(action);
+        setBusy(next);
         setError(null);
         try {
             const res = await request();
-            // A 5xx/proxy page isn't JSON — don't let the parse throw.
-            const data = (await res.json().catch(() => ({}))) as {
-                code?: string;
-                error?: unknown;
-            };
+            const data = await readApiJson<{ code?: string; error?: unknown }>(
+                res,
+            );
             const target = res.ok ? codeFromData(data) : "";
             if (!target) {
                 setBusy(null);
-                setError(describeError(data.error));
+                setError(errorLabel(data?.error));
                 return;
             }
             // Stay busy while navigating so the button can't double-submit.
             router.push(`/lobby/${target}`);
         } catch {
             setBusy(null);
-            setError(describeError(null));
+            setError(errorLabel(null));
         }
     }
 
-    function createRoom(
-        moduleId: string,
-        visibility: "public" | "private" = "private",
-    ) {
-        return run(
-            "create",
+    async function createRoom(moduleId: string) {
+        await run(
+            { action: "create", moduleId },
             () =>
                 apiFetch("/api/rooms", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ moduleId, visibility }),
+                    body: JSON.stringify({ moduleId, visibility: "private" }),
                 }),
-            (data) => data.code ?? "",
+            (data) => data?.code ?? "",
         );
     }
 
-    function joinRoom(target: string) {
-        const normalized = target.trim().toUpperCase();
+    async function joinRoom(target: string) {
+        const normalized = normalizeRoomCode(target.trim());
         if (!normalized) return;
-        return run(
-            "join",
+        await run(
+            { action: "join" },
             () => apiFetch(`/api/rooms/${normalized}/join`, { method: "POST" }),
             () => normalized,
         );
     }
 
-    return { busy, error, createRoom, joinRoom };
+    return {
+        busy,
+        busyModuleId: busy?.action === "create" ? busy.moduleId : null,
+        error,
+        createRoom,
+        joinRoom,
+    };
 }

@@ -26,7 +26,7 @@ describe("game registry", () => {
         expect(module).toBeDefined();
         if (!module) return;
 
-        let state = createGame(module, seats(2), 12345);
+        let state = createGame(module, seats(2), { seed: 12345 });
         let guard = 0;
         while (!module.isOver(state) && guard++ < 10000) {
             const actor = state.players[0].id;
@@ -47,7 +47,7 @@ describe("game registry", () => {
         expect(module).toBeDefined();
         if (!module) return;
 
-        let state = createGame(module, seats(4), 999);
+        let state = createGame(module, seats(4), { seed: 999 });
         let guard = 0;
         while (!module.isOver(state) && guard++ < 10000) {
             const actor = state.currentPlayerId;
@@ -69,7 +69,7 @@ describe("game registry", () => {
         expect(module).toBeDefined();
         if (!module) return;
 
-        let state = createGame(module, seats(4), 2024);
+        let state = createGame(module, seats(4), { seed: 2024 });
         let guard = 0;
         while (!module.isOver(state) && guard++ < 10000) {
             const actor = state.currentPlayerId;
@@ -91,7 +91,7 @@ describe("game registry", () => {
         expect(module).toBeDefined();
         if (!module) return;
 
-        const state = createGame(module, seats(4), 7);
+        const state = createGame(module, seats(4), { seed: 7 });
         const view = clientState(module, state, "p0").view as PresidentView;
         const me = view.players.find((p) => p.playerId === "p0");
         const other = view.players.find((p) => p.playerId === "p1");
@@ -105,7 +105,7 @@ describe("game registry", () => {
         expect(module).toBeDefined();
         if (!module) return;
 
-        const state = createGame(module, seats(4), 7);
+        const state = createGame(module, seats(4), { seed: 7 });
         const someoneElse = state.players[0].id;
         const action: GameAction = { type: "pass", playerId: someoneElse };
         // actorId differs from the action's claimed playerId → refused.

@@ -1,13 +1,10 @@
+/** Percentages of the card body; `flip` rotates bottom-half pips. */
 export interface PipPosition {
-    x: number; // % from left
-    y: number; // % from top
-    flip: boolean; // rotate 180° (bottom half of card)
+    x: number;
+    y: number;
+    flip: boolean;
 }
 
-/**
- * Pip positions for numeric cards (2–10) as percentages within the card's
- * inner content area. Positions follow traditional French-suited deck layouts.
- */
 export const PIP_LAYOUTS: Partial<Record<number, PipPosition[]>> = {
     2: [
         { x: 50, y: 22, flip: false },

@@ -7,24 +7,9 @@ import {
 } from "prom-client";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-/**
- * Prometheus instrumentation for Wildcard.
- *
- * Two kinds of metric live here, deliberately:
- *
- *  1. **Runtime counters/histograms** — fed by the server as actions flow
- *     through it (`recordMove`, `recordGameStarted`, `recordGameFinished`).
- *     They reset to 0 on restart; Prometheus handles counter resets natively,
- *     so rates stay correct across deploys.
- *  2. **Scrape-time gauges** — `wildcard_active_games` reads the current
- *     `games` table on every `/api/metrics` scrape via an async `collect`.
- *     A gauge mirrors live state, so a DB read (not an in-memory tally that
- *     would drift after a restart) is the honest source.
- *
- * The whole module is a process singleton, cached on `globalThis` so Next.js
- * dev hot-reload doesn't re-register metrics ("metric already registered").
- */
-
+// Counters reset on restart (Prometheus handles that); the active-games gauge
+// is read from the DB at scrape time, since an in-memory tally would drift.
+// Cached on globalThis: dev hot-reload must not re-register the metrics.
 const GLOBAL_KEY = Symbol.for("wildcard.metrics.registry");
 
 interface MetricsBundle {
@@ -41,12 +26,7 @@ type GlobalWithMetrics = typeof globalThis & {
     [GLOBAL_KEY]?: MetricsBundle;
 };
 
-/**
- * Refresh `wildcard_active_games` from the database at scrape time. Counts
- * live games (`is_over = false`) per module. A failed read leaves the gauge
- * empty rather than throwing — the scrape must never 500 because Postgres
- * blinked.
- */
+/** A failed read empties the gauge: the scrape must never 500 because Postgres blinked. */
 async function collectActiveGames(gauge: Gauge<"module">): Promise<void> {
     gauge.reset();
     try {
@@ -67,8 +47,6 @@ async function collectActiveGames(gauge: Gauge<"module">): Promise<void> {
             gauge.set({ module }, count);
         }
     } catch (err) {
-        // Degrade the gauge, never the scrape — but warn so a persistently
-        // broken collect is visible instead of silently reading empty forever.
         console.warn("[metrics] active-games collect failed:", err);
     }
 }
@@ -77,8 +55,6 @@ function build(): MetricsBundle {
     const registry = new Registry();
     registry.setDefaultLabels({ app: "wildcard" });
 
-    // Node/process internals (CPU, heap, event-loop lag, GC) under the same
-    // prefix — free infra observability alongside the business metrics.
     collectDefaultMetrics({ register: registry, prefix: "wildcard_" });
 
     const moveDuration = new Histogram({
@@ -147,7 +123,7 @@ function getMetrics(): MetricsBundle {
 
 export const metrics = getMetrics();
 
-/** Record one applied action: its latency and outcome, labelled by module. */
+/** Latency is observed for successful moves only. */
 export function recordMove(
     moduleId: string,
     result: string,
@@ -159,16 +135,11 @@ export function recordMove(
     }
 }
 
-/** Record a freshly dealt game. */
 export function recordGameStarted(moduleId: string): void {
     metrics.gamesStarted.inc({ module: moduleId });
 }
 
-/**
- * Record a game reaching its terminal state, with its total duration. Safe to
- * call from any code path that flips `is_over` true; callers guard against
- * double-counting (only the action that *causes* the end calls this).
- */
+/** Called once per game, by the settlement that wins the `settled_at` compare-and-set. */
 export function recordGameFinished(
     moduleId: string,
     durationSeconds: number,

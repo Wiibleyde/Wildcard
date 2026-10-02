@@ -3,92 +3,66 @@
 import { useTranslations } from "next-intl";
 import { DECKS } from "@/lib/card/decks";
 import type { Suit } from "@/lib/card/types";
-import type { EcaDeckId, EcaEventType, EcaOperand } from "@/lib/eca/types";
-import type { Translate } from "@/lib/games/catalogView";
+import {
+    defaultLiteral,
+    ECA_CARD_PROPS,
+    ECA_CARD_SOURCES,
+    ECA_STAT_SOURCES,
+    literalDomainFor,
+} from "@/lib/eca/schema";
+import type {
+    EcaCardProp,
+    EcaCardSource,
+    EcaDeckId,
+    EcaEventType,
+    EcaOperand,
+    EcaStatSource,
+} from "@/lib/eca/types";
 import { fieldClass, fieldStyle } from "./fields";
+import type { StudioMessageKey } from "./messages";
 
 /**
- * One side of a condition. A single select covers every card/stat source; the
- * "fixed value" choice reveals a literal editor whose SHAPE follows the other
- * side of the comparison — a rank picker against a rank, a suit picker against
- * a suit, a number everywhere else — so creators can't type `7` (number) when
- * the rank `"7"` (string) was meant.
+ * One side of a condition. The literal editor's shape follows the other side,
+ * so a rank `"7"` can't be typed as the number `7`.
  */
 
-interface Choice {
-    readonly id: string;
-    readonly labelKey: string;
-    /** `null` = the literal choice (built from the counterpart's shape). */
-    readonly operand: EcaOperand | null;
-}
+const CARD_LABELS: Record<
+    EcaCardSource,
+    Record<EcaCardProp, StudioMessageKey>
+> = {
+    playedCard: {
+        rank: "operand_played_rank",
+        suit: "operand_played_suit",
+        value: "operand_played_value",
+    },
+    topDiscard: {
+        rank: "operand_top_rank",
+        suit: "operand_top_suit",
+        value: "operand_top_value",
+    },
+};
 
-const CHOICES: readonly Choice[] = [
-    {
-        id: "card:playedCard:rank",
-        labelKey: "operand_played_rank",
-        operand: { kind: "card", source: "playedCard", prop: "rank" },
-    },
-    {
-        id: "card:playedCard:suit",
-        labelKey: "operand_played_suit",
-        operand: { kind: "card", source: "playedCard", prop: "suit" },
-    },
-    {
-        id: "card:playedCard:value",
-        labelKey: "operand_played_value",
-        operand: { kind: "card", source: "playedCard", prop: "value" },
-    },
-    {
-        id: "card:topDiscard:rank",
-        labelKey: "operand_top_rank",
-        operand: { kind: "card", source: "topDiscard", prop: "rank" },
-    },
-    {
-        id: "card:topDiscard:suit",
-        labelKey: "operand_top_suit",
-        operand: { kind: "card", source: "topDiscard", prop: "suit" },
-    },
-    {
-        id: "card:topDiscard:value",
-        labelKey: "operand_top_value",
-        operand: { kind: "card", source: "topDiscard", prop: "value" },
-    },
-    {
-        id: "stat:actorHandCount",
-        labelKey: "operand_hand_count",
-        operand: { kind: "stat", source: "actorHandCount" },
-    },
-    {
-        id: "stat:drawPileCount",
-        labelKey: "operand_draw_count",
-        operand: { kind: "stat", source: "drawPileCount" },
-    },
-    {
-        id: "stat:discardPileCount",
-        labelKey: "operand_discard_count",
-        operand: { kind: "stat", source: "discardPileCount" },
-    },
-    { id: "literal", labelKey: "operand_literal", operand: null },
-];
+const STAT_LABELS: Record<EcaStatSource, StudioMessageKey> = {
+    actorHandCount: "operand_hand_count",
+    drawPileCount: "operand_draw_count",
+    discardPileCount: "operand_discard_count",
+};
 
-export const SUITS: readonly Suit[] = ["spades", "hearts", "diamonds", "clubs"];
-const SUIT_KEYS: Record<Suit, string> = {
+const SUIT_LABELS: Record<Suit, StudioMessageKey> = {
     spades: "suit_spades",
     hearts: "suit_hearts",
     diamonds: "suit_diamonds",
     clubs: "suit_clubs",
 };
 
-export type LiteralMode = "rank" | "suit" | "number";
-
-/** The literal-editor shape a counterpart operand demands. */
-export function literalModeFor(counterpart: EcaOperand): LiteralMode {
-    if (counterpart.kind === "card") {
-        if (counterpart.prop === "rank") return "rank";
-        if (counterpart.prop === "suit") return "suit";
-    }
-    return "number";
+interface Choice {
+    readonly id: string;
+    readonly labelKey: StudioMessageKey;
+    /** `null` = the literal choice. */
+    readonly operand: EcaOperand | null;
 }
+
+const LITERAL_ID = "literal";
 
 function encode(operand: EcaOperand): string {
     switch (operand.kind) {
@@ -97,13 +71,35 @@ function encode(operand: EcaOperand): string {
         case "stat":
             return `stat:${operand.source}`;
         case "literal":
-            return "literal";
+            return LITERAL_ID;
     }
+}
+
+function choice(operand: EcaOperand, labelKey: StudioMessageKey): Choice {
+    return { id: encode(operand), labelKey, operand };
+}
+
+function choicesFor(event: EcaEventType): readonly Choice[] {
+    const cards = ECA_CARD_SOURCES.filter(
+        (source) => source !== "playedCard" || event === "cardPlayed",
+    ).flatMap((source) =>
+        ECA_CARD_PROPS.map((prop) =>
+            choice({ kind: "card", source, prop }, CARD_LABELS[source][prop]),
+        ),
+    );
+    const stats = ECA_STAT_SOURCES.map((source) =>
+        choice({ kind: "stat", source }, STAT_LABELS[source]),
+    );
+    return [
+        ...cards,
+        ...stats,
+        { id: LITERAL_ID, labelKey: "operand_literal", operand: null },
+    ];
 }
 
 interface Props {
     readonly operand: EcaOperand;
-    /** The other side of the condition — drives the literal editor's shape. */
+    /** Drives the literal editor's shape. */
     readonly counterpart: EcaOperand;
     readonly event: EcaEventType;
     readonly deckId: EcaDeckId;
@@ -117,29 +113,22 @@ export function OperandField({
     deckId,
     onChange,
 }: Props) {
-    // Dynamic labelKey lookups need the loose Translate shape.
-    const t = useTranslations("studio") as unknown as Translate;
-
-    // `playedCard` only exists while a card is being played.
-    const choices =
-        event === "cardPlayed"
-            ? CHOICES
-            : CHOICES.filter((c) => !c.id.startsWith("card:playedCard"));
-
-    const mode = literalModeFor(counterpart);
-    const ranks = DECKS[deckId].ranks;
+    const t = useTranslations("studio");
+    const choices = choicesFor(event);
+    const domain = literalDomainFor(counterpart);
+    const { ranks, suits } = DECKS[deckId];
 
     function handleSelect(id: string) {
-        const choice = choices.find((c) => c.id === id);
-        if (!choice) return;
-        if (choice.operand !== null) {
-            onChange(choice.operand);
-            return;
+        const picked = choices.find((c) => c.id === id);
+        if (!picked) return;
+        if (picked.operand !== null) {
+            onChange(picked.operand);
+        } else if (operand.kind !== "literal") {
+            onChange({
+                kind: "literal",
+                value: defaultLiteral(domain, deckId),
+            });
         }
-        if (operand.kind === "literal") return; // already a literal — keep it
-        const value =
-            mode === "rank" ? ranks[0] : mode === "suit" ? "spades" : 0;
-        onChange({ kind: "literal", value });
     }
 
     function handleNumber(raw: string) {
@@ -159,14 +148,14 @@ export function OperandField({
                 className={`${fieldClass} min-w-0 flex-1`}
                 style={fieldStyle}
             >
-                {choices.map((choice) => (
-                    <option key={choice.id} value={choice.id}>
-                        {t(choice.labelKey)}
+                {choices.map((c) => (
+                    <option key={c.id} value={c.id}>
+                        {t(c.labelKey)}
                     </option>
                 ))}
             </select>
 
-            {operand.kind === "literal" && mode === "rank" && (
+            {operand.kind === "literal" && domain === "rank" && (
                 <select
                     value={String(operand.value)}
                     onChange={(e) =>
@@ -184,7 +173,7 @@ export function OperandField({
                 </select>
             )}
 
-            {operand.kind === "literal" && mode === "suit" && (
+            {operand.kind === "literal" && domain === "suit" && (
                 <select
                     value={String(operand.value)}
                     onChange={(e) =>
@@ -194,15 +183,15 @@ export function OperandField({
                     className={`${fieldClass} w-28 shrink-0`}
                     style={fieldStyle}
                 >
-                    {SUITS.map((suit) => (
+                    {suits.map((suit) => (
                         <option key={suit} value={suit}>
-                            {t(SUIT_KEYS[suit])}
+                            {t(SUIT_LABELS[suit])}
                         </option>
                     ))}
                 </select>
             )}
 
-            {operand.kind === "literal" && mode === "number" && (
+            {operand.kind === "literal" && domain === "number" && (
                 <input
                     type="number"
                     value={

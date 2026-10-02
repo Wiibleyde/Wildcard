@@ -1,28 +1,22 @@
-import { cardKey, FACE_DOWN_CARD } from "@/lib/card/utils";
+import { cardKey } from "@/lib/card/utils";
 import { describeEcaEvent } from "@/lib/eca/display";
 import type { EcaAction, EcaView } from "@/lib/eca/types";
-import { playerName } from "../table/helpers";
+import {
+    faceDownPile,
+    handFromActions,
+    playerName,
+    seatChips,
+    turnBanner,
+} from "../table/helpers";
 import {
     registerTable,
-    type TableCardItem,
     type TableControl,
-    type TableSeat,
     type TableZoneInstance,
 } from "../table/types";
 
-/**
- * ECA (studio) table — ONE config renders every creator-authored game, because
- * every ECA game shares the same shape: a hand, a draw pile, a discard, and the
- * three verbs `playCard` / `drawCard` / `pass`. There is no per-game React and
- * no per-game config: the generic {@link GameModule} contract already reduced
- * each studio game to this common surface, so a single view→table projection
- * covers all of them.
- *
- * Interaction is direct-play (tap a legal card to lay it), matching the studio
- * sandbox: the board a creator tests in is the board everyone else plays on.
- */
+/** Every studio game shares the same zones and verbs, hence one table config. */
 
-export const ecaTable = registerTable<EcaView>({
+export const ecaTable = registerTable<EcaView, EcaAction>({
     zones: [
         {
             id: "draw",
@@ -41,16 +35,9 @@ export const ecaTable = registerTable<EcaView>({
         { id: "hand", placement: "bottom", arrangement: "fan", cardSize: "lg" },
     ],
 
-    /**
-     * Optimistic prediction of the viewer's own play/pass: the card leaves the
-     * hand and lands on the discard immediately, the turn blanked so the board
-     * stops offering moves until the server reconciles. Rule effects (draw, skip,
-     * reverse, play-again, end) are the server's to settle a beat later. `drawCard`
-     * is never predicted — it reveals a face-down card the client can't know.
-     */
-    predict(view, action, viewerId) {
+    /** Rule effects are left to the server; a draw is never predicted (hidden card). */
+    predict(view, a, viewerId) {
         if (viewerId === null || view.currentPlayerId !== viewerId) return null;
-        const a = action as EcaAction;
         const self = view.players.find((p) => p.id === viewerId);
         if (!self?.hand) return null;
 
@@ -77,53 +64,23 @@ export const ecaTable = registerTable<EcaView>({
         const self = view.players.find((p) => p.id === ctx.viewerId);
         const isYourTurn = !ctx.isOver && view.currentPlayerId === ctx.viewerId;
 
-        const banner = ctx.isOver
-            ? ctx.t("game_over")
-            : isYourTurn
-              ? ctx.t("your_turn")
-              : self
-                ? ctx.t("waiting_for", {
-                      name: playerName(ctx, view.currentPlayerId),
-                  })
-                : ctx.t("spectating");
+        const seats = seatChips(
+            view.players.map((p) => ({ ...p, playerId: p.id })),
+            ctx,
+            view.currentPlayerId,
+            (p) => ctx.t("cards_left", { n: p.handCount }),
+        );
 
-        const seats: TableSeat[] = view.players
-            .filter((p) => p.id !== ctx.viewerId)
-            .map((p) => ({
-                playerId: p.id,
-                name: p.name,
-                handCount: p.handCount,
-                isTurn: !ctx.isOver && p.id === view.currentPlayerId,
-                status: ctx.t("cards_left", { n: p.handCount }),
-            }));
-
-        // The payload's legal actions came from this module — safe narrow.
-        const legal = ctx.legalActions as readonly EcaAction[];
+        const legal = ctx.legalActions;
         const drawAction = legal.find((a) => a.type === "drawCard");
         const passAction = legal.find((a) => a.type === "pass");
-        const playByKey = new Map<string, EcaAction>();
-        for (const a of legal) {
-            if (a.type === "playCard") playByKey.set(cardKey(a.card), a);
-        }
-
-        // Draw pile: a face-down stock (up to three slivers for depth). Clicking
-        // the pile draws — the action lives on the zone so it works even once the
-        // pile is visually empty but a reshuffle can still refill it.
-        const drawSlots = Math.min(view.drawPileCount, 3);
-        const drawCards: TableCardItem[] = Array.from(
-            { length: drawSlots },
-            (_, i) => ({
-                id: `draw:${i}`,
-                card: FACE_DOWN_CARD,
-                faceDown: true,
-            }),
-        );
 
         const zones: TableZoneInstance[] = [
             {
                 key: "draw",
                 zone: "draw",
-                cards: drawCards,
+                // The action sits on the zone: a reshuffle can refill an empty-looking pile.
+                cards: faceDownPile("draw", Math.min(view.drawPileCount, 3)),
                 caption: ctx.t("cards_left", { n: view.drawPileCount }),
                 action: drawAction,
             },
@@ -133,8 +90,7 @@ export const ecaTable = registerTable<EcaView>({
                 cards: view.topDiscard
                     ? [
                           {
-                              // Scope the id by discard depth so each new top
-                              // card gets a fresh identity and animates in.
+                              // Depth-scoped id so each new top card animates in.
                               id: `discard:${cardKey(view.topDiscard)}:${view.discardCount}`,
                               card: view.topDiscard,
                           },
@@ -148,23 +104,15 @@ export const ecaTable = registerTable<EcaView>({
             zones.push({
                 key: "hand",
                 zone: "hand",
-                cards: self.hand.map((card) => {
-                    const action = playByKey.get(cardKey(card));
-                    return {
-                        id: `hand:${cardKey(card)}`,
-                        card,
-                        action,
-                        // Your turn but this card has no legal play right now: a
-                        // blocked move, not an inert card — a click says why.
-                        illegal: isYourTurn && action === undefined,
-                    };
-                }),
+                cards: handFromActions(
+                    self.hand,
+                    legal.filter((a) => a.type === "playCard"),
+                    isYourTurn,
+                ),
             });
         }
 
-        // Draw / Pass surface only when the game's rules make them legal this
-        // turn — an ECA game may disable either entirely, and the view carries no
-        // turn-config flags, so legality is the single source of truth.
+        // The view carries no turn flags: legality alone decides these controls.
         const controls: TableControl[] = [];
         if (drawAction) {
             controls.push({
@@ -184,7 +132,7 @@ export const ecaTable = registerTable<EcaView>({
         }
 
         return {
-            banner: { label: banner, highlight: isYourTurn },
+            banner: turnBanner(ctx, view.currentPlayerId),
             seats,
             zones,
             controls,

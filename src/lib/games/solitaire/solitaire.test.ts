@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { CardDescriptor, Rank, Suit } from "@/lib/card/types";
-import { createRng } from "@/lib/engine/rng";
 import { createGame, dispatch, replay } from "@/lib/engine/runner";
 import type { Player } from "@/lib/engine/types";
 import {
@@ -59,7 +58,7 @@ function makeState(patch: Partial<SolitaireState>): SolitaireState {
 
 describe("solitaire — deal", () => {
     it("deals a Klondike tableau and parks the rest in the stock", () => {
-        const state = createGame(solitaire, players, 42);
+        const state = createGame(solitaire, players, { seed: 42 });
         expect(state.tableau).toHaveLength(7);
         state.tableau.forEach((col, i) => {
             expect(col.down).toHaveLength(i); // 0,1,…,6 hidden
@@ -72,8 +71,8 @@ describe("solitaire — deal", () => {
     });
 
     it("is deterministic in the seed (replayable deal)", () => {
-        const a = createGame(solitaire, players, 7);
-        const b = createGame(solitaire, players, 7);
+        const a = createGame(solitaire, players, { seed: 7 });
+        const b = createGame(solitaire, players, { seed: 7 });
         expect(b.stock).toEqual(a.stock);
         expect(b.tableau).toEqual(a.tableau);
     });
@@ -312,7 +311,7 @@ describe("solitaire — auto-finish", () => {
 
 describe("solitaire — view redaction", () => {
     it("leaks only counts for the stock and the hidden tableau cards", () => {
-        const state = createGame(solitaire, players, 99);
+        const state = createGame(solitaire, players, { seed: 99 });
         const view = solitaire.view(state, "solo");
         expect(view.stockCount).toBe(24);
         // The stock order never reaches the client — even its owner.
@@ -325,7 +324,7 @@ describe("solitaire — view redaction", () => {
 
 describe("solitaire — runner contract", () => {
     it("refuses an action from a non-actor and after the game is over", () => {
-        const state = createGame(solitaire, players, 1);
+        const state = createGame(solitaire, players, { seed: 1 });
         const mismatch = dispatch(
             solitaire,
             state,
@@ -346,7 +345,7 @@ describe("solitaire — runner contract", () => {
     });
 
     it("gives no legal actions to a spectator or once won", () => {
-        const state = createGame(solitaire, players, 1);
+        const state = createGame(solitaire, players, { seed: 1 });
         expect(solitaire.legalActions(state, "someone-else")).toHaveLength(0);
         expect(
             solitaire.legalActions(makeState({ phase: "won" }), "solo"),
@@ -359,15 +358,19 @@ describe("solitaire — runner contract", () => {
             playerId: "solo",
         }));
 
-        let manual = createGame(solitaire, players, 2024, "g");
+        let manual = createGame(solitaire, players, {
+            seed: 2024,
+            gameId: "g",
+        });
         for (const action of actions) {
-            const rng = createRng(manual.rngState);
-            const res = solitaire.apply(manual, action, rng);
+            const res = dispatch(solitaire, manual, action, "solo");
             expect(res.ok).toBe(true);
             if (res.ok) manual = res.state;
         }
 
-        const replayed = replay(solitaire, players, 2024, actions, "g");
+        const replayed = replay(solitaire, players, 2024, actions, {
+            gameId: "g",
+        });
         expect(replayed).toEqual(manual);
     });
 });
@@ -376,7 +379,7 @@ describe("solitaire — resign", () => {
     const resign: SolitaireAction = { type: "resign", playerId: "solo" };
 
     it("is always offered while playing", () => {
-        const state = createGame(solitaire, players, 3, "g");
+        const state = createGame(solitaire, players, { seed: 3, gameId: "g" });
         expect(solitaire.legalActions(state, "solo")).toContainEqual(resign);
     });
 
@@ -401,7 +404,7 @@ describe("solitaire — resign", () => {
     it("refuses any action once resigned", () => {
         const res = dispatch(solitaire, makeState({}), resign, "solo");
         if (!res.ok) throw new Error("resign refused");
-        const again = solitaire.apply(res.state, resign, createRng(1));
+        const again = dispatch(solitaire, res.state, resign, "solo");
         expect(again.ok).toBe(false);
         if (!again.ok) expect(again.error.code).toBe("game_over");
     });
@@ -443,7 +446,7 @@ describe("solitaire — untrusted payloads", () => {
             ...(payload as object),
             playerId: "solo",
         } as SolitaireAction;
-        const res = solitaire.apply(state, action, createRng(1));
+        const res = dispatch(solitaire, state, action, "solo");
         expect(res.ok).toBe(false);
     });
 

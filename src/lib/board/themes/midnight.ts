@@ -13,7 +13,7 @@ export const midnightTheme: BoardTheme = {
     },
     zone: {
         background: "rgba(5,10,20,0.55)",
-        // Purple frame — an ink outline would vanish on the near-ink surface
+        // An ink outline would vanish on the near-ink surface.
         borderColor: "#9b6cf2",
         boxShadow: "inset 0 3px 0 rgba(0,0,0,0.30)",
         textColor: "#f7edd4",

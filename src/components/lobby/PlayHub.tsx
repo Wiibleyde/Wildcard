@@ -2,79 +2,61 @@
 
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { GameButton } from "@/components/ui/GameButton";
 import { useMatchmaking } from "@/hooks/lobby/useMatchmaking";
 import { useRoomAction } from "@/hooks/lobby/useRoomAction";
+import { useApiErrorLabel } from "@/hooks/useApiErrorLabel";
 import type { PlayGame } from "@/lib/games/catalog";
 import {
     buildPlaySections,
     gameLabels,
     type Translate,
 } from "@/lib/games/catalogView";
+import { CODE_LENGTH } from "@/lib/models/roomCode";
+import type { PublishedEcaGame } from "@/lib/models/studio";
+import { CommunityGames } from "./CommunityGames";
 import { GameCard } from "./GameCard";
 import { MatchmakingOverlay } from "./MatchmakingOverlay";
-
-/** Matchmaking error code (API `error` field) → `lobby` dictionary key. */
-function matchmakingErrorKey(
-    code: string,
-):
-    | "error_rate_limited"
-    | "error_maintenance"
-    | "error_payload_too_large"
-    | "error_generic" {
-    switch (code) {
-        case "rate_limited":
-            return "error_rate_limited";
-        case "maintenance":
-            return "error_maintenance";
-        case "payload_too_large":
-            return "error_payload_too_large";
-        default:
-            return "error_generic";
-    }
-}
 
 interface Props {
     readonly userId: string;
     readonly games: PlayGame[];
+    readonly community: readonly PublishedEcaGame[];
 }
 
-export function PlayHub({ userId, games }: Props) {
+export function PlayHub({ userId, games, community }: Props) {
     const t = useTranslations("lobby");
-    // Loosen next-intl's strict key type for the catalog view's dynamic keys.
+    const errorLabel = useApiErrorLabel();
+    // catalogView builds its keys dynamically (`cat_${id}`) and takes a loose translator.
     const tg = useTranslations("games") as unknown as Translate;
     const { state, quickMatch, cancel, playBots } = useMatchmaking(userId);
-    const { busy, error: roomError, createRoom, joinRoom } = useRoomAction();
+    // One room action for the whole page: a single busy state and error banner.
+    const room = useRoomAction();
     const [code, setCode] = useState("");
 
     const sections = buildPlaySections(games, tg);
+    const busy = room.busy !== null;
 
     const activeGame =
         state.phase === "searching"
             ? games.find((g) => g.id === state.moduleId)
             : undefined;
-    const showOverlay =
-        state.phase === "searching" || state.phase === "matched";
     const errorText =
-        state.phase === "error"
-            ? t(matchmakingErrorKey(state.code))
-            : roomError
-              ? roomError
-              : null;
+        state.phase === "error" ? errorLabel(state.code) : room.error;
+
+    function createLabel(moduleId: string, idle: string): string {
+        return room.busyModuleId === moduleId ? t("creating") : idle;
+    }
 
     return (
         <div className="flex flex-col gap-8">
-            {/* Join a private game by code. */}
             <section className="panel flex flex-col gap-4 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-center gap-3">
-                    {/* Search glyph tile. */}
                     <span
-                        aria-hidden
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl"
+                        aria-hidden="true"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-nb border-wc-ink bg-wc-red text-xl"
                         style={{
-                            background: "var(--red)",
-                            color: "var(--accent-ink)",
-                            border: "2.5px solid var(--ink)",
                             boxShadow: "0 4px 0 var(--ink)",
                             transform: "rotate(-4deg)",
                         }}
@@ -82,16 +64,10 @@ export function PlayHub({ userId, games }: Props) {
                         🔎
                     </span>
                     <div className="flex flex-col gap-0.5">
-                        <h2
-                            className="font-display text-xl leading-tight"
-                            style={{ color: "var(--ink)" }}
-                        >
+                        <h2 className="font-display text-xl leading-tight text-wc-ink">
                             {t("join_title")}
                         </h2>
-                        <p
-                            className="text-sm font-semibold"
-                            style={{ color: "#5a5340" }}
-                        >
+                        <p className="text-sm font-semibold text-wc-ink-soft">
                             {t("join_subtitle")}
                         </p>
                     </div>
@@ -103,66 +79,41 @@ export function PlayHub({ userId, games }: Props) {
                         placeholder={t("code_placeholder")}
                         aria-label={t("code_label")}
                         autoComplete="off"
-                        maxLength={5}
-                        className="min-w-0 flex-1 rounded-xl px-4 py-3 text-center outline-none lg:w-44"
+                        maxLength={CODE_LENGTH}
+                        className="min-w-0 flex-1 rounded-xl border-nb border-wc-ink bg-wc-cream2 px-4 py-3 text-center font-pixel text-[15px] tracking-[0.3em] text-wc-ink outline-none lg:w-44"
                         style={{
-                            background: "var(--cream2)",
-                            border: "2.5px solid var(--ink)",
-                            color: "var(--ink)",
-                            fontFamily: "var(--pixel)",
-                            letterSpacing: "0.3em",
-                            fontSize: "15px",
                             boxShadow: "inset 0 2px 0 rgba(11,18,32,0.12)",
                         }}
                     />
                     <GameButton
                         variant="red"
                         size="sm"
-                        onClick={() => joinRoom(code)}
-                        disabled={busy !== null || code.length < 3}
+                        onClick={() => room.joinRoom(code)}
+                        disabled={busy || code.length !== CODE_LENGTH}
                         className="shrink-0"
                     >
-                        {busy === "join" ? t("joining") : t("join_room")}
+                        {room.busy?.action === "join"
+                            ? t("joining")
+                            : t("join_room")}
                     </GameButton>
                 </div>
             </section>
 
-            {errorText && (
-                <p
-                    className="rounded-xl px-4 py-3 text-sm font-bold"
-                    style={{
-                        background: "var(--red)",
-                        border: "2.5px solid var(--ink)",
-                        boxShadow: "0 4px 0 var(--ink)",
-                        color: "var(--accent-ink)",
-                    }}
-                >
-                    {errorText}
-                </p>
-            )}
+            {errorText && <ErrorBanner>{errorText}</ErrorBanner>}
 
-            {/* Categorised game catalog. */}
             {sections.map((section) => (
                 <section key={section.id} className="flex flex-col gap-4">
                     <div className="flex items-center gap-3">
                         <h2
-                            className="wc-chip font-display"
+                            className="wc-chip rounded-[11px] border-nb border-wc-ink px-3.5 py-2 font-display text-sm text-wc-ink"
                             style={{
-                                padding: "8px 14px",
-                                borderRadius: 11,
-                                border: "2.5px solid var(--ink)",
                                 boxShadow: "0 3px 0 var(--ink)",
                                 background: section.accent,
-                                color: "var(--ink)",
-                                fontSize: "14px",
                             }}
                         >
                             {section.label}
                         </h2>
-                        <span
-                            className="h-0.5 flex-1 rounded-full"
-                            style={{ background: "var(--bg-line)" }}
-                        />
+                        <span className="h-0.5 flex-1 rounded-full bg-wc-bg-line" />
                     </div>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                         {section.games.map((g) => {
@@ -184,7 +135,7 @@ export function PlayHub({ userId, games }: Props) {
                                                     onClick={() =>
                                                         quickMatch(g.id)
                                                     }
-                                                    disabled={busy !== null}
+                                                    disabled={busy}
                                                     className="w-full"
                                                 >
                                                     {t("quick_match")}
@@ -193,17 +144,15 @@ export function PlayHub({ userId, games }: Props) {
                                                     variant="gold"
                                                     size="sm"
                                                     onClick={() =>
-                                                        createRoom(
-                                                            g.id,
-                                                            "private",
-                                                        )
+                                                        room.createRoom(g.id)
                                                     }
-                                                    disabled={busy !== null}
+                                                    disabled={busy}
                                                     className="w-full"
                                                 >
-                                                    {busy === "create"
-                                                        ? t("creating")
-                                                        : t("create_private")}
+                                                    {createLabel(
+                                                        g.id,
+                                                        t("create_private"),
+                                                    )}
                                                 </GameButton>
                                             </>
                                         ) : (
@@ -211,14 +160,15 @@ export function PlayHub({ userId, games }: Props) {
                                                 variant="red"
                                                 size="sm"
                                                 onClick={() =>
-                                                    createRoom(g.id, "private")
+                                                    room.createRoom(g.id)
                                                 }
-                                                disabled={busy !== null}
+                                                disabled={busy}
                                                 className="w-full"
                                             >
-                                                {busy === "create"
-                                                    ? t("creating")
-                                                    : t("play_solo")}
+                                                {createLabel(
+                                                    g.id,
+                                                    t("play_solo"),
+                                                )}
                                             </GameButton>
                                         )
                                     }
@@ -229,7 +179,14 @@ export function PlayHub({ userId, games }: Props) {
                 </section>
             ))}
 
-            {showOverlay && (
+            <CommunityGames
+                games={community}
+                busy={busy}
+                busyModuleId={room.busyModuleId}
+                onHost={room.createRoom}
+            />
+
+            {(state.phase === "searching" || state.phase === "matched") && (
                 <MatchmakingOverlay
                     game={activeGame}
                     matched={state.phase === "matched"}

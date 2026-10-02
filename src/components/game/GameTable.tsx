@@ -1,61 +1,55 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import {
-    type ReactNode,
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from "react";
-import { Card, useCardLabel } from "@/components/card/Card";
+import { type ReactNode, useCallback, useMemo } from "react";
+import { useCardLabel } from "@/components/card/Card";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
+import { buildLogLines } from "@/hooks/game/logLines";
+import { useClickToMove } from "@/hooks/game/useClickToMove";
+import { usePlayerNames } from "@/hooks/game/usePlayerNames";
 import { useTableCardAnimations } from "@/hooks/game/useTableCardAnimations";
-import { CLONE_OFFSET, useTableDrag } from "@/hooks/game/useTableDrag";
-import { buildSurfaceStyle } from "@/lib/board/styles";
+import { useTableDrag } from "@/hooks/game/useTableDrag";
+import { BOARD_RADIUS, buildSurfaceStyle } from "@/lib/board/styles";
 import type { BoardTheme } from "@/lib/board/types";
 import { getCardTheme } from "@/lib/card/themes";
 import type { CardTheme } from "@/lib/card/types";
 import type { GameAction } from "@/lib/engine/types";
 import type {
     AnyGameTableConfig,
-    TableCardItem,
     TableContext,
+    TableControl,
     TableData,
-    TableText,
     TableZoneTemplate,
+    Translate,
     ZonePlacement,
 } from "@/lib/games/table/types";
 import type { GameClientPayload } from "@/lib/models/game";
+import { DragClone } from "./DragClone";
 import { GameOverOverlay, TurnBanner } from "./GameChrome";
-import { GameLog, type GameLogLine } from "./GameLog";
+import { GameRail } from "./GameRail";
 import { TableControls } from "./TableControls";
 import { TableSeats } from "./TableSeats";
-import { TableZone, type ZoneContext } from "./TableZone";
+import { TableZone } from "./TableZone";
+import type { ZoneContext } from "./zones/ZoneCard";
 
-/** Max pointer travel (px) between down and up still counted as a tap. */
-const TAP_SLOP = 6;
+const NO_CONTROLS: readonly TableControl[] = [];
 
 interface GameTableProps {
     table: AnyGameTableConfig;
-    view: unknown;
     payload: GameClientPayload;
     currentUserId: string;
-    /** The viewer's own deck — fallback for cards without an owner. */
+    /** Fallback for cards without an owner. */
     deckTheme: CardTheme;
     boardTheme: BoardTheme;
     pending: boolean;
     onAction: (action: GameAction) => void;
-    /** Surface an "illegal move" notice when a blocked card is clicked. */
     onIllegal?: () => void;
-    /** Optional right-rail slot rendered under the history feed (e.g. chat). */
+    /** Rendered in the rail under the log. */
     chat?: ReactNode;
 }
 
 export function GameTable({
     table,
-    view,
     payload,
     currentUserId,
     deckTheme,
@@ -66,59 +60,37 @@ export function GameTable({
     chat,
 }: GameTableProps) {
     const t = useTranslations("game");
+    const { players, nameOf } = usePlayerNames(payload.players, payload.botIds);
     const labelOf = useCardLabel();
-    // Game tables build their keys at runtime (`TableText` takes a string);
-    // narrow to the namespace's key union at this single boundary.
+    // Tables build their keys at runtime; narrow to the namespace's keys here only.
     type GameKey = Parameters<typeof t>[0];
-    const text: TableText = useCallback(
+    const text: Translate = useCallback(
         (key, values) => t(key as GameKey, values),
         [t],
     );
 
-    // Everything below is a pure projection of the payload — memoised so the
-    // frequent presentation-only re-renders (drag fires ~60×/s, pending toggles,
-    // selection) skip the `mapView` recompute and, crucially, keep `data` stable
-    // so the GSAP landing effect (keyed on `data`) never re-runs off a real move.
+    // Memoised so presentation-only re-renders (pending, selection) keep `data`
+    // stable: the GSAP landing effect is keyed on it.
     const ctx: TableContext = useMemo(
         () => ({
             viewerId: payload.viewerId,
-            players: payload.players,
+            players,
             legalActions: payload.legalActions,
             isOver: payload.isOver,
             t: text,
         }),
-        [
-            payload.viewerId,
-            payload.players,
-            payload.legalActions,
-            payload.isOver,
-            text,
-        ],
+        [payload.viewerId, players, payload.legalActions, payload.isOver, text],
     );
     const data: TableData = useMemo(
-        () => table.mapView(view, ctx),
-        [table, view, ctx],
+        () => table.mapView(payload.view, ctx),
+        [table, payload.view, ctx],
     );
-
-    const logLines: GameLogLine[] | null = useMemo(
+    const logLines = useMemo(
         () =>
             table.logLine
-                ? // Newest first — across entries AND within one entry, so a
-                  // step's last event ("game over") sits on top of its group.
-                  [...payload.log].reverse().flatMap((entry) =>
-                      entry.events
-                          .flatMap((event, eventIndex) => {
-                              const line = table.logLine?.(event, ctx);
-                              return line
-                                  ? [
-                                        {
-                                            id: `${entry.seq}.${eventIndex}`,
-                                            text: line,
-                                        },
-                                    ]
-                                  : [];
-                          })
-                          .reverse(),
+                ? buildLogLines(
+                      payload.log,
+                      (event) => table.logLine?.(event, ctx) ?? null,
                   )
                 : null,
         [table, payload.log, ctx],
@@ -142,84 +114,23 @@ export function GameTable({
                 : getCardTheme(styleOf.get(ownerId)),
         [styleOf, deckTheme, currentUserId],
     );
+    const deckStyleOf = useCallback(
+        (playerId: string) => styleOf.get(playerId),
+        [styleOf],
+    );
 
     const { rootRef, registerCard } = useTableCardAnimations(
         data,
         themeFor,
         currentUserId,
     );
-
-    const { dragging, beginDrag } = useTableDrag({
+    const { dragging, beginDrag, cloneRef } = useTableDrag({
         onAction,
         pending,
         boundsRef: rootRef,
     });
-
-    // Click-to-move: pick a draggable card up (tap, Enter/Space), then press a
-    // highlighted destination. The same legal `dropTargets` as a drag, so it
-    // is a pointer-free path to every move (keyboard, screen reader, touch).
-    const [selectedId, setSelectedId] = useState<string | null>(null);
-    const selection = useMemo(() => {
-        if (selectedId === null || pending) return null;
-        for (const zone of data.zones) {
-            const item = zone.cards.find((c) => c.id === selectedId);
-            if (item?.dropTargets?.length) {
-                return { id: item.id, card: item, targets: item.dropTargets };
-            }
-        }
-        return null; // the card moved / is no longer movable
-    }, [selectedId, pending, data]);
-
-    const toggleSelect = useCallback((item: TableCardItem) => {
-        setSelectedId((prev) => (prev === item.id ? null : item.id));
-    }, []);
-    const moveSelected = useCallback(
-        (action: GameAction) => {
-            setSelectedId(null);
-            onAction(action);
-        },
-        [onAction],
-    );
-
-    const hasSelection = selection !== null;
-    useEffect(() => {
-        if (!hasSelection) return;
-        const onKey = (e: KeyboardEvent) => {
-            if (e.key === "Escape") setSelectedId(null);
-        };
-        document.addEventListener("keydown", onKey);
-        return () => document.removeEventListener("keydown", onKey);
-    }, [hasSelection]);
-
-    // A drag that never moved is a tap → toggle the pick-up. Detected here
-    // (not via the card's click) because the source card hides the moment the
-    // drag starts, so the browser's click lands on whatever is underneath.
-    const tapRef = useRef<{ item: TableCardItem; x: number; y: number } | null>(
-        null,
-    );
-    const beginDragOrTap = useCallback(
-        (item: TableCardItem, x: number, y: number, rect: DOMRect) => {
-            tapRef.current = { item, x, y };
-            beginDrag(item, x, y, rect);
-        },
-        [beginDrag],
-    );
-    useEffect(() => {
-        const end = (e: PointerEvent) => {
-            const tap = tapRef.current;
-            tapRef.current = null;
-            if (!tap || e.type !== "pointerup") return;
-            if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) <= TAP_SLOP) {
-                toggleSelect(tap.item);
-            }
-        };
-        window.addEventListener("pointerup", end);
-        window.addEventListener("pointercancel", end);
-        return () => {
-            window.removeEventListener("pointerup", end);
-            window.removeEventListener("pointercancel", end);
-        };
-    }, [toggleSelect]);
+    const { selection, toggleSelect, moveSelected, beginDragOrTap } =
+        useClickToMove(data, pending, onAction, beginDrag);
 
     const zoneCtx: ZoneContext = useMemo(
         () => ({
@@ -267,39 +178,34 @@ export function GameTable({
     const top = zonesAt("top");
     const center = zonesAt("center");
     const bottom = zonesAt("bottom");
-    const controls = data.controls ?? [];
+    const controls = data.controls ?? NO_CONTROLS;
 
-    // A `fill` center zone (e.g. solitaire tableau) spans the board in one
-    // non-wrapping row; otherwise cards wrap centered.
-    const centerFills = data.zones.some(
-        (z) =>
-            templates.get(z.zone)?.placement === "center" &&
-            templates.get(z.zone)?.fill,
-    );
+    // A `fill` center zone (solitaire tableau) spans the board in one row.
+    const centerFills = data.zones.some((z) => {
+        const template = templates.get(z.zone);
+        return template?.placement === "center" && template.fill;
+    });
     const centerClass = centerFills
         ? "flex w-full items-start justify-center gap-1 sm:gap-2 xl:gap-3 lg:min-h-0 lg:flex-1"
         : "flex flex-wrap items-start justify-center gap-4 sm:gap-6 xl:gap-10";
 
     const hasHand = bottom.length > 0;
 
-    // Irreversible controls (`confirm`, e.g. solitaire resign) go through a
-    // confirmation step, like leaving a game in progress.
     const confirm = useConfirm();
     const onControl = useCallback(
-        async (action: GameAction) => {
-            const control = controls.find((c) => c.action === action);
-            if (control?.confirm) {
+        async (control: TableControl) => {
+            if (control.confirm) {
                 const ok = await confirm({
-                    title: control.label,
+                    title: control.label ?? t("danger_title"),
                     message: t("danger_confirm"),
-                    confirmLabel: control.label ?? t("play"),
+                    confirmLabel: control.label ?? t("danger_confirm_label"),
                     variant: "red",
                 });
                 if (!ok) return;
             }
-            onAction(action);
+            onAction(control.action);
         },
-        [controls, confirm, onAction, t],
+        [confirm, onAction, t],
     );
 
     return (
@@ -315,13 +221,12 @@ export function GameTable({
                     className="relative flex min-h-[60vh] flex-1 flex-col gap-3 overflow-hidden p-3 sm:gap-4 sm:p-4 lg:h-[70vh] lg:min-h-0 xl:p-6"
                     style={{
                         ...buildSurfaceStyle(boardTheme),
-                        borderRadius: "clamp(1.125rem, 3vw, 2rem)",
+                        borderRadius: BOARD_RADIUS,
                         border: "3px solid var(--ink)",
                         boxShadow:
                             "inset 0 0 0 3px rgba(0,0,0,0.35), inset 0 0 90px rgba(0,0,0,0.4), 0 10px 0 var(--ink)",
                     }}
                 >
-                    {/* Announces the click-to-move pick-up for screen readers. */}
                     <output aria-live="polite" className="sr-only">
                         {selection
                             ? t("card_selected", {
@@ -333,7 +238,6 @@ export function GameTable({
                             : ""}
                     </output>
 
-                    {/* felt monogram watermark */}
                     <span
                         aria-hidden
                         className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center font-display"
@@ -350,9 +254,7 @@ export function GameTable({
                         <div className="relative z-10 shrink-0">
                             <TableSeats
                                 seats={data.seats}
-                                deckStyleOf={(playerId) =>
-                                    styleOf.get(playerId)
-                                }
+                                deckStyleOf={deckStyleOf}
                             />
                         </div>
                     )}
@@ -393,7 +295,7 @@ export function GameTable({
                                 controls={controls}
                                 deckTheme={deckTheme}
                                 pending={pending}
-                                onAction={onControl}
+                                onControl={onControl}
                             />
                         </div>
                     )}
@@ -402,7 +304,7 @@ export function GameTable({
                         <GameOverOverlay
                             outcome={payload.outcome}
                             end={payload.end}
-                            players={payload.players}
+                            nameOf={nameOf}
                             currentUserId={currentUserId}
                             titleOf={
                                 table.rankTitle
@@ -415,46 +317,15 @@ export function GameTable({
                     )}
                 </div>
 
-                {(logLines || chat) && (
-                    <div className="flex flex-col gap-3 lg:h-[70vh] lg:self-start">
-                        {logLines && (
-                            <GameLog
-                                title={t("log_title")}
-                                emptyText={t("log_empty")}
-                                lines={logLines}
-                            />
-                        )}
-                        {chat}
-                    </div>
-                )}
+                <GameRail logLines={logLines} chat={chat} />
             </div>
 
-            {/* Fixed to the viewport so the board's overflow can't clip the clone. */}
             {dragging && (
-                <div
-                    className="pointer-events-none fixed z-9999"
-                    style={{ left: dragging.x, top: dragging.y }}
-                >
-                    {dragging.stack.map((s, i) => (
-                        <div
-                            key={s.id}
-                            className="absolute will-change-transform"
-                            style={{
-                                top: i * CLONE_OFFSET,
-                                left: 0,
-                                width: dragging.cardW,
-                                transform: "rotate(2deg)",
-                                filter: "drop-shadow(0 8px 20px rgba(0,0,0,0.4))",
-                            }}
-                        >
-                            <Card
-                                card={s.card}
-                                theme={themeFor(s.ownerId)}
-                                disableTransitions
-                            />
-                        </div>
-                    ))}
-                </div>
+                <DragClone
+                    dragging={dragging}
+                    cloneRef={cloneRef}
+                    themeFor={themeFor}
+                />
             )}
         </div>
     );

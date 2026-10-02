@@ -1,20 +1,21 @@
 "use client";
 
-import { useGSAP } from "@gsap/react";
 import { type RefObject, useCallback, useRef } from "react";
 import { getPlayAnimation, prefersReducedMotion } from "@/lib/card/animations";
 import type { CardTheme } from "@/lib/card/types";
 import type { TableData } from "@/lib/games/table/types";
+import { useGSAP } from "@/lib/gsap";
+
+type CardRef = (el: HTMLDivElement | null) => void;
 
 interface TableCardAnimations {
     rootRef: RefObject<HTMLDivElement | null>;
-    registerCard: (id: string) => (el: HTMLDivElement | null) => void;
+    registerCard: (id: string) => CardRef;
 }
 
 /**
- * Animated card ids are tracked so a re-render never re-plays a landing. The
- * cards already on the table at mount (page load, reconnect, replay seek) are
- * seeded as "seen": only cards that arrive afterwards animate in.
+ * Plays the deck's landing animation for cards that appear on the table.
+ * Cards present at mount (page load, reconnect, replay seek) don't animate.
  */
 export function useTableCardAnimations(
     data: TableData,
@@ -22,26 +23,29 @@ export function useTableCardAnimations(
     currentUserId: string,
 ): TableCardAnimations {
     const rootRef = useRef<HTMLDivElement>(null);
-    const cardRefs = useRef(new Map<string, HTMLDivElement>());
-    const animatedIds = useRef<Set<string> | null>(null);
+    const cardEls = useRef(new Map<string, HTMLDivElement>());
+    // One stable callback per id, so React doesn't detach/reattach every ref each render.
+    const cardRefs = useRef(new Map<string, CardRef>());
+    const shownIds = useRef<Set<string> | null>(null);
 
     useGSAP(
         () => {
-            if (animatedIds.current === null) {
-                animatedIds.current = new Set(
-                    data.zones.flatMap((zone) =>
-                        zone.cards.map((item) => item.id),
-                    ),
-                );
-                return;
+            const ids = new Set(
+                data.zones.flatMap((zone) => zone.cards.map((c) => c.id)),
+            );
+            const previous = shownIds.current;
+            // Only the current table is kept: a card that leaves and later
+            // comes back lands again.
+            shownIds.current = ids;
+            for (const id of cardRefs.current.keys()) {
+                if (!ids.has(id)) cardRefs.current.delete(id);
             }
-            const seen = animatedIds.current;
-            if (prefersReducedMotion()) return;
+            if (previous === null || prefersReducedMotion()) return;
+
             for (const zone of data.zones) {
                 for (const item of zone.cards) {
-                    if (seen.has(item.id)) continue;
-                    seen.add(item.id);
-                    const el = cardRefs.current.get(item.id);
+                    if (previous.has(item.id)) continue;
+                    const el = cardEls.current.get(item.id);
                     if (!el) continue;
                     const theme = themeFor(item.ownerId);
                     getPlayAnimation(theme.playAnimation).animate(el, {
@@ -57,13 +61,17 @@ export function useTableCardAnimations(
         { dependencies: [data], scope: rootRef },
     );
 
-    const registerCard = useCallback(
-        (id: string) => (el: HTMLDivElement | null) => {
-            if (el) cardRefs.current.set(id, el);
-            else cardRefs.current.delete(id);
-        },
-        [],
-    );
+    const registerCard = useCallback((id: string) => {
+        let ref = cardRefs.current.get(id);
+        if (!ref) {
+            ref = (el) => {
+                if (el) cardEls.current.set(id, el);
+                else cardEls.current.delete(id);
+            };
+            cardRefs.current.set(id, ref);
+        }
+        return ref;
+    }, []);
 
     return { rootRef, registerCard };
 }

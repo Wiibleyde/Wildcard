@@ -1,31 +1,12 @@
 "use client";
 
-import { portalFetch } from "@/lib/api/client";
+import { portalFetch, readApiJson } from "@/lib/api/client";
 import { portalApiUrl } from "@/lib/auth/urls";
 
-/**
- * Typed client for the portal's JSON API (`https://auth.wiibleyde.dev/api/v1`):
- * the account's profile and its friend / block lists, which belong to the
- * domain-wide account, not to Wildcard.
- *
- * Why the API rather than PostgREST on the `portal` schema: it is the contract
- * the portal keeps stable (the table layout is not), it merges both friend
- * edges into one `added`/`addedMe` entry, and it validates input with the same
- * rate limits as the portal's own pages. RLS still decides: the portal calls
- * Supabase with the user's own token, never a service key.
- */
+// The portal API rather than PostgREST on `portal`: its contract is stable
+// (the tables are not), and it still calls Supabase with the user's own token.
 
-/** The signed-in account (`GET /me`). */
-export interface PortalMe {
-    readonly id: string;
-    readonly pseudo: string | null;
-    readonly avatarUrl: string | null;
-}
-
-/**
- * One entry of the **directed** friend list. `added`: I added them;
- * `addedMe`: they added me. A real friendship is `mutual` (both).
- */
+/** A directed edge: real friendship is `mutual`. */
 export interface PortalFriend {
     readonly id: string;
     readonly pseudo: string | null;
@@ -41,12 +22,12 @@ export interface PortalBlock {
     readonly avatarUrl: string | null;
 }
 
-/** Who to add or block: a stranger by exact pseudo, or someone on screen by id. */
+/** A stranger by exact pseudo, or someone on screen by id. */
 export type PortalTarget =
     | { readonly pseudo: string }
     | { readonly id: string };
 
-/** Stable error codes of the portal API (its `message` is French-only). */
+/** The portal's `message` is French-only; switch on the code. */
 export type PortalErrorCode =
     | "invalid_pseudo"
     | "invalid_id"
@@ -91,7 +72,7 @@ export class PortalApiError extends Error {
     }
 }
 
-/** Same pseudo rule as the portal: 3–24 chars of `[A-Za-z0-9._-]`. */
+/** Same rule as the portal. */
 export const PSEUDO_PATTERN = /^[A-Za-z0-9._-]{3,24}$/;
 
 async function call<T>(
@@ -119,10 +100,7 @@ async function call<T>(
     }
 
     if (res.status === 204) return null;
-    const body = (await res.json().catch(() => null)) as {
-        error?: unknown;
-        message?: unknown;
-    } | null;
+    const body = await readApiJson<{ error?: unknown; message?: unknown }>(res);
     if (!res.ok) {
         const raw = typeof body?.error === "string" ? body.error : "";
         const code = (
@@ -131,20 +109,16 @@ async function call<T>(
         const message = typeof body?.message === "string" ? body.message : raw;
         throw new PortalApiError(code, res.status, message);
     }
-    return body as T;
+    return body as T | null;
 }
 
-export async function getMe(): Promise<PortalMe> {
-    return (await call<PortalMe>("/me")) as PortalMe;
-}
-
-/** Sorted by the portal: mutual, then waiting for them, then waiting for me. */
+/** Mutual first, then waiting for them, then waiting for me. */
 export async function listFriends(): Promise<readonly PortalFriend[]> {
     const body = await call<{ friends: PortalFriend[] }>("/friends");
     return body?.friends ?? [];
 }
 
-/** Add a friend (or accept an incoming request: add them back by id). */
+/** Also accepts an incoming request (add them back by id). */
 export async function addFriend(target: PortalTarget): Promise<string> {
     const body = await call<{ id: string }>("/friends", {
         method: "POST",
@@ -153,12 +127,12 @@ export async function addFriend(target: PortalTarget): Promise<string> {
     return body?.id ?? "";
 }
 
-/** Take back **my** edge to `id` (unfriend / cancel a pending request). */
+/** Take back my edge (unfriend / cancel a request). */
 export async function removeFriend(id: string): Promise<void> {
     await call(`/friends/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
-/** Refuse: remove the edge `id` wrote towards me. They can add me again. */
+/** Remove their edge towards me; they can add me again. */
 export async function refuseFriend(id: string): Promise<void> {
     await call(`/friends/${encodeURIComponent(id)}/incoming`, {
         method: "DELETE",
@@ -170,12 +144,11 @@ export async function listBlocks(): Promise<readonly PortalBlock[]> {
     return body?.blocks ?? [];
 }
 
-/** Block: ends both friend edges and stops them adding me again. */
+/** Ends both friend edges and stops them adding me again. */
 export async function blockUser(target: PortalTarget): Promise<void> {
     await call("/blocks", { method: "POST", json: target });
 }
 
-/** Unblock: restores nothing, only allows new edges. */
 export async function unblockUser(id: string): Promise<void> {
     await call(`/blocks/${encodeURIComponent(id)}`, { method: "DELETE" });
 }

@@ -1,4 +1,7 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import {
+    createClient as createSupabaseClient,
+    type SupabaseClient,
+} from "@supabase/supabase-js";
 import {
     getServerSupabaseEnv,
     getServiceRoleKey,
@@ -6,25 +9,14 @@ import {
 } from "./env";
 import type { Database } from "./types";
 
-/**
- * Service-role Supabase client — **server-only**, bypasses RLS.
- *
- * The game engine is server-authoritative: full secret state (every hand, the
- * RNG seed) lives in `game_states`, a table no client key can read. Only this
- * admin client touches it. Never import this from a `"use client"` module.
- *
- * No cookies / session: it authenticates purely with the service-role key, so
- * it must never be exposed to the browser. Identity checks (is this user
- * allowed to act?) are enforced in the API route before calling into it.
- */
-export function createAdminClient() {
+/** Service-role client: bypasses RLS, so callers must authorize first. */
+export type AdminClient = SupabaseClient<Database>;
+
+/** Server-only — the only client allowed to read `game_states`. */
+export function createAdminClient(): AdminClient {
     const { url } = getServerSupabaseEnv();
-    const serviceRoleKey = getServiceRoleKey();
-    return createSupabaseClient<Database>(url, serviceRoleKey, {
+    return createSupabaseClient<Database>(url, getServiceRoleKey(), {
         db: { schema: getSupabaseSchema() },
-        auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-        },
+        auth: { autoRefreshToken: false, persistSession: false },
     });
 }

@@ -8,7 +8,6 @@ import {
     evaluateCondition,
     evaluateOperand,
     firstMatchingRule,
-    matchingRules,
     ruleHasEffect,
     ruleMatches,
     topOfDiscard,
@@ -261,16 +260,6 @@ describe("rule matching", () => {
                 ctx(),
             ),
         ).toBeNull();
-    });
-
-    it("matchingRules returns every match, in order", () => {
-        const rules = [
-            rule("a", "turnStarted", []),
-            rule("b", "cardPlayed", []),
-            rule("c", "turnStarted", [isSeven]),
-        ];
-        expect(matchingRules(rules, "turnStarted", ctx()).map((r) => r.id)) //
-            .toEqual(["a", "c"]);
     });
 
     it("ruleHasEffect finds an effect by type", () => {

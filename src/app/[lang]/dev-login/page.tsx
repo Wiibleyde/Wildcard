@@ -1,7 +1,9 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { Locale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
-import { fieldClass, fieldStyle } from "@/components/studio/fields";
+import { ErrorBanner } from "@/components/ui/ErrorBanner";
+import { fieldClass, fieldStyle } from "@/components/ui/fields";
 import { devSignIn } from "./actions";
 
 /** Accounts created by supabase/seed.sql (password: password123). */
@@ -10,12 +12,9 @@ const SEEDED = [
     { email: "player@local.test", label: "player — joueur" },
 ] as const;
 
-/**
- * Local stand-in for the portal login (auth.wiibleyde.dev), reachable only
- * under `next dev`: production builds answer 404. Seeded accounts sign in in
- * one click; the form also takes a real account of the shared stack when
- * running `bun run dev:shared`. Dev tool — not translated on purpose.
- */
+// Dev-only stand-in for the portal login (404 in production builds): not translated on purpose.
+export const metadata: Metadata = { title: "Dev login" };
+
 export default async function Page({
     params,
     searchParams,
@@ -51,14 +50,7 @@ export default async function Page({
                     </p>
                 </div>
 
-                {error && (
-                    <p
-                        className="text-sm font-semibold"
-                        style={{ color: "var(--red)" }}
-                    >
-                        {error}
-                    </p>
-                )}
+                {error && <ErrorBanner>{error}</ErrorBanner>}
 
                 <div className="flex flex-col gap-2">
                     {SEEDED.map((account) => (

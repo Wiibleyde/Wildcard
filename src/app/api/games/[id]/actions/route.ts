@@ -1,44 +1,33 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/api/auth";
-import { isJsonObject, readJsonObject } from "@/lib/api/body";
-import { rateLimit } from "@/lib/api/rateLimit";
 import { failureResponse } from "@/lib/api/respond";
-import { APPLY_ERROR_STATUS, applyAction } from "@/lib/models/game";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { apiRoute } from "@/lib/api/route";
+import { numberField, objectField } from "@/lib/api/validate";
+import { applyAction } from "@/lib/models/game/apply";
+import { GAME_ERROR_STATUS } from "@/lib/models/game/errors";
 
-export async function POST(
-    request: Request,
-    ctx: { params: Promise<{ id: string }> },
-) {
-    const { id } = await ctx.params;
-    const auth = await requireUser(request);
-    if (!auth.ok) return auth.response;
+export const POST = apiRoute<{ id: string }>(
+    { rateLimit: "gameAction", body: true },
+    async ({ params, body, user, admin }) => {
+        const version = numberField(body, "version");
+        const action = objectField(body, "action");
 
-    const limited = rateLimit("gameAction", auth.user.id);
-    if (limited) return limited;
-
-    const parsed = await readJsonObject(request);
-    if (!parsed.ok) return parsed.response;
-    const { version, action } = parsed.body;
-    if (typeof version !== "number" || !isJsonObject(action)) {
-        return NextResponse.json(
-            { error: "version (number) and action (object) are required" },
-            { status: 400 },
+        const result = await applyAction(
+            admin,
+            params.id,
+            user.id,
+            version,
+            action,
         );
-    }
-
-    const admin = createAdminClient();
-    const result = await applyAction(admin, id, auth.user.id, version, action);
-    if (!result.ok) {
-        return failureResponse("games.actions", result, APPLY_ERROR_STATUS, {
-            violation: result.violation,
+        if (!result.ok) {
+            return failureResponse("games.actions", result, GAME_ERROR_STATUS, {
+                violation: result.violation,
+            });
+        }
+        return NextResponse.json({
+            ok: true,
+            version: result.version,
+            events: result.events,
+            payload: result.payload,
         });
-    }
-
-    return NextResponse.json({
-        ok: true,
-        version: result.version,
-        events: result.events,
-        payload: result.payload,
-    });
-}
+    },
+);

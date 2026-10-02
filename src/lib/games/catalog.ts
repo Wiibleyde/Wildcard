@@ -1,17 +1,12 @@
 import { gameCatalog } from "./index";
 
-/**
- * Display layer for the game catalog. The engine `GameModule` is a pure game
- * contract — it deliberately knows nothing about UI (colours, categories,
- * taglines). This module is the *presentation* source of truth: it merges the
- * engine facts (name, player range) for every registered game with the display
- * metadata below, and adds "coming soon" games that have no module yet.
- *
- * Home page and the play-hub picker both read from here, so the catalog is
- * described once and never drifts between the two surfaces.
+/*
+ * Presentation source of truth for the catalog: engine facts (name, player
+ * range) merged with display metadata, plus "coming soon" games with no
+ * module yet. Modules stay UI-agnostic on purpose.
  */
 
-/** Buckets the picker groups games into. Order here is the display order. */
+/** Display order of the picker's sections. */
 export const GAME_CATEGORIES = [
     { id: "duel", accent: "#ff4b3b" },
     { id: "shedding", accent: "#ffc23d" },
@@ -22,17 +17,13 @@ export const GAME_CATEGORIES = [
 
 export type GameCategoryId = (typeof GAME_CATEGORIES)[number]["id"];
 
-/** Display-only metadata, keyed by game id (engine id, or a placeholder id). */
 interface GameDisplayMeta {
     readonly category: GameCategoryId;
     readonly accent: string;
-    readonly shadow: string;
     readonly suits: string;
-    /** 1 = easy, 2 = medium, 3 = hard. Drives the difficulty pips. */
     readonly difficulty: 1 | 2 | 3;
-    /** Typical game length in minutes — shown as "~N min". */
     readonly durationMin: number;
-    /** Player range + name for games that ship no engine module yet. */
+    /** Name and player range of a game that ships no module yet. */
     readonly comingSoon?: {
         name: string;
         minPlayers: number;
@@ -40,11 +31,11 @@ interface GameDisplayMeta {
     };
 }
 
+/** Key order IS the display order. */
 const DISPLAY: Record<string, GameDisplayMeta> = {
     bataille: {
         category: "duel",
         accent: "#ff4b3b",
-        shadow: "#0b1220",
         suits: "♠ ♥",
         difficulty: 1,
         durationMin: 3,
@@ -52,7 +43,6 @@ const DISPLAY: Record<string, GameDisplayMeta> = {
     president: {
         category: "shedding",
         accent: "#ffc23d",
-        shadow: "#0b1220",
         suits: "♦ ♣",
         difficulty: 2,
         durationMin: 12,
@@ -60,7 +50,6 @@ const DISPLAY: Record<string, GameDisplayMeta> = {
     tarot: {
         category: "trick",
         accent: "#9b6cf2",
-        shadow: "#0b1220",
         suits: "♠ ♥ ♦ ♣",
         difficulty: 3,
         durationMin: 20,
@@ -68,7 +57,6 @@ const DISPLAY: Record<string, GameDisplayMeta> = {
     solitaire: {
         category: "solo",
         accent: "#38cf78",
-        shadow: "#0b1220",
         suits: "♦ ♣",
         difficulty: 2,
         durationMin: 6,
@@ -76,7 +64,6 @@ const DISPLAY: Record<string, GameDisplayMeta> = {
     belote: {
         category: "trick",
         accent: "#ff8a3d",
-        shadow: "#0b1220",
         suits: "♠ ♦",
         difficulty: 3,
         durationMin: 15,
@@ -85,7 +72,6 @@ const DISPLAY: Record<string, GameDisplayMeta> = {
     kems: {
         category: "party",
         accent: "#3b8cff",
-        shadow: "#0b1220",
         suits: "♥ ♣",
         difficulty: 1,
         durationMin: 8,
@@ -93,60 +79,49 @@ const DISPLAY: Record<string, GameDisplayMeta> = {
     },
 };
 
-/**
- * One game as the play UI needs it: engine facts when available, display meta
- * always. `available` games have a registered module and can be played now.
- */
 export interface PlayGame {
     readonly id: string;
     readonly name: string;
     readonly category: GameCategoryId;
     readonly accent: string;
-    readonly shadow: string;
     readonly suits: string;
     readonly difficulty: 1 | 2 | 3;
     readonly durationMin: number;
     readonly minPlayers: number;
     readonly maxPlayers: number;
+    /** A registered module exists. */
     readonly available: boolean;
-    /** True when the game can be quick-matched against other humans (max > 1). */
+    /** Can be quick-matched against other humans. */
     readonly matchmaking: boolean;
 }
 
 let CACHE: PlayGame[] | null = null;
 
-/**
- * The merged, serialisable play catalog (server-side; passed to client
- * components). Engine games override the placeholder name/range; coming-soon
- * games fall back to their declared `comingSoon` block.
- *
- * `DISPLAY`'s key order IS the display order (available first, then coming
- * soon) — it's the single list of every game shown, so there's no separate
- * order array to keep in sync. The result is input-free, so it's built once and
- * memoised for every page render.
- */
+/** Input-free, so built once and memoised. */
 export function buildPlayCatalog(): PlayGame[] {
     if (CACHE) return CACHE;
 
     const engine = new Map(gameCatalog().map((g) => [g.id, g]));
     CACHE = Object.entries(DISPLAY).map(([id, meta]) => {
-        const mod = engine.get(id);
-        const available = mod !== undefined;
-        const min = mod?.minPlayers ?? meta.comingSoon?.minPlayers ?? 2;
-        const max = mod?.maxPlayers ?? meta.comingSoon?.maxPlayers ?? 4;
+        const facts = engine.get(id) ?? meta.comingSoon;
+        if (!facts) {
+            throw new Error(
+                `catalog: "${id}" has neither a module nor a comingSoon entry`,
+            );
+        }
+        const available = engine.has(id);
         return {
             id,
-            name: mod?.name ?? meta.comingSoon?.name ?? id,
+            name: facts.name,
             category: meta.category,
             accent: meta.accent,
-            shadow: meta.shadow,
             suits: meta.suits,
             difficulty: meta.difficulty,
             durationMin: meta.durationMin,
-            minPlayers: min,
-            maxPlayers: max,
+            minPlayers: facts.minPlayers,
+            maxPlayers: facts.maxPlayers,
             available,
-            matchmaking: available && max > 1,
+            matchmaking: available && facts.maxPlayers > 1,
         };
     });
     return CACHE;

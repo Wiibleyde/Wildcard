@@ -2,60 +2,46 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, readApiError, readApiJson } from "@/lib/api/client";
 import { useTicketChannel } from "@/lib/realtime/useTicketChannel";
 
-/** Server ticket status, as returned by the matchmaking API. */
 type ServerStatus =
     | { status: "idle" }
     | { status: "searching"; moduleId: string; waiting: number }
     | { status: "matched"; gameId: string; code: string };
 
-/** UI-facing matchmaking state machine. */
 export type MatchState =
     | { phase: "idle" }
     | { phase: "searching"; moduleId: string; waiting: number; since: number }
     | { phase: "matched" }
     | { phase: "error"; code: string };
 
-/**
- * Drive the quick-match flow for a signed-in user. Enqueues, listens on the
- * caller's own ticket over Realtime (`useTicketChannel`), and walks everyone
- * into the dealt game the moment they're matched. `playBots` bails out of the
- * wait into a solo+bots game; `cancel` leaves the queue.
- */
+/** Drops the ticket whatever its state; a matched ticket holds a room, hence `all`. */
+function consumeTicket(): void {
+    apiFetch("/api/matchmaking?all=1", { method: "DELETE" }).catch(() => {});
+}
+
 export function useMatchmaking(userId: string) {
     const router = useRouter();
     const [state, setState] = useState<MatchState>({ phase: "idle" });
-    // Guards against a double navigation when the realtime push and the POST
-    // response both report "matched".
+    // The realtime push and the POST response can both report "matched".
     const navigating = useRef(false);
-    // True only once the user has started matchmaking *this mount*. A matched
-    // ticket seen while this is false is a spent ticket from a previous game
-    // (the backstop poll refetches status on every /lobby visit) — consume it
-    // instead of yanking the player back into a finished game. This is what
-    // stops "Leave game" → /lobby → instantly rejoined.
+    // A matched ticket seen before the user searched in this mount is a spent
+    // one from a previous game: consume it rather than yank them back in.
     const active = useRef(false);
 
     const handleStatus = useCallback(
         (s: ServerStatus) => {
             if (s.status === "matched") {
                 if (!active.current) {
-                    // Stale match — drop it (matched tickets hold a room_id, so
-                    // this needs the unconditional clear) and stay put.
-                    apiFetch("/api/matchmaking?all=1", {
-                        method: "DELETE",
-                    }).catch(() => {});
+                    consumeTicket();
                     setState({ phase: "idle" });
                     return;
                 }
                 if (navigating.current) return;
                 navigating.current = true;
                 setState({ phase: "matched" });
-                // Consume the spent ticket, then walk into the game.
-                apiFetch("/api/matchmaking?all=1", { method: "DELETE" }).catch(
-                    () => {},
-                );
+                consumeTicket();
                 router.push(`/game/${s.gameId}`);
                 return;
             }
@@ -80,16 +66,14 @@ export function useMatchmaking(userId: string) {
     const refresh = useCallback(async () => {
         try {
             const res = await apiFetch("/api/matchmaking");
-            if (res.ok) handleStatus((await res.json()) as ServerStatus);
+            const status = res.ok ? await readApiJson<ServerStatus>(res) : null;
+            if (status) handleStatus(status);
         } catch {
             // Transient: the ticket channel's next doorbell/poll retries.
         }
     }, [handleStatus]);
 
-    // Realtime doorbell on our ticket → refetch the authoritative status.
-    // (useTicketChannel already falls back to a 2s poll while the socket is
-    // down — so no extra polling loop here; forming is driven server-side by
-    // enqueue + its bounded retry.)
+    // useTicketChannel polls by itself while the socket is down.
     useTicketChannel(userId, refresh);
 
     const quickMatch = useCallback(
@@ -108,26 +92,23 @@ export function useMatchmaking(userId: string) {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ moduleId }),
                 });
-                // A 5xx/proxy page isn't JSON — don't let the parse throw.
-                const data = (await res.json().catch(() => ({}))) as {
-                    error?: string;
-                };
                 if (!res.ok) {
-                    // Already matched (409): the game exists — re-read the
-                    // ticket and walk in (active stays true) rather than error.
-                    if (data.error === "match_in_progress") {
+                    const error = await readApiError(res);
+                    // Already matched: the game exists, walk in rather than error.
+                    if (error === "match_in_progress") {
                         await refresh();
                         return;
                     }
                     active.current = false;
-                    // `code` carries rate_limited / maintenance / … for the UI.
-                    setState({ phase: "error", code: data.error ?? "generic" });
+                    setState({ phase: "error", code: error ?? "generic" });
                     return;
                 }
-                handleStatus(data as ServerStatus);
+                handleStatus(
+                    (await readApiJson<ServerStatus>(res)) ?? {
+                        status: "idle",
+                    },
+                );
             } catch {
-                // Network failure: leave the searching overlay instead of
-                // spinning forever on a queue we may never have joined.
                 active.current = false;
                 setState({ phase: "error", code: "generic" });
             }
@@ -136,14 +117,11 @@ export function useMatchmaking(userId: string) {
     );
 
     const cancel = useCallback(async () => {
-        // Also the escape hatch from a "matched" overlay that never resolved:
-        // clear the navigation latch so a real match can still walk us in.
+        // Also the way out of a "matched" overlay that never resolved.
         navigating.current = false;
         setState({ phase: "idle" });
-        // leaveQueue (no `all`) drops only a still-searching ticket; if a match
-        // landed in the click window it survives. Re-read the authoritative
-        // status so we walk into that game (active stays true → handleStatus
-        // navigates) instead of silently abandoning a live match.
+        // Without `all`, only a still-searching ticket is dropped: a match that
+        // landed in the click window survives and the refresh walks us in.
         await apiFetch("/api/matchmaking", { method: "DELETE" }).catch(
             () => {},
         );
@@ -161,23 +139,21 @@ export function useMatchmaking(userId: string) {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ moduleId }),
                 });
-                const data = (await res.json().catch(() => ({}))) as {
+                const data = await readApiJson<{
                     error?: string;
                     gameId?: string;
-                };
-                if (!res.ok || !data.gameId) {
+                }>(res);
+                if (!res.ok || !data?.gameId) {
                     navigating.current = false;
-                    // A human match grabbed our ticket in the same instant:
-                    // there's a real game incoming, so stay on the "matched"
-                    // overlay and let the realtime doorbell walk us in.
-                    if (data.error === "match_in_progress") return;
-                    setState({ phase: "error", code: data.error ?? "generic" });
+                    // A human match took our ticket meanwhile: the doorbell walks us in.
+                    if (data?.error === "match_in_progress") return;
+                    setState({
+                        phase: "error",
+                        code: data?.error ?? "generic",
+                    });
                     return;
                 }
-                // Consume the now-spent ticket so a later /lobby visit can't rejoin.
-                apiFetch("/api/matchmaking?all=1", { method: "DELETE" }).catch(
-                    () => {},
-                );
+                consumeTicket();
                 router.push(`/game/${data.gameId}`);
             } catch {
                 navigating.current = false;

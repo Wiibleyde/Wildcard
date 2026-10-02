@@ -1,80 +1,36 @@
 /**
- * Deterministic, seedable PRNG.
+ * Deterministic, seedable PRNG: a game is a pure function of (seed, action
+ * log), which buys replay, reproducible tests and server-side anti-cheat.
  *
- * The whole engine draws randomness from here so a game becomes a pure
- * function of (seed, action log): same seed + same actions ⇒ identical
- * outcome. That buys us free replay, reproducible tests, and server-side
- * anti-cheat — the server can re-derive any shuffle a client claims to see.
- *
- * `state` exposes the evolving cursor: persist it into `GameState.rngState`
- * after every step so the next `apply` resumes the sequence instead of
- * re-seeding from scratch (which would repeat shuffles, e.g. on a reshuffle).
- *
- * ## Two generators, one interface
- *
- * - **sfc32 (current)** — 128-bit state, seeded with 128 bits from
- *   `crypto.getRandomValues`. Serialized as `"sfc32:<32 hex chars>"` (the four
- *   32-bit words a, b, c, d, big-endian hex). The seed IS the initial state, so
- *   `createRng(seed)` and `createRng(rngState)` go through the same parser.
- * - **mulberry32 (legacy)** — a plain 32-bit `number`. Only kept so games
- *   recorded before the switch still load and replay bit-identically. Never
- *   generated for a new game: a 32-bit seed is brute-forceable (2^32 candidate
- *   deals in minutes on one core — a player knowing their own 13 cards can
- *   recover every opponent hand and the Tarot chien).
- *
- * The representation itself selects the generator (`number` ⇒ mulberry32,
- * tagged string ⇒ sfc32), so a stored game needs no migration and modules
- * never branch on it — they only see the {@link Rng} interface.
- *
- * Why sfc32 rather than xoshiro128**: xoshiro's state transition is linear
- * over GF(2), so a few full outputs determine the state by linear algebra.
- * sfc32 mixes additions with xor/rotations (non-linear) and carries a counter
- * that rules out short cycles. Neither is a CSPRNG; the threat this closes is
- * exhaustive search of the seed space, which 2^128 makes infeasible. Clients
- * never see raw outputs anyway — only a few cards, i.e. heavily reduced
- * shuffle indices — and the seed/state never leave the server.
+ * The encoding selects the generator, so stored games need no migration:
+ * - `"sfc32:<32 hex>"` — 128-bit sfc32, seeded from `crypto.getRandomValues`.
+ *   Its non-linear mixing resists recovering the state from outputs, unlike
+ *   xoshiro's GF(2)-linear transition.
+ * - `number` — legacy 32-bit mulberry32, kept bit-identical for old games.
+ *   Never used for new ones: 2^32 seeds are brute-forceable in minutes from
+ *   a player's own hand.
  */
 export interface Rng {
     /** Float in [0, 1). */
     next(): number;
     /** Integer in [0, maxExclusive). */
     int(maxExclusive: number): number;
-    /** Fisher–Yates shuffle — returns a NEW array, input left untouched. */
+    /** Fisher–Yates; returns a new array. */
     shuffle<T>(items: readonly T[]): T[];
-    /** Current internal cursor — store in `GameState.rngState`. */
     readonly state: RngState;
 }
 
-/** Tag of the current 128-bit generator's serialized state. */
 const SFC32_PREFIX = "sfc32:";
 const SFC32_PATTERN = /^sfc32:[0-9a-f]{32}$/;
 
-/** Serialized 128-bit sfc32 state: `"sfc32:"` + 32 lowercase hex chars. */
 export type Sfc32State = `sfc32:${string}`;
 
-/**
- * A serialized RNG cursor, JSON-safe so it lives inside the persisted state:
- * `number` = legacy mulberry32 (32-bit), {@link Sfc32State} = current sfc32.
- */
+/** JSON-safe cursor persisted in the state. */
 export type RngState = number | Sfc32State;
 
-/** A game seed — the RNG state the game was dealt from (same encoding). */
+/** The RNG state the game was dealt from (same encoding). */
 export type GameSeed = RngState;
 
-/** Runtime guard for a value read back from storage (untrusted JSON). */
-export function isRngState(value: unknown): value is RngState {
-    if (typeof value === "number") {
-        return Number.isInteger(value) && value >= 0 && value <= 0xffff_ffff;
-    }
-    return typeof value === "string" && SFC32_PATTERN.test(value);
-}
-
-/** True for a seed/state from before the 128-bit switch (mulberry32). */
-export function isLegacyRngState(state: RngState): state is number {
-    return typeof state === "number";
-}
-
-/** Shared float/int/shuffle derivation over a raw 32-bit source. */
 function rngFrom(nextUint32: () => number, state: () => RngState): Rng {
     const next = (): number => nextUint32() / 0x1_0000_0000;
 
@@ -102,7 +58,6 @@ function rngFrom(nextUint32: () => number, state: () => RngState): Rng {
     };
 }
 
-/** Legacy mulberry32 — kept bit-identical for games recorded before sfc32. */
 function mulberry32(seed: number): Rng {
     let cursor = seed >>> 0;
     return rngFrom(
@@ -119,7 +74,7 @@ function mulberry32(seed: number): Rng {
 const hex32 = (word: number): string =>
     (word >>> 0).toString(16).padStart(8, "0");
 
-/** sfc32 (Chris Doty-Humphrey's Small Fast Chaotic PRNG), 128-bit state. */
+/** sfc32 (Chris Doty-Humphrey's Small Fast Chaotic PRNG). */
 function sfc32(serialized: Sfc32State): Rng {
     const body = serialized.slice(SFC32_PREFIX.length);
     let a = Number.parseInt(body.slice(0, 8), 16) | 0;
@@ -140,11 +95,7 @@ function sfc32(serialized: Sfc32State): Rng {
     );
 }
 
-/**
- * Resume (or start) a generator from a serialized seed / `rngState`. The
- * encoding picks the algorithm, so legacy numeric games keep mulberry32.
- * Throws on a malformed string rather than silently dealing from garbage.
- */
+/** Throws on a malformed string rather than dealing from garbage. */
 export function createRng(state: RngState): Rng {
     if (typeof state === "number") return mulberry32(state);
     if (!SFC32_PATTERN.test(state)) {
@@ -153,11 +104,6 @@ export function createRng(state: RngState): Rng {
     return sfc32(state);
 }
 
-/**
- * Cryptographically-random 128-bit seed for a fresh game (sfc32 encoding).
- * Every new game uses this; numeric seeds exist only for legacy replays and
- * fixed test fixtures.
- */
 export function randomSeed(): Sfc32State {
     const words = new Uint32Array(4);
     crypto.getRandomValues(words);

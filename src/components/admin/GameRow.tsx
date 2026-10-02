@@ -1,20 +1,8 @@
 "use client";
 
-import { useLocale, useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { GameButton } from "@/components/ui/GameButton";
 import type { OngoingGame } from "@/lib/models/admin";
-
-/** Localised "il y a 3 min" from an ISO timestamp, given a clock tick. */
-function relativeTime(locale: string, iso: string, now: number): string {
-    const diffSec = Math.max(
-        0,
-        Math.round((now - new Date(iso).getTime()) / 1000),
-    );
-    const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
-    if (diffSec < 60) return rtf.format(-diffSec, "second");
-    if (diffSec < 3600) return rtf.format(-Math.floor(diffSec / 60), "minute");
-    return rtf.format(-Math.floor(diffSec / 3600), "hour");
-}
 
 type Props = {
     game: OngoingGame;
@@ -28,16 +16,13 @@ type Props = {
 export function GameRow({ game: g, canEnd, now, endingId, onEnd }: Props) {
     const t = useTranslations("admin");
     const tCommon = useTranslations("common");
-    const locale = useLocale();
+    const format = useFormatter();
 
     return (
-        <li className="panel flex flex-col sm:flex-row sm:items-center gap-3 p-3.5">
-            <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span
-                        className="font-display text-base leading-none"
-                        style={{ color: "var(--ink)" }}
-                    >
+        <li className="panel flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center">
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-display text-base leading-none text-wc-ink">
                         {g.moduleName}
                     </span>
                     <span
@@ -49,38 +34,29 @@ export function GameRow({ game: g, canEnd, now, endingId, onEnd }: Props) {
                     >
                         {g.roomCode}
                     </span>
-                    <span
-                        className="stamp"
-                        style={{
-                            background: "var(--purple)",
-                            color: "var(--accent-ink)",
-                        }}
-                    >
-                        {t("phase")}: {g.phase}
-                    </span>
                 </div>
-                <div
-                    className="flex items-center gap-3 flex-wrap text-xs font-semibold"
-                    style={{ color: "#5a5340" }}
-                >
-                    <span>
-                        {t("players_count", { count: g.playerCount })}
-                        {g.botCount > 0 &&
-                            ` · ${t("bots_count", { count: g.botCount })}`}
-                    </span>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-wc-ink-soft">
+                    <span>{t("players_count", { count: g.playerCount })}</span>
+                    {g.botCount > 0 && (
+                        <span>{t("bots_count", { count: g.botCount })}</span>
+                    )}
                     {(g.currentPlayerName || g.currentIsBot) && (
                         <span>
-                            {t("current_turn")}:{" "}
-                            <span style={{ color: "var(--ink)" }}>
-                                {g.currentIsBot
+                            {t.rich("current_turn", {
+                                name: g.currentIsBot
                                     ? t("bot_turn")
-                                    : g.currentPlayerName}
-                            </span>
+                                    : (g.currentPlayerName ?? ""),
+                                b: (chunks) => (
+                                    <span className="text-wc-ink">
+                                        {chunks}
+                                    </span>
+                                ),
+                            })}
                         </span>
                     )}
                     {now !== null && (
-                        <span style={{ color: "#5a5340" }}>
-                            {relativeTime(locale, g.startedAt, now)}
+                        <span>
+                            {format.relativeTime(new Date(g.startedAt), now)}
                         </span>
                     )}
                 </div>

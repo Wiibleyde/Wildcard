@@ -1,13 +1,7 @@
 import type gsap from "gsap";
 
-/**
- * Write `value` into an element's text without replacing React's Text node.
- *
- * Setting `el.textContent` swaps the child Text node for a new one, so React
- * keeps committing later updates to the detached original and the screen goes
- * stale. Mutating the existing node's `nodeValue` keeps React's handle valid:
- * the next commit simply overwrites what GSAP wrote.
- */
+// Mutates the existing Text node: replacing it via `textContent` would leave
+// React committing later updates to a detached node.
 export function writeOwnedText(el: HTMLElement | null, value: string): void {
     if (!el) return;
     const node = el.firstChild;
@@ -18,10 +12,6 @@ export function writeOwnedText(el: HTMLElement | null, value: string): void {
     }
 }
 
-/**
- * Count an integer up from `from` to `to` on a timeline by tweening a plain
- * proxy object and writing each step through {@link writeOwnedText}.
- */
 export function tweenCount(
     tl: gsap.core.Timeline,
     el: HTMLElement | null,

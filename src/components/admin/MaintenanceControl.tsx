@@ -1,10 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
+import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { GameButton } from "@/components/ui/GameButton";
+import { Switch } from "@/components/ui/Switch";
+import { useRouter } from "@/i18n/navigation";
 import { apiFetch } from "@/lib/api/client";
 
 type Props = {
@@ -12,10 +14,6 @@ type Props = {
     initialMessage: string | null;
 };
 
-/**
- * Toggle site-wide maintenance. Enabling locks every non-admin out (enforced
- * in src/proxy.ts), so it confirms first.
- */
 export function MaintenanceControl({ initialEnabled, initialMessage }: Props) {
     const t = useTranslations("admin");
     const tCommon = useTranslations("common");
@@ -28,6 +26,7 @@ export function MaintenanceControl({ initialEnabled, initialMessage }: Props) {
     const [error, setError] = useState<string | null>(null);
 
     async function apply(next: boolean) {
+        // Enabling locks every non-admin out (src/proxy.ts): confirm first.
         if (next && !enabled) {
             const ok = await confirm({
                 title: t("maintenance_title"),
@@ -64,7 +63,7 @@ export function MaintenanceControl({ initialEnabled, initialMessage }: Props) {
 
     return (
         <section
-            className="panel-d p-5 xl:p-6 flex flex-col gap-4"
+            className="panel-d flex flex-col gap-4 p-5 xl:p-6"
             style={
                 enabled
                     ? {
@@ -74,11 +73,9 @@ export function MaintenanceControl({ initialEnabled, initialMessage }: Props) {
                     : undefined
             }
         >
-            <div className="flex items-center gap-2.5">
-                <h2 className="font-display text-xl xl:text-2xl leading-none">
-                    {t("maintenance_title")}
-                </h2>
-            </div>
+            <h2 className="font-display text-xl leading-none xl:text-2xl">
+                {t("maintenance_title")}
+            </h2>
 
             <div className="flex items-center justify-between gap-3">
                 <span
@@ -92,59 +89,21 @@ export function MaintenanceControl({ initialEnabled, initialMessage }: Props) {
                         ? t("maintenance_active")
                         : t("maintenance_inactive")}
                 </span>
-
-                <button
-                    type="button"
-                    role="switch"
-                    aria-checked={enabled}
-                    aria-label={t("maintenance_title")}
-                    onClick={() => apply(!enabled)}
+                <Switch
+                    checked={enabled}
+                    onChange={apply}
+                    label={t("maintenance_title")}
                     disabled={saving}
-                    className="relative shrink-0 disabled:opacity-50 disabled:cursor-default"
-                    style={{
-                        width: 62,
-                        height: 34,
-                        borderRadius: 10,
-                        border: "2.5px solid var(--ink)",
-                        background: enabled ? "var(--red)" : "var(--panel-d2)",
-                        transition: "background 0.12s",
-                        cursor: saving ? "default" : "pointer",
-                    }}
-                >
-                    <span
-                        className="absolute top-1/2"
-                        style={{
-                            width: 22,
-                            height: 22,
-                            borderRadius: 6,
-                            background: "var(--gold)",
-                            border: "2.5px solid var(--ink)",
-                            boxShadow: "0 3px 0 var(--ink)",
-                            transform: `translateY(-50%) translateX(${enabled ? 30 : 3}px)`,
-                            transition:
-                                "transform 0.14s cubic-bezier(0.3,0.8,0.3,1)",
-                        }}
-                    />
-                </button>
+                    onColor="var(--red)"
+                />
             </div>
 
-            <p
-                className="text-xs font-semibold"
-                style={{ color: "var(--muted)" }}
-            >
+            <p className="text-xs font-semibold text-wc-muted">
                 {t("maintenance_desc")}
             </p>
 
             <label className="flex flex-col gap-1.5">
-                <span
-                    className="uppercase"
-                    style={{
-                        fontFamily: "var(--pixel)",
-                        fontSize: 10,
-                        letterSpacing: "0.02em",
-                        color: "var(--muted)",
-                    }}
-                >
+                <span className="font-pixel text-wc-label tracking-wc-cap text-wc-muted uppercase">
                     {t("maintenance_message_label")}
                 </span>
                 <textarea
@@ -153,23 +112,11 @@ export function MaintenanceControl({ initialEnabled, initialMessage }: Props) {
                     rows={3}
                     maxLength={280}
                     placeholder={t("maintenance_message_placeholder")}
-                    className="w-full rounded-xl px-3 py-2.5 text-sm font-semibold resize-none outline-none"
-                    style={{
-                        background: "var(--panel-d2)",
-                        border: "2.5px solid var(--ink)",
-                        color: "var(--cream)",
-                    }}
+                    className="w-full resize-none rounded-xl border-nb border-wc-ink bg-wc-panel-d2 px-3 py-2.5 text-sm font-semibold text-wc-cream outline-none"
                 />
             </label>
 
-            {error && (
-                <p
-                    className="text-xs font-bold"
-                    style={{ color: "var(--red)" }}
-                >
-                    {error}
-                </p>
-            )}
+            {error && <ErrorBanner>{error}</ErrorBanner>}
 
             <GameButton
                 variant="gold"

@@ -8,21 +8,14 @@ import type { EcaDefinition } from "@/lib/eca/types";
 import { TestPlayLog } from "./TestPlayLog";
 import { TestPlaySeat } from "./TestPlaySeat";
 
-/**
- * Studio sandbox: the current draft becomes a real GameModule (`eca:draft`)
- * driven through the REAL runner. A thin shell over {@link useTestPlay} — the
- * table center (stock / discard / direction / turn), one {@link TestPlaySeat}
- * per player, and the {@link TestPlayLog}. If it works here, it works in a
- * match.
- */
+/** `definition` is `null` while the draft does not validate. */
 export function TestPlay({
     definition,
-    valid,
 }: {
-    readonly definition: EcaDefinition;
-    readonly valid: boolean;
+    readonly definition: EcaDefinition | null;
 }) {
     const t = useTranslations("studio");
+    const valid = definition !== null;
     const {
         sandbox,
         stale,
@@ -84,7 +77,6 @@ export function TestPlay({
             {sandbox && (
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                     <div className="flex flex-col gap-4 lg:col-span-2">
-                        {/* Table center: stock, discard, direction, turn. */}
                         <div className="flex flex-wrap items-center gap-3">
                             <span
                                 className="stamp"
@@ -157,7 +149,6 @@ export function TestPlay({
                             </p>
                         )}
 
-                        {/* One panel per seat, rendered from that seat's view. */}
                         <div className="flex flex-col gap-3">
                             {seats.map((seat) => (
                                 <TestPlaySeat

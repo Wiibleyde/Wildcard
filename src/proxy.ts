@@ -1,6 +1,8 @@
 import { type CookieOptions, createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import createMiddleware from "next-intl/middleware";
+import { getUserRole, roleAtLeast } from "@/lib/auth/roles";
+import { localeFromPath, pathSegments } from "@/lib/locale";
 import { getAppSettings } from "@/lib/models/settings";
 import { readPublicEnvFromProcess } from "@/lib/public-env";
 import { buildCsp, generateNonce } from "@/lib/security/csp";
@@ -15,28 +17,11 @@ const handleI18nRouting = createMiddleware(routing);
 
 type PendingCookie = { name: string; value: string; options: CookieOptions };
 
-/**
- * Paths that stay reachable during maintenance: the maintenance page itself
- * (no rewrite loop) and the dev login page. In prod, sign-in happens on the
- * portal, outside this app, so a signed-out admin is never blocked from it.
- * Matched anywhere in the path so the locale prefix is irrelevant.
- */
-const MAINTENANCE_ALLOW = ["/maintenance", "/dev-login"];
-
-function localeFromPath(pathname: string): string {
-    const seg = pathname.split("/")[1];
-    return (routing.locales as readonly string[]).includes(seg)
-        ? seg
-        : routing.defaultLocale;
-}
+/** First segment after the locale; prod sign-in happens on the portal, outside this app. */
+const MAINTENANCE_ALLOW = new Set(["maintenance", "dev-login"]);
 
 export async function proxy(request: NextRequest) {
-    // ── Content Security Policy ──────────────────────────────────────────
-    // A fresh nonce per page request. Set on the *request* headers, Next.js
-    // reads it while rendering and stamps it on its own scripts (and next-intl
-    // forwards request headers on its rewrite/next responses); set on the
-    // *response*, the browser enforces it. Pages are dynamic (the layout reads
-    // the session cookie), so every render gets its own nonce.
+    // Nonce on the request headers for Next to stamp its scripts, on the response for the browser.
     const env = readPublicEnvFromProcess();
     const nonce = generateNonce();
     const csp = buildCsp(nonce, {
@@ -52,7 +37,6 @@ export async function proxy(request: NextRequest) {
 
     const { url, anonKey } = getServerSupabaseEnv();
     const supabase = createServerClient<Database>(url, anonKey, {
-        // Same cookie name/encoding/domain as every client and the portal (env.ts).
         ...supabaseSharedOptions(),
         cookies: {
             getAll: () => request.cookies.getAll(),
@@ -64,13 +48,11 @@ export async function proxy(request: NextRequest) {
             },
         },
     });
-    // Must run right after creating the client: it refreshes an expired session
-    // (writing the new cookie via setAll) and verifies the JWT signature. Any
-    // await in between risks acting on a stale session.
+    // Right after creating the client: refreshes an expired session. Any await
+    // in between risks acting on a stale one.
     const { data: claimsData } = await supabase.auth.getClaims();
     const userId = claimsData?.claims?.sub ?? null;
 
-    /** Carry the refreshed session cookies and the CSP onto the response. */
     const withCookies = (response: NextResponse) => {
         for (const { name, value, options } of pendingCookies) {
             response.cookies.set(name, value, options);
@@ -79,42 +61,30 @@ export async function proxy(request: NextRequest) {
         return response;
     };
 
-    // ── Maintenance gate ─────────────────────────────────────────────────
-    // When maintenance is on, everyone except admins is rewritten to the
-    // maintenance page. One settings read per navigation (assets/api/_next are
-    // excluded by the matcher below); the role is read only while it's on.
     const pathname = request.nextUrl.pathname;
     const settings = await getAppSettings(supabase);
     if (
         settings.maintenance &&
-        !MAINTENANCE_ALLOW.some((p) => pathname.includes(p))
+        !MAINTENANCE_ALLOW.has(pathSegments(pathname).rest[0] ?? "")
     ) {
-        let isAdmin = false;
-        if (userId) {
-            const { data } = await supabase
-                .from("user_roles")
-                .select("role")
-                .eq("user_id", userId)
-                .maybeSingle();
-            isAdmin = data?.role === "admin";
-        }
+        const isAdmin =
+            userId !== null &&
+            roleAtLeast(await getUserRole(supabase, userId), "admin");
         if (!isAdmin) {
-            const url = request.nextUrl.clone();
-            url.pathname = `/${localeFromPath(pathname)}/maintenance`;
+            const target = request.nextUrl.clone();
+            target.pathname = `/${localeFromPath(pathname)}/maintenance`;
             return withCookies(
-                NextResponse.rewrite(url, {
+                NextResponse.rewrite(target, {
                     request: { headers: request.headers },
                 }),
             );
         }
     }
 
-    // next-intl handles locale negotiation, redirects, rewrites, and alt links
     return withCookies(handleI18nRouting(request));
 }
 
 export const config = {
-    // Excludes: _next internals, API routes (JSON — no CSP needed, and they
-    // authenticate by bearer token, not by this cookie refresh), static files.
+    // API routes authenticate by bearer token and need neither CSP nor this refresh.
     matcher: ["/((?!_next|api|favicon\\.ico|.*\\..*).*)"],
 };

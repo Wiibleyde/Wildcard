@@ -1,25 +1,12 @@
 "use client";
 
-import { useGSAP } from "@gsap/react";
-import gsap from "gsap";
 import { useTranslations } from "next-intl";
 import { useRef } from "react";
 import { useGameOverXp } from "@/hooks/game/useGameOverXp";
+import { gsap, useGSAP } from "@/lib/gsap";
 import { tweenCount, writeOwnedText } from "@/lib/gsap/textTween";
 import { xpProgress } from "@/lib/xp/xp";
 
-gsap.registerPlugin(useGSAP);
-
-/**
- * End-of-game XP reward. Shown only to a participant who earned XP (the caller
- * gates on `end.xpGained > 0`). `gained` comes from the server payload — the
- * same rule `settleGame` applied (no XP for an unplayed or winnerless game) —
- * while the running total is resolved authoritatively in {@link useGameOverXp}.
- *
- * Animation (GSAP): the panel rises in, the gained badge pops, the XP counter
- * tallies up from the pre-game total, and the bar fills to the new progress —
- * wrapping through 100% with a gold flash when the player levels up.
- */
 export function GameOverXp({
     userId,
     gained,
@@ -44,7 +31,6 @@ export function GameOverXp({
             const beforePct = xpProgress(xp.before) * 100;
             const afterPct = xpProgress(xp.after) * 100;
             const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-            // A re-run (resolved total changed) restarts from the pre-game level.
             writeOwnedText(levelRef.current, String(xp.levelBefore));
 
             tl.from(containerRef.current, {
@@ -52,18 +38,11 @@ export function GameOverXp({
                 opacity: 0,
                 duration: 0.45,
             });
-
-            // Gained badge pop.
             tl.from(
                 ".xp-gained-badge",
                 { scale: 0, opacity: 0, duration: 0.4, ease: "back.out(2)" },
                 "-=0.1",
             );
-
-            // Count the total up from the pre-game value. A proxy is tweened
-            // and written into React's own Text node: animating `textContent`
-            // would replace that node, leaving React committing to a detached
-            // one (stale numbers on the next render).
             tweenCount(
                 tl,
                 numRef.current,
@@ -73,7 +52,6 @@ export function GameOverXp({
                 "<",
             );
 
-            // Bar fill — wrap through full on a level-up, then continue.
             gsap.set(barRef.current, { width: `${beforePct}%` });
             if (xp.leveledUp) {
                 tl.to(
@@ -90,7 +68,6 @@ export function GameOverXp({
                     duration: 0.7,
                     ease: "power2.out",
                 });
-                // Level-up burst + badge punch.
                 tl.fromTo(
                     levelUpRef.current,
                     { scale: 0.5, opacity: 0, y: 6 },
@@ -105,9 +82,7 @@ export function GameOverXp({
                 );
                 tl.fromTo(
                     levelRef.current,
-                    { scale: 1.6, color: "#ffc23d" },
-                    // clearProps: hand the colour back to the badge's CSS
-                    // (accent ink on purple) instead of pinning a hex.
+                    { scale: 1.6, color: "var(--gold)" },
                     { scale: 1, duration: 0.6, clearProps: "color" },
                     "<",
                 );
@@ -119,7 +94,13 @@ export function GameOverXp({
                 );
             }
         },
-        { scope: containerRef, dependencies: [xp.ready, xp.after] },
+        // The total can be revised upward by a late Realtime event: revert the
+        // previous timeline instead of racing it.
+        {
+            scope: containerRef,
+            dependencies: [xp.ready, xp.after],
+            revertOnUpdate: true,
+        },
     );
 
     if (!xp.ready) return null;
@@ -127,7 +108,6 @@ export function GameOverXp({
     return (
         <div ref={containerRef} className="panel w-full max-w-xs p-3">
             <div className="flex items-center gap-3">
-                {/* chunky ink-bordered reward tile */}
                 <div
                     className="xp-gained-badge grid size-12 shrink-0 place-items-center rounded-xl border-nb font-display text-xl leading-none"
                     style={{
@@ -138,7 +118,7 @@ export function GameOverXp({
                     }}
                     aria-hidden="true"
                 >
-                    XP
+                    {t("xp_unit")}
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -159,10 +139,17 @@ export function GameOverXp({
                                 color: "var(--accent-ink)",
                             }}
                         >
-                            {t("level_short")}{" "}
-                            <span ref={levelRef} className="tabular-nums">
-                                {xp.levelBefore}
-                            </span>
+                            {t.rich("level_badge", {
+                                level: xp.levelBefore,
+                                n: (chunks) => (
+                                    <span
+                                        ref={levelRef}
+                                        className="tabular-nums"
+                                    >
+                                        {chunks}
+                                    </span>
+                                ),
+                            })}
                         </span>
                     </div>
 
@@ -171,8 +158,11 @@ export function GameOverXp({
                         style={{ color: "var(--purple)" }}
                     >
                         +{xp.gained}{" "}
-                        <span className="text-sm" style={{ color: "#5a5340" }}>
-                            XP
+                        <span
+                            className="text-sm"
+                            style={{ color: "var(--ink-soft)" }}
+                        >
+                            {t("xp_unit")}
                         </span>
                     </div>
                 </div>
@@ -217,9 +207,9 @@ export function GameOverXp({
                 )}
                 <span
                     className="text-xs font-bold tabular-nums"
-                    style={{ color: "#5a5340" }}
+                    style={{ color: "var(--ink-soft)" }}
                 >
-                    <span ref={numRef}>{xp.before}</span> XP
+                    <span ref={numRef}>{xp.before}</span> {t("xp_unit")}
                 </span>
             </div>
         </div>

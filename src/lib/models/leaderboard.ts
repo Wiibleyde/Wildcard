@@ -1,17 +1,16 @@
 import { gameCatalog, getGameModule } from "@/lib/games";
 import { ecaNamesByModuleIds } from "@/lib/games/resolve";
-import { fallbackName } from "@/lib/models/identities";
 import type { createClient } from "@/lib/supabase/server";
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>;
 
-/** How many ranked players to surface per game. */
 export const LEADERBOARD_TOP_N = 50;
 
 export interface LeaderboardEntry {
     readonly userId: string;
-    readonly username: string;
-    /** Portal avatar path (`portal.profiles.avatar_path`), or null — see `portalAvatarUrl`. */
+    /** `null` without a portal pseudo. */
+    readonly username: string | null;
+    /** Portal avatar path — see `portalAvatarUrl`. */
     readonly avatarPath: string | null;
     readonly rating: number;
     readonly gamesPlayed: number;
@@ -25,20 +24,8 @@ export interface LeaderboardGame {
 }
 
 /**
- * Per-game ELO standings, best rating first. Delegates ranking to the
- * `leaderboard` SQL function, which uses a window function over the publicly
- * readable `player_elo` rows (RLS allows SELECT to everyone) joined to
- * the portal's `profiles` for the pseudo + profile picture, and returns only the top `topN` per
- * module — the whole table never crosses the wire. Ratings are written
- * server-side from each game's `outcome()` (see {@link recordEloForGame}); this
- * is a pure read-only projection — the browser can never forge a rating here.
- *
- * Rows arrive ordered by module then in-module rank, so the per-module top
- * players are already in display order. Games appear in catalog order; a game
- * with no rated player yet is simply absent.
- *
- * A query failure is thrown, not swallowed: an error and "no rated games yet"
- * must never render as the same empty board.
+ * Per-game top `topN` by ELO, ranked in SQL (`leaderboard`). Throws on error so
+ * a failure never renders as "no rated games yet".
  */
 export async function getLeaderboard(
     supabase: ServerClient,
@@ -47,18 +34,16 @@ export async function getLeaderboard(
     const { data, error } = await supabase.rpc("leaderboard", {
         p_top_n: topN,
     });
+    if (error) throw new Error(`getLeaderboard failed: ${error.message}`);
 
-    if (error) {
-        throw new Error(`getLeaderboard failed: ${error.message}`);
-    }
-
+    // Rows arrive ordered by module, then rank.
     const byModule = new Map<string, LeaderboardEntry[]>();
-    for (const row of data ?? []) {
+    for (const row of data) {
         const list = byModule.get(row.module_id) ?? [];
         byModule.set(row.module_id, list);
         list.push({
             userId: row.user_id,
-            username: row.username ?? fallbackName(row.user_id),
+            username: row.username,
             avatarPath: row.avatar_url,
             rating: row.rating,
             gamesPlayed: row.games_played,
@@ -66,16 +51,12 @@ export async function getLeaderboard(
         });
     }
 
-    // Stable display order: native games as listed in the catalog, then any
-    // other module that has ratings (e.g. a future ECA game), alphabetically.
+    // Catalog order first, then other modules (studio games) alphabetically.
     const catalogOrder = new Map(
         gameCatalog().map((g, index) => [g.id, index] as const),
     );
     const rank = (id: string) =>
         catalogOrder.get(id) ?? Number.MAX_SAFE_INTEGER;
-
-    // Studio games appear on the ladder under their own module id; resolve their
-    // display names in one query (published rows are world-readable under RLS).
     const ecaNames = await ecaNamesByModuleIds(supabase, byModule.keys());
 
     return [...byModule.entries()]

@@ -1,10 +1,6 @@
 import type { CSSProperties } from "react";
 
-/**
- * Shared neobrutalism form-control skin for the Studio editor — the
- * MatchHistoryClient input pattern, on cream panels (hence the
- * deeper cream2 fill for contrast).
- */
+/** Studio form skin, on cream panels (hence the deeper cream2 fill). */
 
 export const fieldClass =
     "rounded-lg px-2.5 py-2 text-sm font-semibold outline-none";
@@ -15,12 +11,13 @@ export const fieldStyle: CSSProperties = {
     color: "var(--ink)",
 };
 
-/** Uppercase pixel-ish field label, dark-on-cream. */
+/** Secondary text on cream panels. */
+export const mutedTextStyle: CSSProperties = { color: "var(--ink-soft)" };
+
 export const labelClass = "text-xs font-bold uppercase tracking-widest";
 
-export const labelStyle: CSSProperties = { color: "#5a5340" };
+export const labelStyle = mutedTextStyle;
 
-/** Small square icon button (move / remove rows). */
 export const squareButtonClass =
     "wc-iconbtn grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sm font-bold disabled:opacity-40";
 

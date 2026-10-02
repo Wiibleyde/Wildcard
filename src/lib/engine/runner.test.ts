@@ -5,7 +5,7 @@ import {
     type PresidentAction,
     president,
 } from "@/lib/games/president/president";
-import { isLegacyRngState, type Rng, randomSeed } from "./rng";
+import { type Rng, randomSeed } from "./rng";
 import { createGame, dispatch, replay, replayFrames } from "./runner";
 import type { Player } from "./types";
 
@@ -24,7 +24,7 @@ describe("replay", () => {
     it("re-derives the exact bataille state from (seed, action log)", () => {
         const seed = 424242;
         const log: BatailleAction[] = [];
-        let state = createGame(bataille, TWO, seed);
+        let state = createGame(bataille, TWO, { seed });
 
         for (let i = 0; i < 25 && !bataille.isOver(state); i++) {
             const action: BatailleAction = { type: "flip", playerId: "a" };
@@ -34,13 +34,15 @@ describe("replay", () => {
             state = result.state;
         }
 
-        expect(replay(bataille, TWO, seed, log, state.gameId)).toEqual(state);
+        expect(
+            replay(bataille, TWO, seed, log, { gameId: state.gameId }),
+        ).toEqual(state);
     });
 
     it("re-derives a full president round, including the outcome", () => {
         const seed = 20260611;
         const log: PresidentAction[] = [];
-        let state = createGame(president, FOUR, seed);
+        let state = createGame(president, FOUR, { seed });
 
         let guard = 0;
         while (!president.isOver(state) && guard++ < 10_000) {
@@ -54,7 +56,9 @@ describe("replay", () => {
             state = result.state;
         }
 
-        const replayed = replay(president, FOUR, seed, log, state.gameId);
+        const replayed = replay(president, FOUR, seed, log, {
+            gameId: state.gameId,
+        });
         expect(replayed).toEqual(state);
         expect(president.outcome(replayed)).toEqual(president.outcome(state));
     });
@@ -71,7 +75,7 @@ describe("replay", () => {
         if (!configured) throw new Error("president.withRules unavailable");
 
         const log: PresidentAction[] = [];
-        let state = createGame(configured, FOUR, seed);
+        let state = createGame(configured, FOUR, { seed });
         let guard = 0;
         while (!configured.isOver(state) && guard++ < 10_000) {
             const action = configured.legalActions(
@@ -87,7 +91,7 @@ describe("replay", () => {
         // Reconstruct the way the replay model does: base module, default-rules
         // deal, then graft the persisted rules back on before folding the log.
         let rebuilt = {
-            ...createGame(president, FOUR, seed, state.gameId),
+            ...createGame(president, FOUR, { seed, gameId: state.gameId }),
             rules,
         };
         for (const action of log) {
@@ -111,7 +115,7 @@ describe("replay", () => {
         if (!configured) throw new Error("president.withRules unavailable");
 
         const log: PresidentAction[] = [];
-        let state = createGame(configured, FOUR, seed);
+        let state = createGame(configured, FOUR, { seed });
         let guard = 0;
         while (!configured.isOver(state) && guard++ < 10_000) {
             const action = configured.legalActions(
@@ -139,7 +143,7 @@ describe("replay", () => {
 
     it("throws when the log diverges from the rules", () => {
         const seed = 7;
-        const opening = createGame(president, FOUR, seed);
+        const opening = createGame(president, FOUR, { seed });
         // A pass on the opening lead is always illegal in président.
         const bad: PresidentAction = {
             type: "pass",
@@ -166,7 +170,9 @@ describe("replayFrames", () => {
             states.push(state);
         }
 
-        const frames = [...replayFrames(bataille, TWO, seed, log, "g")];
+        const frames = [
+            ...replayFrames(bataille, TWO, seed, log, { gameId: "g" }),
+        ];
         expect(frames.map((f) => f.index)).toEqual(states.map((_, i) => i - 1));
         expect(frames.map((f) => f.state)).toEqual(states);
         expect(frames[0].action).toBeNull();
@@ -174,7 +180,7 @@ describe("replayFrames", () => {
 
     it("returns the divergence instead of throwing", () => {
         const seed = 7;
-        const opening = createGame(president, FOUR, seed);
+        const opening = createGame(president, FOUR, { seed });
         const bad: PresidentAction = {
             type: "pass",
             playerId: opening.currentPlayerId,
@@ -191,15 +197,14 @@ describe("createGame", () => {
     it("defaults to a 128-bit seed and keeps a legacy numeric one as-is", () => {
         const fresh = createGame(bataille, TWO);
         expect(fresh.seed).toMatch(/^sfc32:[0-9a-f]{32}$/);
-        expect(isLegacyRngState(fresh.rngState)).toBe(false);
+        expect(typeof fresh.rngState).toBe("string");
 
-        const legacy = createGame(bataille, TWO, 424242);
+        const legacy = createGame(bataille, TWO, { seed: 424242 });
         expect(legacy.seed).toBe(424242);
-        expect(isLegacyRngState(legacy.rngState)).toBe(true);
+        expect(typeof legacy.rngState).toBe("number");
     });
 
-    it("accepts an explicit game id (positional or option)", () => {
-        expect(createGame(bataille, TWO, 1, "row-id").gameId).toBe("row-id");
+    it("accepts an explicit game id", () => {
         expect(createGame(bataille, TWO, { gameId: "row-id" }).gameId).toBe(
             "row-id",
         );
@@ -208,7 +213,10 @@ describe("createGame", () => {
     it("pins the legacy président deal recorded before the 128-bit switch", () => {
         // Golden capture from the pre-sfc32 engine: a stored numeric-seed game
         // must keep dealing exactly this hand.
-        const state = createGame(president, FOUR, 20260611, "g");
+        const state = createGame(president, FOUR, {
+            seed: 20260611,
+            gameId: "g",
+        });
         expect(
             state.hands.a.map((c) =>
                 c.type === "suited" ? `${c.suit}:${c.rank}` : c.type,
@@ -257,8 +265,27 @@ describe("dispatch", () => {
         expect(result.state.rngState).not.toEqual(state.rngState);
     });
 
+    it("owns the turn counter: +1 per applied action", () => {
+        const state = createGame(bataille, TWO, { seed: 1 });
+        const careless = {
+            ...bataille,
+            apply: (s: typeof state, a: BatailleAction, rng: Rng) => {
+                const r = bataille.apply(s, a, rng);
+                return r.ok ? { ...r, state: { ...r.state, turn: 99 } } : r;
+            },
+        };
+        const result = dispatch(
+            careless,
+            state,
+            { type: "flip", playerId: "a" },
+            "a",
+        );
+        if (!result.ok) throw new Error(result.error.code);
+        expect(result.state.turn).toBe(state.turn + 1);
+    });
+
     it("refuses an actor who is not seated (not_seated)", () => {
-        const state = createGame(bataille, TWO, 1);
+        const state = createGame(bataille, TWO, { seed: 1 });
         const result = dispatch(
             bataille,
             state,

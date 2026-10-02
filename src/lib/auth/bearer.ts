@@ -5,19 +5,10 @@ import { createTokenClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 
 /**
- * Bearer-token authentication for the API routes (portal integration, mode C).
- *
- * Why not the session cookie: the portal's cookie lives on `.wiibleyde.dev`,
- * and every subdomain is *same-site* — `SameSite=Lax` does not stop a page on
- * a sibling app from making the browser ride it into a state-changing request.
- * An `Authorization` header is something the caller must set itself, so a
- * cross-origin page cannot forge it (CORS forbids it without a preflight this
- * app never grants). The front end reads the token from the shared session and
- * sends it on every call (see `@/lib/api/client`).
- *
- * Error codes mirror the portal's `/api/v1` so one client handles both:
- * `unauthorized`, `token_expired` (refresh and retry once), `session_revoked`
- * (signed out elsewhere — send the user to sign in).
+ * API identity comes from `Authorization: Bearer` only. The portal cookie is
+ * shared by every same-site *.wiibleyde.dev app, so `SameSite=Lax` cannot stop
+ * a sibling page from riding it; a header must be set by the caller itself.
+ * Error codes mirror the portal's `/api/v1`.
  */
 export type BearerError = "unauthorized" | "token_expired" | "session_revoked";
 
@@ -25,20 +16,18 @@ export type BearerResult =
     | {
           readonly ok: true;
           readonly user: AuthUser;
-          /** RLS-scoped client acting as the token's user. */
+          /** RLS client acting as the token's user. */
           readonly supabase: SupabaseClient<Database>;
       }
     | { readonly ok: false; readonly error: BearerError };
 
-/** How long a "session still alive" answer from GoTrue is trusted — as the portal. */
+/** Same TTL as the portal: a revoked session is refused within 15 s. */
 const LIVENESS_TTL_MS = 15_000;
-/** Bound on the cache: a burst of distinct sessions must not grow it forever. */
 const LIVENESS_MAX_ENTRIES = 5_000;
 
-/** `session_id` → time the session was last confirmed alive. */
+/** `session_id` → when the session was last confirmed alive. */
 const aliveSessions = new Map<string, number>();
 
-/** The raw token of an `Authorization: Bearer <token>` header, if any. */
 export function bearerToken(request: Request): string | null {
     const header = request.headers.get("authorization");
     if (!header) return null;
@@ -46,11 +35,7 @@ export function bearerToken(request: Request): string | null {
     return match ? match[1] : null;
 }
 
-/**
- * Accepted `iss` values. GoTrue signs with its external URL, which on the
- * shared infra is the bare `https://supabase.wiibleyde.dev` and on the local
- * CLI stack `<url>/auth/v1` — both derived from the public Supabase URL.
- */
+/** GoTrue signs with its external URL: bare on the shared infra, `/auth/v1` on the CLI stack. */
 function acceptedIssuers(): readonly string[] {
     const base = getSupabaseEnv().url.replace(/\/$/, "");
     return [base, `${base}/auth/v1`];
@@ -61,14 +46,9 @@ function hasAudience(aud: unknown, expected: string): boolean {
 }
 
 /**
- * Is the session behind this token still alive? A logout, a password reset or
- * an operator deleting the session leaves already-issued tokens validly
- * *signed* until `exp` (up to an hour); only GoTrue knows the session is gone
- * (`GET /auth/v1/user` answers 401/403). The answer is cached per `session_id`
- * for {@link LIVENESS_TTL_MS}, so a revoked session is refused within 15 s.
- *
- * Fails **open** when GoTrue is unreachable or erroring (5xx): the signature
- * was verified, and an auth outage must not lock every player out mid-game.
+ * A signed token outlives a logout until `exp`; only GoTrue knows the session
+ * is gone. Fails open on GoTrue 5xx/network errors (signature already verified)
+ * so an auth outage does not lock players out mid-game.
  */
 async function sessionAlive(
     supabase: SupabaseClient<Database>,
@@ -84,12 +64,10 @@ async function sessionAlive(
     const { error } = await supabase.auth.getUser(token);
     if (error) {
         const status = error.status ?? 0;
-        // 401/403/404: the session (or the user) no longer exists.
         if (status >= 400 && status < 500) {
             if (sessionId) aliveSessions.delete(sessionId);
             return false;
         }
-        // Network error / 5xx — fail open on the verified signature.
         return true;
     }
 
@@ -106,17 +84,13 @@ async function sessionAlive(
     return true;
 }
 
-/**
- * Verify the request's bearer token: signature against the instance JWKS
- * (`getClaims`), issuer, `authenticated` audience, expiry, then liveness.
- */
+/** Signature (instance JWKS), issuer, `authenticated` audience, expiry, liveness. */
 export async function verifyBearer(request: Request): Promise<BearerResult> {
     const token = bearerToken(request);
     if (!token) return { ok: false, error: "unauthorized" };
 
     const supabase = createTokenClient(token);
-    // `allowExpired`: verify the signature first, then tell an expired token
-    // (the client refreshes and retries) apart from a forged one.
+    // `allowExpired`: verify the signature first, then tell expired from forged.
     const { data, error } = await supabase.auth.getClaims(token, {
         allowExpired: true,
     });

@@ -1,20 +1,8 @@
 /**
- * Content Security Policy of every page.
- *
- * Why it matters more here than on a standalone app: the session cookie is the
- * portal's, shared by every `*.wiibleyde.dev` app and readable from JavaScript.
- * One injected script on any of them steals the session for all of them — so
- * no inline script may run unless the server put it there:
- *
- * - `script-src 'nonce-…' 'strict-dynamic'` — a fresh nonce per request
- *   (generated in `proxy.ts`), which Next.js stamps on its own scripts; scripts
- *   those load (e.g. the Umami tag via `next/script`) inherit the trust. No
- *   `'unsafe-inline'`: an injected `<script>` or `onerror=` handler never runs.
- * - `style-src 'unsafe-inline'` — React `style={…}` props and GSAP write inline
- *   styles; CSS cannot execute code, so this is the accepted trade-off.
- * - `connect-src` — only this origin, the shared Supabase (REST + Realtime
- *   websocket), the portal API and Umami: where the access token may go.
- * - `frame-ancestors 'none'` — no clickjacking from a sibling subdomain.
+ * The session cookie is shared by every *.wiibleyde.dev app and readable from
+ * JS, so one injected script would steal it everywhere: no inline script runs
+ * without the per-request nonce. Inline *styles* are allowed (React `style`,
+ * GSAP); CSS cannot execute code. `connect-src` lists where the token may go.
  */
 export interface CspSources {
     readonly supabaseUrl: string;
@@ -23,7 +11,6 @@ export interface CspSources {
     readonly dev: boolean;
 }
 
-/** `https://x.y/path` → `https://x.y`; empty / invalid → null. */
 function originOf(url: string): string | null {
     if (!url) return null;
     try {
@@ -33,12 +20,11 @@ function originOf(url: string): string | null {
     }
 }
 
-/** Realtime: the websocket twin of an http(s) origin. */
 function wsOriginOf(origin: string): string {
     return origin.replace(/^http/, "ws");
 }
 
-/** A fresh, unguessable nonce (128 bits, base64). */
+/** 128 bits, base64. */
 export function generateNonce(): string {
     const bytes = new Uint8Array(16);
     crypto.getRandomValues(bytes);
@@ -54,14 +40,14 @@ export function buildCsp(nonce: string, sources: CspSources): string {
     if (supabase) connect.push(supabase, wsOriginOf(supabase));
     if (portal) connect.push(portal);
     if (umami) connect.push(umami);
-    // Turbopack HMR websocket in `next dev`.
+    // Turbopack HMR websocket.
     if (sources.dev) connect.push("ws:", "wss:");
 
     const img = ["'self'", "data:", "blob:"];
     if (supabase) img.push(supabase);
 
     const script = ["'self'", `'nonce-${nonce}'`, "'strict-dynamic'"];
-    // React rebuilds server error stacks with eval() in development only.
+    // React rebuilds server error stacks with eval() in development.
     if (sources.dev) script.push("'unsafe-eval'");
 
     const directives = [

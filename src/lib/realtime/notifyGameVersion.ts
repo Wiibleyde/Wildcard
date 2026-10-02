@@ -5,26 +5,14 @@ import {
     gameTopic,
 } from "@/lib/realtime/topics";
 
-/** A doorbell that cannot ring promptly is useless — don't hold the caller. */
+/** A doorbell that cannot ring promptly is useless: never hold the caller. */
 const SEND_TIMEOUT_MS = 2000;
 
 /**
- * Ring the game's doorbell: broadcast the freshly committed `version` on the
- * game topic, server-side, through Realtime's REST endpoint.
- *
- * Why Broadcast and not only `postgres_changes`: CDC on the self-hosted stack
- * can report a channel as subscribed while delivering nothing, which forced
- * every client into a sub-second HTTP poll. A server broadcast does not go
- * through the WAL at all, so a subscribed client reliably hears each move and
- * the poll can drop to a slow heartbeat.
- *
- * The payload is a bare version number — public meta, never state. Clients
- * treat it as an untrusted hint ("something changed, ask the server"): the
- * board only ever renders what the authenticated API returns, so a forged
- * broadcast can at worst trigger one extra read.
- *
- * Best-effort and never throws: a missed bell is caught by the client's
- * heartbeat poll.
+ * Broadcast the committed `version` over Realtime's REST endpoint. Broadcast,
+ * not only CDC: self-hosted CDC can look subscribed while delivering nothing.
+ * Clients treat it as an untrusted hint and re-read through the API, so a
+ * forged ring costs one read. Never throws; the heartbeat poll covers a miss.
  */
 export async function notifyGameVersion(
     admin: Pick<SupabaseClient, "channel" | "removeChannel">,
@@ -50,7 +38,7 @@ export async function notifyGameVersion(
             err,
         );
     } finally {
-        // REST-only send: the channel was never joined, just drop it.
+        // REST-only send: the channel was never joined.
         if (channel) void admin.removeChannel(channel).catch(() => {});
     }
 }

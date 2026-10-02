@@ -1,11 +1,23 @@
+import type { Metadata } from "next";
 import type { Locale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { CommunityGames } from "@/components/lobby/CommunityGames";
 import { PlayHub } from "@/components/lobby/PlayHub";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { PageShell } from "@/components/ui/PageShell";
 import { requireAuthUser } from "@/lib/auth/session";
 import { buildPlayCatalog } from "@/lib/games/catalog";
 import { listPublishedEcaGames } from "@/lib/models/studio";
 import { createClient } from "@/lib/supabase/server";
+
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ lang: Locale }>;
+}): Promise<Metadata> {
+    const { lang } = await params;
+    const t = await getTranslations({ locale: lang, namespace: "lobby" });
+    return { title: t("title"), description: t("subtitle") };
+}
 
 export default async function Page({
     params,
@@ -17,22 +29,16 @@ export default async function Page({
     const t = await getTranslations("lobby");
 
     const user = await requireAuthUser(lang, `/${lang}/lobby`);
-    const supabase = await createClient();
-
-    const games = buildPlayCatalog();
-    // Published creator games — RLS exposes published rows to any signed-in user.
-    const community = await listPublishedEcaGames(supabase);
+    const community = await listPublishedEcaGames(await createClient());
 
     return (
-        <div className="min-h-screen px-4 pt-8 pb-16 md:pt-12 xl:px-10">
-            <div className="mx-auto flex max-w-lg flex-col gap-8 lg:max-w-5xl xl:max-w-7xl">
-                <header className="flex flex-col gap-1.5">
-                    <h1 className="h-xl text-3xl xl:text-4xl">{t("title")}</h1>
-                    <p className="sub text-sm">{t("subtitle")}</p>
-                </header>
-                <PlayHub userId={user.id} games={games} />
-                <CommunityGames games={community} />
-            </div>
-        </div>
+        <PageShell width="wide" className="flex flex-col gap-8">
+            <PageHeader title={t("title")} subtitle={t("subtitle")} />
+            <PlayHub
+                userId={user.id}
+                games={buildPlayCatalog()}
+                community={community}
+            />
+        </PageShell>
     );
 }

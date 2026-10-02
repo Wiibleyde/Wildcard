@@ -22,7 +22,7 @@ export interface FriendsHandle {
     readonly load: FriendsLoad;
     readonly friends: readonly PortalFriend[];
     readonly blocks: readonly PortalBlock[];
-    /** Error of the last action (or of the load), as a portal error code. */
+    /** Last action's (or the load's) portal error code. */
     readonly error: PortalErrorCode | null;
     /** Id (or `"add"`) of the action in flight — disables its buttons. */
     readonly pending: string | null;
@@ -39,10 +39,8 @@ function codeOf(e: unknown): PortalErrorCode {
 }
 
 /**
- * Friend and block lists of the domain-wide account, through the portal API.
- * Every action re-reads both lists afterwards rather than patching them
- * locally: a block ends both friend edges server-side, and the portal's sort
- * order (mutual → outgoing → incoming) is its own.
+ * Every action re-reads both lists instead of patching locally: a block ends
+ * both friend edges server-side, and the sort order is the portal's.
  */
 export function useFriends(): FriendsHandle {
     const [load, setLoad] = useState<FriendsLoad>("loading");
@@ -57,6 +55,7 @@ export function useFriends(): FriendsHandle {
             const [f, b] = await Promise.all([listFriends(), listBlocks()]);
             setFriends(f);
             setBlocks(b);
+            setError(null);
             setLoad("ready");
         } catch (e) {
             setError(codeOf(e));

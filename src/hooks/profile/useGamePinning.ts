@@ -2,11 +2,11 @@
 
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, readApiError } from "@/lib/api/client";
 import type { MatchHistoryEntry } from "@/lib/models/history";
 import { MAX_PERSISTENT_REPLAYS } from "@/lib/models/persistence";
 
-// Pinned games survive the 15-day move-retention sweep; capped per account.
+/** Pinned games survive the 15-day move-retention sweep; capped per account. */
 export function useGamePinning(entries: readonly MatchHistoryEntry[]) {
     const t = useTranslations("history");
     const [pinned, setPinned] = useState<Set<string>>(
@@ -39,10 +39,7 @@ export function useGamePinning(entries: readonly MatchHistoryEntry[]) {
                 body: JSON.stringify({ persistent: next }),
             });
             if (!res.ok) {
-                const body = (await res.json().catch(() => ({}))) as {
-                    error?: string;
-                };
-                throw new Error(body.error ?? "pin_error");
+                throw new Error((await readApiError(res)) ?? "pin_error");
             }
         } catch (e) {
             setPinned((prev) => {

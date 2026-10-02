@@ -5,7 +5,8 @@ import { getCardTheme } from "@/lib/card/themes";
 import { FACE_DOWN_CARD } from "@/lib/card/utils";
 import type { TableSeat } from "@/lib/games/table/types";
 
-const SEAT_HAND_MAX = 8;
+// Stable keys for the positional face-down placeholders.
+const SEAT_BACK_IDS = ["b0", "b1", "b2", "b3", "b4", "b5", "b6", "b7"];
 
 interface TableSeatsProps {
     seats: readonly TableSeat[];
@@ -58,7 +59,6 @@ function SeatChip({
                     <span
                         className="font-pixel text-wc-micro leading-none"
                         style={{
-                            fontFamily: "var(--pixel)",
                             color: active ? "#6a4f14" : "var(--muted)",
                         }}
                     >
@@ -68,12 +68,9 @@ function SeatChip({
             </div>
             {seat.handCount !== null && seat.handCount > 0 && (
                 <div className="flex">
-                    {Array.from({
-                        length: Math.min(seat.handCount, SEAT_HAND_MAX),
-                    }).map((_, i) => (
+                    {SEAT_BACK_IDS.slice(0, seat.handCount).map((id) => (
                         <div
-                            // biome-ignore lint/suspicious/noArrayIndexKey: positional face-down placeholders, no identity
-                            key={i}
+                            key={id}
                             className="-ml-3 w-6 first:ml-0 xl:-ml-4 xl:w-8"
                             style={{
                                 filter: "drop-shadow(0 3px 0 rgba(11,18,32,0.35))",

@@ -3,47 +3,26 @@
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { GameButton } from "@/components/ui/GameButton";
-import { useRoomAction } from "@/hooks/lobby/useRoomAction";
 import type { PublishedEcaGame } from "@/lib/models/studio";
-
-/**
- * Community browse hub — the published games every player can host. Each card
- * hosts a private room for its `eca:<uuid>` module through the SAME
- * {@link useRoomAction} path native games use, then drops the host into the
- * lobby to invite friends or add bots. Purely presentational otherwise; the
- * server re-validates and gates the launch.
- */
 
 interface Props {
     readonly games: readonly PublishedEcaGame[];
+    readonly busy: boolean;
+    readonly busyModuleId: string | null;
+    readonly onHost: (moduleId: string) => void;
 }
 
-export function CommunityGames({ games }: Props) {
+export function CommunityGames({ games, busy, busyModuleId, onHost }: Props) {
     const t = useTranslations("lobby");
-    const { busy, error, createRoom } = useRoomAction();
 
     return (
         <section className="flex flex-col gap-4">
             <header className="flex flex-col gap-1.5">
-                <h2 className="font-display text-2xl xl:text-3xl text-wc-cream">
+                <h2 className="font-display text-2xl text-wc-cream xl:text-3xl">
                     {t("community_title")}
                 </h2>
                 <p className="sub text-sm">{t("community_subtitle")}</p>
             </header>
-
-            {error && (
-                <p
-                    className="rounded-xl px-4 py-3 text-sm font-bold"
-                    style={{
-                        background: "var(--red)",
-                        border: "2.5px solid var(--ink)",
-                        boxShadow: "0 4px 0 var(--ink)",
-                        color: "var(--accent-ink)",
-                    }}
-                >
-                    {error}
-                </p>
-            )}
 
             {games.length === 0 ? (
                 <div className="panel-d p-6">
@@ -57,10 +36,7 @@ export function CommunityGames({ games }: Props) {
                             className="panel lift flex flex-col gap-3 p-4 sm:p-5"
                         >
                             {g.imageUrl && (
-                                <div
-                                    className="relative aspect-video w-full overflow-hidden rounded-xl"
-                                    style={{ border: "2.5px solid var(--ink)" }}
-                                >
+                                <div className="relative aspect-video w-full overflow-hidden rounded-xl border-nb border-wc-ink">
                                     <Image
                                         src={g.imageUrl}
                                         alt={g.name}
@@ -72,10 +48,7 @@ export function CommunityGames({ games }: Props) {
                                 </div>
                             )}
                             <div className="flex items-start justify-between gap-2">
-                                <h3
-                                    className="font-display text-lg leading-tight"
-                                    style={{ color: "var(--ink)" }}
-                                >
+                                <h3 className="font-display text-lg leading-tight text-wc-ink">
                                     {g.name}
                                 </h3>
                                 <span
@@ -85,39 +58,36 @@ export function CommunityGames({ games }: Props) {
                                         color: "var(--ink)",
                                     }}
                                 >
-                                    👥 {g.minPlayers}–{g.maxPlayers}
+                                    <span aria-hidden="true">👥</span>
+                                    {t("community_players", {
+                                        min: g.minPlayers,
+                                        max: g.maxPlayers,
+                                    })}
                                 </span>
                             </div>
-                            <p
-                                className="text-xs font-semibold"
-                                style={{ color: "#5a5340" }}
-                            >
-                                {t("community_by", { name: g.ownerName })}
-                            </p>
+                            {g.ownerName && (
+                                <p className="text-xs font-semibold text-wc-ink-soft">
+                                    {t("community_by", { name: g.ownerName })}
+                                </p>
+                            )}
                             {g.description && (
-                                <p
-                                    className="line-clamp-2 text-xs font-semibold"
-                                    style={{ color: "#5a5340" }}
-                                >
+                                <p className="line-clamp-2 text-xs font-semibold text-wc-ink-soft">
                                     {g.description}
                                 </p>
                             )}
-                            <p
-                                className="text-xs font-semibold"
-                                style={{ color: "#5a5340" }}
-                            >
+                            <p className="text-xs font-semibold text-wc-ink-soft">
                                 {t("community_rules", { n: g.ruleCount })}
                             </p>
                             <GameButton
                                 variant="green"
                                 size="sm"
-                                onClick={() =>
-                                    createRoom(g.moduleId, "private")
-                                }
-                                disabled={busy !== null}
+                                onClick={() => onHost(g.moduleId)}
+                                disabled={busy}
                                 className="mt-auto w-full"
                             >
-                                {busy === "create" ? t("creating") : t("host")}
+                                {busyModuleId === g.moduleId
+                                    ? t("creating")
+                                    : t("host")}
                             </GameButton>
                         </article>
                     ))}

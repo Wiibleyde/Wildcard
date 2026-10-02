@@ -11,47 +11,51 @@ import type { AnyGameTableConfig } from "./table/types";
 import { tarotTable } from "./tarot/table";
 import { tarot } from "./tarot/tarot";
 
-/**
- * The game catalog. Every native module is registered here under its `id`; the
- * runner, lobby, and API routes resolve modules through this single map, so
- * adding a game is a one-line change (the ECA studio will register here too).
- */
-export const GAMES: Record<string, AnyGameModule> = {
-    [bataille.id]: registerGame(bataille),
-    [president.id]: registerGame(president),
-    [solitaire.id]: registerGame(solitaire),
-    [tarot.id]: registerGame(tarot),
-};
-
-/**
- * Table (card placement) config per game — consumed by the single generic
- * `GameTable` component. A new game ships a config + pure `mapView`, never a
- * dedicated React component.
- */
-export const GAME_TABLES: Record<string, AnyGameTableConfig> = {
-    [bataille.id]: batailleTable,
-    [president.id]: presidentTable,
-    [solitaire.id]: solitaireTable,
-    [tarot.id]: tarotTable,
-};
-
-/** Resolve a module by id, or `undefined` for an unknown game. */
-export function getGameModule(id: string): AnyGameModule | undefined {
-    return GAMES[id];
+interface RegisteredGame {
+    readonly module: AnyGameModule;
+    readonly table: AnyGameTableConfig;
 }
 
-/**
- * Resolve a game's table config, or `undefined` when it has none yet. Every
- * studio game (`eca:<uuid>`) shares the single generic ECA table — no per-game
- * config is stored, so the id prefix is enough to route to it.
- */
+/** Native games, keyed by module id — a new game is one entry. Studio games resolve in `resolve.ts`. */
+const REGISTRY: Readonly<Record<string, RegisteredGame>> = {
+    [bataille.id]: {
+        module: registerGame(bataille),
+        table: batailleTable,
+    },
+    [president.id]: {
+        module: registerGame(president),
+        table: presidentTable,
+    },
+    [solitaire.id]: {
+        module: registerGame(solitaire),
+        table: solitaireTable,
+    },
+    [tarot.id]: {
+        module: registerGame(tarot),
+        table: tarotTable,
+    },
+};
+
+export const GAMES: Readonly<Record<string, AnyGameModule>> =
+    Object.fromEntries(
+        Object.entries(REGISTRY).map(([id, game]) => [id, game.module]),
+    );
+
+function lookup(id: string): RegisteredGame | undefined {
+    return Object.hasOwn(REGISTRY, id) ? REGISTRY[id] : undefined;
+}
+
+export function getGameModule(id: string): AnyGameModule | undefined {
+    return lookup(id)?.module;
+}
+
+/** Every studio game (`eca:<uuid>`) shares the one generic ECA table. */
 export function getGameTable(id: string): AnyGameTableConfig | undefined {
     if (isEcaModuleId(id)) return ecaTable;
-    return GAME_TABLES[id];
+    return lookup(id)?.table;
 }
 
-/** Lightweight catalog entry for lobby UI (no engine internals leaked). */
-export interface GameCatalogEntry {
+interface GameCatalogEntry {
     readonly id: string;
     readonly name: string;
     readonly minPlayers: number;
@@ -59,7 +63,7 @@ export interface GameCatalogEntry {
 }
 
 export function gameCatalog(): GameCatalogEntry[] {
-    return Object.values(GAMES).map((m) => ({
+    return Object.values(REGISTRY).map(({ module: m }) => ({
         id: m.id,
         name: m.name,
         minPlayers: m.minPlayers,

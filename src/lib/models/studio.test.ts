@@ -22,11 +22,7 @@ interface Call {
     readonly filters: Array<[string, unknown]>;
 }
 
-/**
- * Minimal chainable stand-in for the supabase-js query builder — just the
- * surface the studio models use. Reads answer `row`; writes are recorded
- * (with their `.eq` filters) and answer `writeError`.
- */
+/** Chainable query-builder stand-in: reads answer `row`, writes are recorded and answer `writeError`. */
 function fakeClient(row: Row | null, writeError: Row | null = null) {
     const calls: Call[] = [];
     const removed: string[][] = [];
@@ -113,6 +109,21 @@ describe("studio model — id validation", () => {
             error: "not_found",
         });
         expect(calls).toHaveLength(0);
+    });
+});
+
+describe("studio model — names", () => {
+    it("stores trimmed names and refuses blank ones", async () => {
+        const { admin, calls } = fakeClient(storedRow());
+        expect(
+            await updateEcaGame(admin, GAME, OWNER, { name: "   " }),
+        ).toEqual({ ok: false, error: "invalid_input" });
+        expect(
+            await updateEcaGame(admin, GAME, OWNER, { name: "  Mon jeu " }),
+        ).toEqual({ ok: true });
+        expect(calls.find((c) => c.op === "update")?.payload).toMatchObject({
+            name: "Mon jeu",
+        });
     });
 });
 

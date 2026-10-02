@@ -1,8 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { DECKS } from "@/lib/card/decks";
-import type { Rank } from "@/lib/card/types";
+import { comparatorsFor, isOneOf, reconcileCondition } from "@/lib/eca/schema";
 import type {
     EcaComparator,
     EcaCondition,
@@ -11,52 +10,17 @@ import type {
     EcaOperand,
 } from "@/lib/eca/types";
 import { dangerButtonStyle, fieldClass, fieldStyle } from "./fields";
-import { literalModeFor, OperandField, SUITS } from "./OperandField";
+import { OperandField } from "./OperandField";
+import { StudioRow } from "./StudioRow";
 
-/** One SI row: left operand · comparator · right operand · remove. */
-
-/**
- * The literal editor's SHAPE (rank / suit / number) is derived from the
- * counterpart operand, but the stored value is not: when the counterpart
- * changes shape, a literal on the other side could keep an incompatible value
- * (the select would DISPLAY its first option while the draft still held the
- * old value). Reconcile on every operand change: if `other` is a literal
- * whose value no longer fits the changed counterpart's shape, coerce it to
- * that shape's default — otherwise return it untouched.
- */
-function reconcileLiteral(
-    changed: EcaOperand,
-    other: EcaOperand,
-    deckRanks: readonly Rank[],
-): EcaOperand {
-    if (other.kind !== "literal") return other;
-    const mode = literalModeFor(changed);
-    if (mode === "rank") {
-        return deckRanks.some((rank) => rank === other.value)
-            ? other
-            : { kind: "literal", value: deckRanks[0] };
-    }
-    if (mode === "suit") {
-        return SUITS.some((suit) => suit === other.value)
-            ? other
-            : { kind: "literal", value: SUITS[0] };
-    }
-    return typeof other.value === "number"
-        ? other
-        : { kind: "literal", value: 0 };
-}
-
-const COMPARATORS: ReadonlyArray<{
-    readonly id: EcaComparator;
-    readonly label: string;
-}> = [
-    { id: "eq", label: "=" },
-    { id: "neq", label: "≠" },
-    { id: "gt", label: ">" },
-    { id: "gte", label: "≥" },
-    { id: "lt", label: "<" },
-    { id: "lte", label: "≤" },
-];
+const COMPARATOR_SYMBOLS: Record<EcaComparator, string> = {
+    eq: "=",
+    neq: "≠",
+    gt: ">",
+    gte: "≥",
+    lt: "<",
+    lte: "≤",
+};
 
 interface Props {
     readonly condition: EcaCondition;
@@ -74,44 +38,33 @@ export function ConditionRow({
     onRemove,
 }: Props) {
     const t = useTranslations("studio");
-    const ranks = DECKS[deckId].ranks;
+    const allowed = comparatorsFor(condition.lhs, condition.rhs);
+    // Keep a stored out-of-domain comparator visible; the validator flags it.
+    const comparators = allowed.includes(condition.op)
+        ? allowed
+        : [...allowed, condition.op];
 
-    function handleComparator(id: string) {
-        const next = COMPARATORS.find((c) => c.id === id);
-        if (next) onChange({ ...condition, op: next.id });
+    function handleComparator(op: string) {
+        if (isOneOf(op, comparators)) onChange({ ...condition, op });
     }
 
-    /** Changing one side may invalidate a literal on the other — coerce it. */
-    function handleLhs(lhs: EcaOperand) {
-        onChange({
-            ...condition,
-            lhs,
-            rhs: reconcileLiteral(lhs, condition.rhs, ranks),
-        });
-    }
-
-    function handleRhs(rhs: EcaOperand) {
-        onChange({
-            ...condition,
-            rhs,
-            lhs: reconcileLiteral(rhs, condition.lhs, ranks),
-        });
+    // Changing a side may leave the other side's literal or the comparator out of domain.
+    function handleOperand(side: "lhs" | "rhs", operand: EcaOperand) {
+        const next: EcaCondition =
+            side === "lhs"
+                ? { ...condition, lhs: operand }
+                : { ...condition, rhs: operand };
+        onChange(reconcileCondition(next, deckId));
     }
 
     return (
-        <div
-            className="flex flex-col gap-2 rounded-xl p-2.5 sm:flex-row sm:items-center"
-            style={{
-                background: "var(--cream)",
-                border: "2px solid var(--ink)",
-            }}
-        >
+        <StudioRow>
             <OperandField
                 operand={condition.lhs}
                 counterpart={condition.rhs}
                 event={event}
                 deckId={deckId}
-                onChange={handleLhs}
+                onChange={(lhs) => handleOperand("lhs", lhs)}
             />
             <select
                 value={condition.op}
@@ -120,9 +73,9 @@ export function ConditionRow({
                 style={fieldStyle}
                 aria-label={t("comparator_label")}
             >
-                {COMPARATORS.map((comparator) => (
-                    <option key={comparator.id} value={comparator.id}>
-                        {comparator.label}
+                {comparators.map((op) => (
+                    <option key={op} value={op}>
+                        {COMPARATOR_SYMBOLS[op]}
                     </option>
                 ))}
             </select>
@@ -131,7 +84,7 @@ export function ConditionRow({
                 counterpart={condition.lhs}
                 event={event}
                 deckId={deckId}
-                onChange={handleRhs}
+                onChange={(rhs) => handleOperand("rhs", rhs)}
             />
             <button
                 type="button"
@@ -142,6 +95,6 @@ export function ConditionRow({
             >
                 ✕
             </button>
-        </div>
+        </StudioRow>
     );
 }

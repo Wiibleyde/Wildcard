@@ -1,36 +1,24 @@
 "use client";
 
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import type {
+    RealtimeChannel,
+    RealtimeChannelOptions,
+} from "@supabase/supabase-js";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import type { RealtimeStatus } from "@/lib/realtime/reconnect";
+import { CHAT_MESSAGE_EVENT, chatTopic } from "@/lib/realtime/topics";
+import { useAuthedChannel } from "@/lib/realtime/useAuthedChannel";
 
-/** One chat line as held in the UI. `at` is the sender's clock (display only). */
+/** `at` is the sender's clock (display only). */
 export interface ChatMessage {
     readonly id: string;
     readonly userId: string;
-    /**
-     * Sender's display name, carried on the message itself. The chat channel
-     * is open to spectators too, who are NOT in the game's seated `players`
-     * list — so resolving names from that list dropped every spectator to "?".
-     * A self-describing message needs no roster lookup and works for anyone on
-     * the channel. (Chat is already client-trusted broadcast, so embedding the
-     * name adds no new trust surface.)
-     */
+    /** Carried on the message: spectators are not in the seated roster. */
     readonly name: string;
     readonly text: string;
     readonly at: number;
 }
 
-/** Wire shape crossing the socket — kept tiny and mirrors {@link ChatMessage}. */
-interface ChatWire {
-    id: string;
-    userId: string;
-    name: string;
-    text: string;
-    at: number;
-}
-
-/** Outcome of a send attempt, so the UI can nudge on rejected input. */
 export type SendResult =
     | "sent"
     | "empty"
@@ -38,27 +26,20 @@ export type SendResult =
     | "rate_limited"
     | "disconnected";
 
-// ── Moderation knobs ─────────────────────────────────────────────────────────
-// Client-side guardrails only. Broadcast is client-trusted (the message never
-// passes through the server), so this is UX hygiene, not enforcement —
-// authoritative moderation would require routing chat through an API Route /
-// Edge Function. Scoped deliberately to the ticket: longueur + rate-limit.
-/** Hard length cap — mirrored by the input's `maxLength` and clamped on receive. */
+// Peer-to-peer broadcast never passes through the server: these limits are UX
+// hygiene, not enforcement.
 export const MAX_CHAT_LENGTH = 280;
-/** Chat is ephemeral: keep only the tail in memory, not a full transcript. */
 const MAX_MESSAGES = 50;
-/** Minimum gap between two of *my* messages. */
 const RATE_MIN_GAP_MS = 800;
-/** ...and no more than this many inside the rolling window. */
 const RATE_WINDOW_MS = 10_000;
 const RATE_MAX_IN_WINDOW = 6;
 
-// ── Reload-survival cache ────────────────────────────────────────────────────
-// sessionStorage, not a DB: chat is ephemeral, so we only need history to
-// survive an F5 within the same tab. It dies when the tab closes and is wiped
-// when the game ends — nothing is persisted server-side (no schema, no RLS, no
-// retention). A peer's messages sent *during* the reload gap aren't recoverable
-// (broadcast has no replay) — that would need a DB table.
+/** The sender echoes its own line optimistically. */
+const CHANNEL_OPTIONS: RealtimeChannelOptions = {
+    config: { broadcast: { self: false } },
+};
+
+// Per-tab sessionStorage: history survives an F5, nothing is stored server-side.
 const CACHE_PREFIX = "wc:chat:";
 
 function cacheKey(gameId: string): string {
@@ -95,7 +76,7 @@ function saveCache(gameId: string, messages: readonly ChatMessage[]): void {
     try {
         sessionStorage.setItem(cacheKey(gameId), JSON.stringify(messages));
     } catch {
-        // Storage disabled/full — we only lose reload-survival, not the chat.
+        // Storage disabled or full: only reload-survival is lost.
     }
 }
 
@@ -104,30 +85,11 @@ function clearCache(gameId: string): void {
     try {
         sessionStorage.removeItem(cacheKey(gameId));
     } catch {
-        // Best-effort cleanup — ignore.
+        // Best-effort.
     }
 }
 
-/**
- * In-game chat over a **dedicated** Supabase Realtime broadcast channel
- * (`chat:game:<id>`), separate from {@link useGameChannel}. Two reasons it's
- * its own channel:
- * - chat is ephemeral and peer-to-peer (broadcast), not authoritative state —
- *   there's nothing to refetch, so it never rings the game's "doorbell";
- * - keeping it off the state channel means chatter can't trigger a board
- *   refetch — the ticket's *ne bloque pas le flux de jeu* guarantee.
- *
- * Public broadcast channel, so no auth gating: nothing private crosses it and
- * messages are display-only. Drops over a reconnect are simply lost, which is
- * how chat is expected to behave.
- *
- * History survives an F5 via a per-tab sessionStorage cache (see helpers
- * above): re-seeded on mount, persisted as it grows, and wiped once `isOver`
- * so a reload after the final hand starts clean.
- *
- * Returns the recent message tail and a `send` that applies the moderation
- * knobs above and echoes optimistically (channel is `self: false`).
- */
+/** Ephemeral in-game chat on its own broadcast channel; the cache is wiped once `isOver`. */
 export function useGameChat(
     gameId: string,
     currentUserId: string,
@@ -135,13 +97,12 @@ export function useGameChat(
     isOver: boolean,
 ) {
     const [messages, setMessages] = useState<readonly ChatMessage[]>([]);
-    const channelRef = useRef<RealtimeChannel | null>(null);
     const readyRef = useRef(false);
     const sentAtRef = useRef<number[]>([]);
 
     const append = useCallback((msg: ChatMessage) => {
         setMessages((prev) => {
-            // Broadcast can redeliver across a rejoin — dedupe by id.
+            // Broadcast can redeliver across a rejoin.
             if (prev.some((m) => m.id === msg.id)) return prev;
             const next = [...prev, msg];
             return next.length > MAX_MESSAGES
@@ -150,77 +111,43 @@ export function useGameChat(
         });
     }, []);
 
-    useEffect(() => {
-        const supabase = createClient();
-        let channel: RealtimeChannel | undefined;
-        let active = true;
+    const build = useCallback(
+        (channel: RealtimeChannel) =>
+            channel.on(
+                "broadcast",
+                { event: CHAT_MESSAGE_EVENT },
+                ({ payload }: { payload: unknown }) => {
+                    const p = payload as Partial<ChatMessage> | null;
+                    if (
+                        !p ||
+                        typeof p.id !== "string" ||
+                        typeof p.text !== "string"
+                    ) {
+                        return;
+                    }
+                    append({
+                        id: p.id,
+                        userId: typeof p.userId === "string" ? p.userId : "?",
+                        name: typeof p.name === "string" ? p.name : "",
+                        // A peer could broadcast an oversized string.
+                        text: p.text.slice(0, MAX_CHAT_LENGTH),
+                        at: typeof p.at === "number" ? p.at : Date.now(),
+                    });
+                },
+            ),
+        [append],
+    );
+    const onStatus = useCallback((status: RealtimeStatus) => {
+        readyRef.current = status === "connected";
+    }, []);
+    const channelRef = useAuthedChannel(
+        chatTopic(gameId),
+        build,
+        onStatus,
+        CHANNEL_OPTIONS,
+    );
 
-        const onMessage = ({ payload }: { payload: unknown }) => {
-            const p = payload as Partial<ChatWire> | null;
-            if (!p || typeof p.id !== "string" || typeof p.text !== "string") {
-                return;
-            }
-            append({
-                id: p.id,
-                userId: typeof p.userId === "string" ? p.userId : "?",
-                // Empty when a peer omits it → the UI falls back to the
-                // seated-roster lookup (works for players, not spectators).
-                name: typeof p.name === "string" ? p.name : "",
-                // Clamp defensively — a peer could broadcast an oversized string.
-                text: p.text.slice(0, MAX_CHAT_LENGTH),
-                at: typeof p.at === "number" ? p.at : Date.now(),
-            });
-        };
-
-        // The session token MUST be set on the socket *before* subscribing, or
-        // the cookie-based SSR client connects as `anon`. On a stack whose
-        // Realtime authorization is `authenticated`-only (self-hosted default),
-        // an anon socket is rejected — the channel never reaches SUBSCRIBED, so
-        // every `send` below returns "disconnected" and the chat looks dead even
-        // though the game (which polls) keeps working. Same setAuth dance as
-        // {@link useRealtimeSync}; chat just never did it.
-        const join = async () => {
-            const {
-                data: { session },
-            } = await supabase.auth.getSession();
-            if (!active) return;
-            if (session?.access_token) {
-                supabase.realtime.setAuth(session.access_token);
-            }
-            channel = supabase
-                .channel(`chat:game:${gameId}`, {
-                    config: { broadcast: { self: false } },
-                })
-                .on("broadcast", { event: "message" }, onMessage)
-                .subscribe((status) => {
-                    readyRef.current = status === "SUBSCRIBED";
-                });
-            channelRef.current = channel;
-        };
-
-        // Keep the socket token fresh across the ~1h access-token refresh, so a
-        // long game doesn't silently drop back to anon mid-session.
-        const {
-            data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event, session) => {
-            if (session?.access_token) {
-                supabase.realtime.setAuth(session.access_token);
-            }
-        });
-
-        join();
-
-        return () => {
-            active = false;
-            readyRef.current = false;
-            channelRef.current = null;
-            subscription.unsubscribe();
-            if (channel) supabase.removeChannel(channel);
-        };
-    }, [gameId, append]);
-
-    // Reload-survival: re-seed from the per-tab cache after mount (client-only,
-    // so SSR renders an empty feed and there's no hydration mismatch).
+    // Client-only re-seed, so SSR renders an empty feed (no hydration mismatch).
     useEffect(() => {
         const cached = loadCache(gameId);
         if (cached.length === 0) return;
@@ -233,8 +160,6 @@ export function useGameChat(
         });
     }, [gameId]);
 
-    // Persist while the game runs; wipe the moment it's over so an F5 after the
-    // final hand starts clean (the in-memory feed stays for the current tab).
     useEffect(() => {
         if (isOver) {
             clearCache(gameId);
@@ -270,17 +195,28 @@ export function useGameChat(
                 at: now,
             };
             sentAtRef.current = [...recent, now];
-            // Optimistic echo: the channel is self:false, so the sender renders
-            // its own line immediately instead of waiting on the round-trip.
             append(msg);
-            channel.send({
-                type: "broadcast",
-                event: "message",
-                payload: msg satisfies ChatWire,
-            });
+            // A refused send nobody received must not stay in the sender's feed.
+            void channel
+                .send({
+                    type: "broadcast",
+                    event: CHAT_MESSAGE_EVENT,
+                    payload: msg,
+                })
+                .then(
+                    (result) => result === "ok",
+                    () => false,
+                )
+                .then((delivered) => {
+                    if (!delivered) {
+                        setMessages((prev) =>
+                            prev.filter((m) => m.id !== msg.id),
+                        );
+                    }
+                });
             return "sent";
         },
-        [currentUserId, currentUserName, append],
+        [currentUserId, currentUserName, append, channelRef],
     );
 
     return { messages, send };

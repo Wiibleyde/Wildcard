@@ -216,7 +216,6 @@ function stateWith(
 
 type EcaModule = ReturnType<typeof createEcaModule>;
 
-/** Route through the runner (supplies rng + identity check). */
 function step(
     module: EcaModule,
     s: EcaState,
@@ -252,7 +251,7 @@ describe("eca module surface", () => {
 
 describe("eca setup", () => {
     it("deals handSize cards each, flips a start discard, stocks the rest", () => {
-        const s = createGame(crazy, P3, 1234);
+        const s = createGame(crazy, P3, { seed: 1234 });
         for (const p of P3) expect(s.hands[p.id]).toHaveLength(7);
         expect(s.discardPile).toHaveLength(1);
         expect(s.drawPile).toHaveLength(52 - 3 * 7 - 1);
@@ -267,20 +266,20 @@ describe("eca setup", () => {
     });
 
     it("skips the start discard when the definition says so", () => {
-        const s = createGame(minimal, P2, 42);
+        const s = createGame(minimal, P2, { seed: 42 });
         expect(s.discardPile).toHaveLength(0);
         expect(s.drawPile).toHaveLength(32 - 2 * 5);
     });
 
     it("is deterministic for a fixed seed", () => {
-        const a = createGame(crazy, P3, 99, "g");
-        const b = createGame(crazy, P3, 99, "g");
+        const a = createGame(crazy, P3, { seed: 99, gameId: "g" });
+        const b = createGame(crazy, P3, { seed: 99, gameId: "g" });
         expect(a).toEqual(b);
     });
 
     it("fires turnStarted rules for the opening player", () => {
         const module = createEcaModule(TURN_DRAW, "eca:turn-draw");
-        const s = createGame(module, P3, 7);
+        const s = createGame(module, P3, { seed: 7 });
         expect(s.hands.a).toHaveLength(6); // 5 dealt + 1 drawn at turn start
         expect(s.hands.b).toHaveLength(5);
         expect(s.drawPile).toHaveLength(32 - 15 - 1);
@@ -735,10 +734,7 @@ describe("eca game end", () => {
     });
 
     it("blocked game: with draws disabled a full pass cycle ends despite a stocked pile", () => {
-        // Regression: the old guard required an EMPTY draw pile, but with
-        // allowDraw:false the pile never empties — a game where nobody can
-        // play would pass forever (livelock). Drawing cannot help here, so
-        // the cycle must end the game even though cards remain in the pile.
+        // With allowDraw:false the pile never empties: the cycle must still end the game.
         const module = createEcaModule(KINGS_ONLY, "eca:kings-only-stock");
         let s = stateWith(
             KINGS_ONLY,
@@ -770,13 +766,13 @@ describe("eca game end", () => {
     });
 
     it("outcome is null while the game runs", () => {
-        const s = createGame(crazy, P3, 5);
+        const s = createGame(crazy, P3, { seed: 5 });
         expect(crazy.outcome(s)).toBeNull();
     });
 });
 
 describe("eca view (RLS in code)", () => {
-    const s = createGame(crazy, P3, 11, "view-game");
+    const s = createGame(crazy, P3, { seed: 11, gameId: "view-game" });
 
     it("reveals only the viewer's own hand", () => {
         const view = crazy.view(s, "a");
@@ -845,7 +841,7 @@ describe("eca legalActions/apply parity", () => {
     });
 
     it("offers nothing out of turn or once the game is done", () => {
-        const s = createGame(crazy, P3, 3);
+        const s = createGame(crazy, P3, { seed: 3 });
         expect(crazy.legalActions(s, "b")).toHaveLength(0);
         expect(crazy.legalActions({ ...s, phase: "done" }, "a")).toHaveLength(
             0,
@@ -858,7 +854,7 @@ describe("eca determinism (replay through the runner)", () => {
         const seed = 20260711;
         const gameId = "replay-game";
         const log: EcaAction[] = [];
-        let s = createGame(crazy, P3, seed, gameId);
+        let s = createGame(crazy, P3, { seed, gameId });
 
         let guard = 0;
         while (!crazy.isOver(s) && guard++ < 5_000) {
@@ -874,13 +870,11 @@ describe("eca determinism (replay through the runner)", () => {
 
         expect(crazy.isOver(s)).toBe(true);
         expect(log.length).toBeGreaterThan(0);
-        const replayed = replay(crazy, P3, seed, log, gameId);
+        const replayed = replay(crazy, P3, seed, log, { gameId });
         expect(replayed).toEqual(s);
         expect(crazy.outcome(replayed)).toEqual(crazy.outcome(s));
     });
 });
-
-// ── Hardening: turn cap, forced passes, untrusted card payloads ──────────────
 
 /** Draw-on-turn-start + accept-anything + reshuffle: never converges. */
 const NEVER_ENDING: EcaDefinition = {
@@ -949,7 +943,7 @@ describe("eca turn limit", () => {
     it("a valid but never-converging definition still terminates", () => {
         expect(validateEcaDefinitionForWrite(NEVER_ENDING).ok).toBe(true);
         const module = createEcaModule(NEVER_ENDING, "eca:never-ending");
-        let s = createGame(module, P2, 11);
+        let s = createGame(module, P2, { seed: 11 });
         let actions = 0;
         while (!module.isOver(s)) {
             const actor = s.currentPlayerId;

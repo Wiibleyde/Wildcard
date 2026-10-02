@@ -6,12 +6,9 @@ export type GameButtonSize = "sm" | "md" | "lg";
 type VariantConfig = {
     bg: string;
     text: string;
-    /** transparent-border ghost drops the hard shadow */
     ghost?: boolean;
 };
 
-// Neobrutalism buttons — saturated fill, thick ink outline + hard ink shadow
-// (supplied by `.wc-btn`), chunky display type.
 const VARIANTS: Record<GameButtonVariant, VariantConfig> = {
     gold: { bg: "var(--gold)", text: "var(--ink)" },
     green: { bg: "var(--green)", text: "var(--ink)" },
@@ -32,7 +29,6 @@ type BaseProps = {
     children: React.ReactNode;
     className?: string;
     disabled?: boolean;
-    /** Accessible name for icon-only buttons (e.g. ⏮ / ⏭). */
     ariaLabel?: string;
 };
 
@@ -71,11 +67,9 @@ export function GameButton({
 
     const baseClass = `wc-btn ${SIZES[size]} ${className}`;
 
-    // A disabled "link" must not be navigable or focusable — fall through to
-    // the disabled <button> branch instead of rendering an <a aria-disabled>.
+    // A disabled link renders as a disabled <button>: not navigable, not focusable.
     if ("href" in rest && rest.href !== undefined && !disabled) {
-        // Off-site targets (the portal) are plain anchors: the i18n Link is for
-        // in-app routes only.
+        // Off-site targets (the portal) bypass the locale-prefixing i18n Link.
         if (/^https?:\/\//.test(rest.href)) {
             return (
                 <a

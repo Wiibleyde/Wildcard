@@ -3,6 +3,7 @@ import type { Locale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
 import { EcaEditor } from "@/components/studio/EcaEditor";
 import { requireAuthUser } from "@/lib/auth/session";
+import { isUuid } from "@/lib/eca/id";
 import { validateEcaDefinition } from "@/lib/eca/validate";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,11 +16,10 @@ export default async function Page({
     setRequestLocale(lang);
 
     const user = await requireAuthUser(lang, `/${lang}/studio/${id}`);
+    if (!isUuid(id)) redirect(`/${lang}/studio`);
     const supabase = await createClient();
 
-    // RLS client: the select policy already hides other people's drafts; the
-    // explicit owner check on top keeps published-but-foreign games out of
-    // the editor (they are readable, not editable).
+    // Published foreign games pass RLS: readable, but not editable.
     const { data } = await supabase
         .from("eca_games")
         .select(
@@ -29,8 +29,6 @@ export default async function Page({
         .maybeSingle();
     if (!data || data.owner_id !== user.id) redirect(`/${lang}/studio`);
 
-    // Rows are validated by the API before every write, so this only fails on
-    // hand-tampered data — in which case the editor has nothing to edit.
     const validated = validateEcaDefinition(data.definition);
     if (!validated.ok) redirect(`/${lang}/studio`);
 

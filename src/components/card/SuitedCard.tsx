@@ -1,95 +1,49 @@
-import type { ReactElement } from "react";
 import { PIP_LAYOUTS, type PipPosition } from "@/lib/card/pips";
-import type {
-    CardDescriptor,
-    CardTheme,
-    Rank,
-    SuitStyle,
-} from "@/lib/card/types";
+import type { CardTheme, Rank, SuitedCard, SuitStyle } from "@/lib/card/types";
 import { rankToPipIndex } from "@/lib/card/utils";
-import { ArtworkFill, CardBody, CenterBox, CenteredArtwork } from "./CardBody";
-import { Corner } from "./Corner";
+import { CenterBox } from "./CardBody";
+import { CardFace } from "./CardFace";
 
 export function SuitedContent({
     card,
     theme,
 }: {
-    card: Extract<CardDescriptor, { type: "suited" }>;
+    card: SuitedCard;
     theme: CardTheme;
 }) {
     const { suit, rank } = card;
     const suitStyle = theme.suits[suit];
-    const isFaceCard =
-        rank === "J" || rank === "C" || rank === "Q" || rank === "K";
-    const isAce = rank === "A";
-
     const artwork =
         theme.artwork?.suited?.[suit]?.[rank] ??
         theme.artwork?.suitDefault?.[suit];
 
-    const showCorners = artwork ? artwork.showCorners !== false : true;
-    const showCenter = artwork?.fill ? artwork.showCenter === true : true;
-
     return (
-        <>
-            {artwork?.fill && <ArtworkFill artwork={artwork} />}
-            {showCorners && (
-                <Corner
-                    label={rank}
-                    sub={suitStyle.symbol}
-                    color={suitStyle.color}
-                    font={theme.font}
-                />
-            )}
-            {showCenter && (
-                <CardBody>
-                    <SuitedBody
-                        isAce={isAce}
-                        isFaceCard={isFaceCard}
-                        rank={rank}
-                        suitStyle={suitStyle}
-                        pipLayout={PIP_LAYOUTS[rankToPipIndex(rank)]}
-                        centerArtwork={artwork?.center}
-                    />
-                </CardBody>
-            )}
-            {showCorners && (
-                <Corner
-                    label={rank}
-                    sub={suitStyle.symbol}
-                    color={suitStyle.color}
-                    font={theme.font}
-                    flipped
-                />
-            )}
-        </>
+        <CardFace
+            artwork={artwork}
+            color={suitStyle.color}
+            font={theme.font}
+            label={rank}
+            sub={suitStyle.symbol}
+        >
+            <SuitedBody
+                rank={rank}
+                suitStyle={suitStyle}
+                pipLayout={PIP_LAYOUTS[rankToPipIndex(rank)]}
+            />
+        </CardFace>
     );
 }
 
-interface SuitedBodyProps {
-    isAce: boolean;
-    isFaceCard: boolean;
-    rank: Rank;
-    suitStyle: SuitStyle;
-    pipLayout: PipPosition[] | undefined;
-    centerArtwork: string | ReactElement | undefined;
-}
-
 function SuitedBody({
-    isAce,
-    isFaceCard,
     rank,
     suitStyle,
     pipLayout,
-    centerArtwork,
-}: SuitedBodyProps) {
-    if (centerArtwork !== undefined) {
-        return (
-            <CenteredArtwork artwork={centerArtwork} color={suitStyle.color} />
-        );
-    }
-
-    if (isAce) {
+}: {
+    rank: Rank;
+    suitStyle: SuitStyle;
+    pipLayout: PipPosition[] | undefined;
+}) {
+    if (rank === "A") {
         return (
             <CenterBox
                 style={{
@@ -104,7 +58,7 @@ function SuitedBody({
         );
     }
 
-    if (isFaceCard) {
+    if (rank === "J" || rank === "C" || rank === "Q" || rank === "K") {
         return (
             <CenterBox col style={{ color: suitStyle.color, gap: "5%" }}>
                 <span
@@ -129,33 +83,30 @@ function SuitedBody({
         );
     }
 
-    if (pipLayout) {
-        // Denser layouts (8–10 pips) get smaller symbols so rows don't collide
-        const pipSize =
-            pipLayout.length <= 6 ? 20 : pipLayout.length <= 8 ? 18 : 16;
-        return (
-            <div className="relative w-full h-full">
-                {pipLayout.map((pip, i) => (
-                    <span
-                        // biome-ignore lint/suspicious/noArrayIndexKey: pip order is stable by card value
-                        key={i}
-                        className="absolute"
-                        style={{
-                            left: `${pip.x}%`,
-                            top: `${pip.y}%`,
-                            fontSize: `${pipSize}cqi`,
-                            color: suitStyle.color,
-                            lineHeight: 1,
-                            transform: `translate(-50%, -50%)${pip.flip ? " rotate(180deg)" : ""}`,
-                            ...suitStyle.symbolStyle,
-                        }}
-                    >
-                        {suitStyle.symbol}
-                    </span>
-                ))}
-            </div>
-        );
-    }
+    if (!pipLayout) return null;
 
-    return null;
+    // Denser layouts get smaller symbols so rows don't collide.
+    const pipSize =
+        pipLayout.length <= 6 ? 20 : pipLayout.length <= 8 ? 18 : 16;
+    return (
+        <div className="relative w-full h-full">
+            {pipLayout.map((pip) => (
+                <span
+                    key={`${pip.x}:${pip.y}`}
+                    className="absolute"
+                    style={{
+                        left: `${pip.x}%`,
+                        top: `${pip.y}%`,
+                        fontSize: `${pipSize}cqi`,
+                        color: suitStyle.color,
+                        lineHeight: 1,
+                        transform: `translate(-50%, -50%)${pip.flip ? " rotate(180deg)" : ""}`,
+                        ...suitStyle.symbolStyle,
+                    }}
+                >
+                    {suitStyle.symbol}
+                </span>
+            ))}
+        </div>
+    );
 }

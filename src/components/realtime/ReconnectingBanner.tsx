@@ -3,10 +3,7 @@
 import { useTranslations } from "next-intl";
 import type { RealtimeStatus } from "@/lib/realtime/useRealtimeSync";
 
-/**
- * Renders only while reconnecting after a drop — the first `connecting` join is
- * silent to avoid a banner flashing on every page load.
- */
+// The first `connecting` join stays silent so the banner doesn't flash on every load.
 export function ReconnectingBanner({ status }: { status: RealtimeStatus }) {
     const t = useTranslations("realtime");
     if (status !== "reconnecting") return null;

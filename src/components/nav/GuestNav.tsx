@@ -3,12 +3,10 @@ import { GameButton } from "@/components/ui/GameButton";
 import { loginHref, signupUrl } from "@/lib/auth/urls";
 import { Brand } from "./Brand";
 
-// Top bar for signed-out visitors: AppNav needs a user, so guests would otherwise
-// get an empty sidebar gap and no way in.
 export async function GuestNav() {
     const t = await getTranslations("navigation");
     const lang = await getLocale();
-    // Account creation is the portal's too — absent in local dev.
+    // Portal-only: null in local dev.
     const signup = signupUrl(`/${lang}`);
 
     return (
@@ -24,8 +22,7 @@ export async function GuestNav() {
 
                 <div className="flex items-center gap-2">
                     {signup && (
-                        // Hidden on phones: brand + two buttons overflow 375px;
-                        // the portal login page links to sign-up anyway.
+                        // Hidden on phones (overflows 375px); the portal login links to sign-up anyway.
                         <span className="hidden sm:block">
                             <GameButton href={signup} variant="ghost" size="sm">
                                 {t("signup")}
@@ -37,7 +34,9 @@ export async function GuestNav() {
                         variant="green"
                         size="sm"
                     >
-                        <span style={{ fontSize: "1.1em" }}>♠</span>
+                        <span aria-hidden="true" className="text-[1.1em]">
+                            ♠
+                        </span>
                         {t("login")}
                     </GameButton>
                 </div>

@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { useGameImageUpload } from "@/hooks/studio/useGameImageUpload";
+import { ECA_IMAGE_EXTENSIONS } from "@/lib/eca/id";
+import { labelClass, labelStyle, mutedTextStyle } from "./fields";
 import { CheckIcon, UploadIcon } from "./UploadIcons";
 
 interface Props {
@@ -11,21 +13,15 @@ interface Props {
     readonly initialImagePath: string | null;
 }
 
-/**
- * Cover-image picker for the studio editor. Same interaction as the profile
- * avatar (hover-to-upload, direct browser → public bucket), but a wide game
- * cover instead of a round avatar. Colocated in the editor's identity panel.
- */
+const ACCEPT = ECA_IMAGE_EXTENSIONS.map((ext) => `.${ext}`).join(",");
+
 export function GameImageField({ ownerId, gameId, initialImagePath }: Props) {
     const t = useTranslations("studio");
     const img = useGameImageUpload(ownerId, gameId, initialImagePath);
 
     return (
         <div className="flex flex-col gap-2">
-            <span
-                className="text-xs font-bold uppercase tracking-widest"
-                style={{ color: "var(--muted)" }}
-            >
+            <span className={labelClass} style={labelStyle}>
                 {t("image_label")}
             </span>
 
@@ -51,7 +47,7 @@ export function GameImageField({ ownerId, gameId, initialImagePath }: Props) {
                     ) : (
                         <div
                             className="flex h-full w-full items-center justify-center text-sm font-semibold"
-                            style={{ color: "#5a5340" }}
+                            style={mutedTextStyle}
                         >
                             {t("image_hint")}
                         </div>
@@ -61,6 +57,7 @@ export function GameImageField({ ownerId, gameId, initialImagePath }: Props) {
                         type="button"
                         onClick={img.openFilePicker}
                         disabled={img.busy}
+                        aria-label={t("image_upload")}
                         className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/55 opacity-0 transition-opacity group-hover:opacity-100 disabled:cursor-not-allowed"
                     >
                         {img.busy ? (
@@ -99,19 +96,19 @@ export function GameImageField({ ownerId, gameId, initialImagePath }: Props) {
                 )}
             </div>
 
-            {img.status === "error" && img.error && (
+            {img.status === "error" && (
                 <p
                     className="text-xs font-semibold"
                     style={{ color: "var(--red)" }}
                 >
-                    {img.error}
+                    {t("image_error")}
                 </p>
             )}
 
             <input
                 ref={img.fileRef}
                 type="file"
-                accept="image/*"
+                accept={ACCEPT}
                 className="hidden"
                 onChange={img.handleChange}
             />

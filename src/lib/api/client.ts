@@ -1,32 +1,17 @@
 "use client";
 
 import { loginUrl } from "@/lib/auth/urls";
+import { localeFromPath } from "@/lib/locale";
 import { createClient } from "@/lib/supabase/client";
 
-/**
- * `fetch` for the app's own `/api` routes — and, through {@link portalFetch},
- * for the portal's — authenticated by the shared session's **access token**,
- * sent as `Authorization: Bearer`. The API ignores the session cookie on
- * purpose: the cookie rides along on any same-site request, a header does not
- * (see `@/lib/auth/bearer`).
- *
- * The token is only ever sent to this app's own origin and to the portal — never
- * to a third party, never in a URL.
- *
- * 401 handling follows the portal's contract:
- * - `token_expired` → refresh the session once and retry the call;
- * - `session_revoked` → the session was ended elsewhere (logout, password
- *   reset): send the user to sign in again.
- */
+// The access token goes only to this origin and the portal, as a header:
+// unlike the shared cookie, a sibling site cannot make the browser send it.
 
-/** The current access token, refreshed by supabase-js when close to expiry. */
 async function accessToken(forceRefresh = false): Promise<string | null> {
     const supabase = createClient();
-    if (forceRefresh) {
-        const { data } = await supabase.auth.refreshSession();
-        return data.session?.access_token ?? null;
-    }
-    const { data } = await supabase.auth.getSession();
+    const { data } = forceRefresh
+        ? await supabase.auth.refreshSession()
+        : await supabase.auth.getSession();
     return data.session?.access_token ?? null;
 }
 
@@ -36,23 +21,29 @@ function withBearer(init: RequestInit, token: string | null): RequestInit {
     return { ...init, headers };
 }
 
-/** Peek at a 401 body's `error` code without consuming the original response. */
-async function errorCode(res: Response): Promise<string | null> {
+/** The JSON body, or `null` when it is not JSON (a 5xx/proxy page). Consumes `res`. */
+export async function readApiJson<T>(res: Response): Promise<T | null> {
     try {
-        const body = (await res.clone().json()) as { error?: unknown };
-        return typeof body.error === "string" ? body.error : null;
+        return (await res.json()) as T;
     } catch {
         return null;
     }
 }
 
-/** Send the user to the portal sign-in, coming back to the current page. */
-function redirectToSignIn(): void {
-    const { pathname, search } = window.location;
-    const lang = pathname.split("/")[1] || "fr";
-    window.location.assign(loginUrl(`${pathname}${search}`, lang));
+/** The `error` code of an API response body, if any. Consumes `res`. */
+export async function readApiError(res: Response): Promise<string | null> {
+    const body = await readApiJson<{ error?: unknown }>(res);
+    return typeof body?.error === "string" ? body.error : null;
 }
 
+function redirectToSignIn(): void {
+    const { pathname, search } = window.location;
+    window.location.assign(
+        loginUrl(`${pathname}${search}`, localeFromPath(pathname)),
+    );
+}
+
+/** 401 contract (portal's): `token_expired` → refresh once and retry; `session_revoked` → sign in. */
 async function authedFetch(
     input: string,
     init: RequestInit = {},
@@ -60,26 +51,27 @@ async function authedFetch(
     const res = await fetch(input, withBearer(init, await accessToken()));
     if (res.status !== 401) return res;
 
-    const code = await errorCode(res);
+    const code = await readApiError(res.clone());
     if (code === "token_expired") {
         const fresh = await accessToken(true);
-        if (fresh) {
-            const retry = await fetch(input, withBearer(init, fresh));
-            if (retry.status !== 401) return retry;
-            if ((await errorCode(retry)) === "session_revoked") {
-                redirectToSignIn();
-            }
-            return retry;
+        if (!fresh) {
+            redirectToSignIn();
+            return res;
         }
+        const retry = await fetch(input, withBearer(init, fresh));
+        if (
+            retry.status === 401 &&
+            (await readApiError(retry.clone())) === "session_revoked"
+        ) {
+            redirectToSignIn();
+        }
+        return retry;
     }
     if (code === "session_revoked") redirectToSignIn();
     return res;
 }
 
-/**
- * Call one of the app's API routes (`/api/...`). Drop-in for `fetch`: same
- * arguments, same `Response`.
- */
+/** Drop-in `fetch` for the app's own API routes. */
 export function apiFetch(
     path: `/api/${string}`,
     init?: RequestInit,
@@ -87,7 +79,7 @@ export function apiFetch(
     return authedFetch(path, init);
 }
 
-/** Same as {@link apiFetch}, for an absolute portal URL (`/api/v1/...`). */
+/** {@link apiFetch} for an absolute portal API URL. */
 export function portalFetch(
     url: string,
     init?: RequestInit,

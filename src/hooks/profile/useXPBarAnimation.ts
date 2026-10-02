@@ -1,11 +1,8 @@
 "use client";
 
-import { useGSAP } from "@gsap/react";
-import gsap from "gsap";
 import { useRef } from "react";
+import { gsap, useGSAP } from "@/lib/gsap";
 import { tweenCount } from "@/lib/gsap/textTween";
-
-gsap.registerPlugin(useGSAP);
 
 export function useXPBarAnimation(xp: number, progress: number) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -33,8 +30,7 @@ export function useXPBarAnimation(xp: number, progress: number) {
                 "-=0.2",
             );
 
-            // Tween a proxy and write into React's own Text node — animating
-            // `textContent` would detach it and freeze later updates.
+            // Animating `textContent` would detach React's Text node and freeze later updates.
             tweenCount(
                 tl,
                 xpNumRef.current,
