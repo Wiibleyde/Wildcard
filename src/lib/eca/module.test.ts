@@ -216,7 +216,6 @@ function stateWith(
 
 type EcaModule = ReturnType<typeof createEcaModule>;
 
-/** Route through the runner (supplies rng + identity check). */
 function step(
     module: EcaModule,
     s: EcaState,
@@ -735,10 +734,7 @@ describe("eca game end", () => {
     });
 
     it("blocked game: with draws disabled a full pass cycle ends despite a stocked pile", () => {
-        // Regression: the old guard required an EMPTY draw pile, but with
-        // allowDraw:false the pile never empties — a game where nobody can
-        // play would pass forever (livelock). Drawing cannot help here, so
-        // the cycle must end the game even though cards remain in the pile.
+        // With allowDraw:false the pile never empties: the cycle must still end the game.
         const module = createEcaModule(KINGS_ONLY, "eca:kings-only-stock");
         let s = stateWith(
             KINGS_ONLY,
@@ -879,8 +875,6 @@ describe("eca determinism (replay through the runner)", () => {
         expect(crazy.outcome(replayed)).toEqual(crazy.outcome(s));
     });
 });
-
-// ── Hardening: turn cap, forced passes, untrusted card payloads ──────────────
 
 /** Draw-on-turn-start + accept-anything + reshuffle: never converges. */
 const NEVER_ENDING: EcaDefinition = {

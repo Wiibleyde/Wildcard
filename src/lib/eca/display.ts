@@ -1,12 +1,8 @@
 import type { CardDescriptor, Suit } from "@/lib/card/types";
 import type { GameEvent } from "@/lib/engine/types";
+import { isRecord } from "./schema";
 
-/**
- * Display helpers shared by every surface that narrates an ECA game — the
- * live table log (`src/lib/games/eca/table.ts`) and the Studio sandbox
- * (`useTestPlay`). One implementation, so the board a creator tests in reads
- * exactly like the one everyone plays on. Pure: safe on client and server.
- */
+/** Narration shared by the live table log and the Studio sandbox. Pure. */
 
 const SUIT_GLYPH: Record<Suit, string> = {
     spades: "♠",
@@ -18,22 +14,20 @@ const SUIT_GLYPH: Record<Suit, string> = {
 function isSuitedCard(
     value: unknown,
 ): value is Extract<CardDescriptor, { type: "suited" }> {
-    if (typeof value !== "object" || value === null) return false;
-    const record = value as Record<string, unknown>;
     return (
-        record.type === "suited" &&
-        typeof record.rank === "string" &&
-        typeof record.suit === "string" &&
-        Object.hasOwn(SUIT_GLYPH, record.suit)
+        isRecord(value) &&
+        value.type === "suited" &&
+        typeof value.rank === "string" &&
+        typeof value.suit === "string" &&
+        Object.hasOwn(SUIT_GLYPH, value.suit)
     );
 }
 
-/** "7♥" for a suited card; "?" for anything face-down/unknown (log lines). */
+/** "7♥", or "?" for anything face-down or unknown. */
 export function ecaCardLabel(value: unknown): string {
     return isSuitedCard(value) ? `${value.rank}${SUIT_GLYPH[value.suit]}` : "?";
 }
 
-/** Hearts and diamonds render red. */
 export function isRedSuit(card: CardDescriptor): boolean {
     return (
         card.type === "suited" &&
@@ -41,19 +35,21 @@ export function isRedSuit(card: CardDescriptor): boolean {
     );
 }
 
-/**
- * Localized text lookup — both the `game` and the `studio` namespaces carry
- * the same `log_*` keys, so either translator fits.
- */
-export type EcaLogText = (
-    key: string,
+/** Present in both the `game` and `studio` namespaces. */
+type EcaLogKey =
+    | "log_card_played"
+    | "log_rule_fired"
+    | "log_cards_drawn"
+    | "log_direction_reversed"
+    | "log_player_skipped"
+    | "log_turn_advanced"
+    | "log_game_ended";
+
+type EcaLogText = (
+    key: EcaLogKey,
     values?: Record<string, string | number>,
 ) => string;
 
-/**
- * One log line for an ECA engine event, or `null` for events with no line.
- * `nameOf` resolves a payload's `playerId` to a display name ("?" if unknown).
- */
 export function describeEcaEvent(
     event: GameEvent,
     t: EcaLogText,

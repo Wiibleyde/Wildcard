@@ -1,10 +1,9 @@
 import type { Locale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import {
-    type StudioGameSummary,
-    StudioHub,
-} from "@/components/studio/StudioHub";
+import type { StudioGameSummary } from "@/components/studio/StudioGameCard";
+import { StudioHub } from "@/components/studio/StudioHub";
 import { requireAuthUser } from "@/lib/auth/session";
+import { listEcaGames } from "@/lib/models/studio";
 import { createClient } from "@/lib/supabase/server";
 import { ecaImagesBucket, publicStorageUrl } from "@/lib/supabase/storage";
 
@@ -18,32 +17,16 @@ export default async function Page({
     const t = await getTranslations("studio");
 
     const user = await requireAuthUser(lang, `/${lang}/studio`);
-    const supabase = await createClient();
-
-    // RLS client on purpose: the own-row select policy scopes this query —
-    // database-level defense-in-depth under the API's ownership checks.
-    const { data } = await supabase
-        .from("eca_games")
-        .select(
-            "id, name, description, status, image_url, definition, updated_at, moderation_locked",
-        )
-        .eq("owner_id", user.id)
-        .order("updated_at", { ascending: false });
-
-    const games: StudioGameSummary[] = (data ?? []).map((row) => ({
-        id: row.id,
-        name: row.name,
-        description: row.description,
-        status: row.status,
-        moderationLocked: row.moderation_locked,
-        ruleCount: Array.isArray(row.definition.rules)
-            ? row.definition.rules.length
-            : 0,
-        imageUrl: row.image_url
-            ? publicStorageUrl(ecaImagesBucket(), row.image_url)
-            : null,
-        updatedAt: row.updated_at,
-    }));
+    // RLS client on purpose: defense in depth under the owner filter.
+    const result = await listEcaGames(await createClient(), user.id);
+    const games: StudioGameSummary[] = result.ok
+        ? result.games.map((game) => ({
+              ...game,
+              imageUrl: game.imageUrl
+                  ? publicStorageUrl(ecaImagesBucket(), game.imageUrl)
+                  : null,
+          }))
+        : [];
 
     return (
         <div className="min-h-screen px-4 pt-8 pb-16 md:pt-12 xl:px-10">

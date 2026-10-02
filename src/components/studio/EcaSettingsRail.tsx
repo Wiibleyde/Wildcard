@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import type { EcaEditorController } from "@/hooks/studio/useEcaEditor";
+import { ECA_DECK_IDS, isOneOf } from "@/lib/eca/schema";
+import type { EcaDeckId, EcaDefinition } from "@/lib/eca/types";
 import {
     ECA_DESCRIPTION_MAX,
     ECA_HAND_SIZE_MAX,
@@ -10,14 +12,34 @@ import {
     ECA_PLAYERS_MAX,
     ECA_PLAYERS_MIN,
 } from "@/lib/eca/validate";
-import { fieldClass, fieldStyle, labelClass, labelStyle } from "./fields";
+import {
+    fieldClass,
+    fieldStyle,
+    labelClass,
+    labelStyle,
+    mutedTextStyle,
+} from "./fields";
 import { GameImageField } from "./GameImageField";
+import type { StudioMessageKey } from "./messages";
+import { NumberField } from "./NumberField";
+import { PanelTitle } from "./PanelTitle";
+import { ToggleRow } from "./ToggleRow";
 
-/**
- * The left settings rail of the Studio editor: game identity (name,
- * description, cover, player range), deal setup, turn flow toggles, and the
- * fixed v1 win condition. All edits flow through the editor's `patch*` helpers.
- */
+const DECK_LABELS: Record<EcaDeckId, StudioMessageKey> = {
+    french52: "deck_french52",
+    french32: "deck_french32",
+};
+
+const TURN_FLAGS: ReadonlyArray<{
+    readonly flag: keyof EcaDefinition["turn"];
+    readonly label: StudioMessageKey;
+}> = [
+    { flag: "allowDraw", label: "allow_draw" },
+    { flag: "allowPass", label: "allow_pass" },
+    { flag: "passRequiresDraw", label: "pass_requires_draw" },
+    { flag: "reshuffleDiscard", label: "reshuffle_discard" },
+];
+
 export function EcaSettingsRail({
     editor,
     ownerId,
@@ -30,18 +52,12 @@ export function EcaSettingsRail({
     readonly imageUrl: string | null;
 }) {
     const t = useTranslations("studio");
-    const { draft, patchMeta, patchSetup, patchTurn, parseCount } = editor;
+    const { draft, patchMeta, patchSetup, patchTurn } = editor;
 
     return (
         <div className="flex flex-col gap-6 lg:col-span-2">
-            {/* Identity */}
             <section className="panel flex flex-col gap-4 p-5">
-                <h2
-                    className="font-display text-xl"
-                    style={{ color: "var(--ink)" }}
-                >
-                    {t("editor_meta")}
-                </h2>
+                <PanelTitle>{t("editor_meta")}</PanelTitle>
                 <div>
                     <label
                         htmlFor="studio-name"
@@ -92,63 +108,27 @@ export function EcaSettingsRail({
                     initialImagePath={imageUrl}
                 />
                 <div className="grid grid-cols-2 gap-3">
-                    <div>
-                        <label
-                            htmlFor="studio-min-players"
-                            className={`${labelClass} mb-2 block`}
-                            style={labelStyle}
-                        >
-                            {t("min_players")}
-                        </label>
-                        <input
-                            id="studio-min-players"
-                            type="number"
-                            min={ECA_PLAYERS_MIN}
-                            max={ECA_PLAYERS_MAX}
-                            value={draft.meta.minPlayers}
-                            onChange={(e) =>
-                                patchMeta({
-                                    minPlayers: parseCount(e.target.value),
-                                })
-                            }
-                            className={`${fieldClass} w-full`}
-                            style={fieldStyle}
-                        />
-                    </div>
-                    <div>
-                        <label
-                            htmlFor="studio-max-players"
-                            className={`${labelClass} mb-2 block`}
-                            style={labelStyle}
-                        >
-                            {t("max_players")}
-                        </label>
-                        <input
-                            id="studio-max-players"
-                            type="number"
-                            min={ECA_PLAYERS_MIN}
-                            max={ECA_PLAYERS_MAX}
-                            value={draft.meta.maxPlayers}
-                            onChange={(e) =>
-                                patchMeta({
-                                    maxPlayers: parseCount(e.target.value),
-                                })
-                            }
-                            className={`${fieldClass} w-full`}
-                            style={fieldStyle}
-                        />
-                    </div>
+                    <NumberField
+                        id="studio-min-players"
+                        label={t("min_players")}
+                        min={ECA_PLAYERS_MIN}
+                        max={ECA_PLAYERS_MAX}
+                        value={draft.meta.minPlayers}
+                        onChange={(minPlayers) => patchMeta({ minPlayers })}
+                    />
+                    <NumberField
+                        id="studio-max-players"
+                        label={t("max_players")}
+                        min={ECA_PLAYERS_MIN}
+                        max={ECA_PLAYERS_MAX}
+                        value={draft.meta.maxPlayers}
+                        onChange={(maxPlayers) => patchMeta({ maxPlayers })}
+                    />
                 </div>
             </section>
 
-            {/* Setup */}
             <section className="panel flex flex-col gap-4 p-5">
-                <h2
-                    className="font-display text-xl"
-                    style={{ color: "var(--ink)" }}
-                >
-                    {t("editor_setup")}
-                </h2>
+                <PanelTitle>{t("editor_setup")}</PanelTitle>
                 <div className="grid grid-cols-2 gap-3">
                     <div>
                         <label
@@ -161,48 +141,30 @@ export function EcaSettingsRail({
                         <select
                             id="studio-deck"
                             value={draft.setup.deckId}
-                            onChange={(e) =>
-                                patchSetup({
-                                    deckId:
-                                        e.target.value === "french32"
-                                            ? "french32"
-                                            : "french52",
-                                })
-                            }
+                            onChange={(e) => {
+                                const deckId = e.target.value;
+                                if (isOneOf(deckId, ECA_DECK_IDS)) {
+                                    patchSetup({ deckId });
+                                }
+                            }}
                             className={`${fieldClass} w-full`}
                             style={fieldStyle}
                         >
-                            <option value="french52">
-                                {t("deck_french52")}
-                            </option>
-                            <option value="french32">
-                                {t("deck_french32")}
-                            </option>
+                            {ECA_DECK_IDS.map((deckId) => (
+                                <option key={deckId} value={deckId}>
+                                    {t(DECK_LABELS[deckId])}
+                                </option>
+                            ))}
                         </select>
                     </div>
-                    <div>
-                        <label
-                            htmlFor="studio-hand-size"
-                            className={`${labelClass} mb-2 block`}
-                            style={labelStyle}
-                        >
-                            {t("hand_size")}
-                        </label>
-                        <input
-                            id="studio-hand-size"
-                            type="number"
-                            min={ECA_HAND_SIZE_MIN}
-                            max={ECA_HAND_SIZE_MAX}
-                            value={draft.setup.handSize}
-                            onChange={(e) =>
-                                patchSetup({
-                                    handSize: parseCount(e.target.value),
-                                })
-                            }
-                            className={`${fieldClass} w-full`}
-                            style={fieldStyle}
-                        />
-                    </div>
+                    <NumberField
+                        id="studio-hand-size"
+                        label={t("hand_size")}
+                        min={ECA_HAND_SIZE_MIN}
+                        max={ECA_HAND_SIZE_MAX}
+                        value={draft.setup.handSize}
+                        onChange={(handSize) => patchSetup({ handSize })}
+                    />
                 </div>
                 <ToggleRow
                     label={t("start_discard")}
@@ -211,83 +173,24 @@ export function EcaSettingsRail({
                 />
             </section>
 
-            {/* Turn flow */}
             <section className="panel flex flex-col gap-3 p-5">
-                <h2
-                    className="font-display text-xl"
-                    style={{ color: "var(--ink)" }}
-                >
-                    {t("editor_turn")}
-                </h2>
-                <ToggleRow
-                    label={t("allow_draw")}
-                    checked={draft.turn.allowDraw}
-                    onChange={(allowDraw) => patchTurn({ allowDraw })}
-                />
-                <ToggleRow
-                    label={t("allow_pass")}
-                    checked={draft.turn.allowPass}
-                    onChange={(allowPass) => patchTurn({ allowPass })}
-                />
-                <ToggleRow
-                    label={t("pass_requires_draw")}
-                    checked={draft.turn.passRequiresDraw}
-                    onChange={(passRequiresDraw) =>
-                        patchTurn({ passRequiresDraw })
-                    }
-                />
-                <ToggleRow
-                    label={t("reshuffle_discard")}
-                    checked={draft.turn.reshuffleDiscard}
-                    onChange={(reshuffleDiscard) =>
-                        patchTurn({ reshuffleDiscard })
-                    }
-                />
+                <PanelTitle>{t("editor_turn")}</PanelTitle>
+                {TURN_FLAGS.map(({ flag, label }) => (
+                    <ToggleRow
+                        key={flag}
+                        label={t(label)}
+                        checked={draft.turn[flag]}
+                        onChange={(checked) => patchTurn({ [flag]: checked })}
+                    />
+                ))}
             </section>
 
-            {/* Win condition (v1: fixed) */}
             <section className="panel flex flex-col gap-2 p-5">
-                <h2
-                    className="font-display text-xl"
-                    style={{ color: "var(--ink)" }}
-                >
-                    {t("editor_win")}
-                </h2>
-                <p
-                    className="text-sm font-semibold"
-                    style={{ color: "#5a5340" }}
-                >
+                <PanelTitle>{t("editor_win")}</PanelTitle>
+                <p className="text-sm font-semibold" style={mutedTextStyle}>
                     {t("win_empty_hand")}
                 </p>
             </section>
         </div>
-    );
-}
-
-function ToggleRow({
-    label,
-    checked,
-    onChange,
-}: {
-    readonly label: string;
-    readonly checked: boolean;
-    readonly onChange: (checked: boolean) => void;
-}) {
-    return (
-        <label className="flex cursor-pointer items-center gap-3">
-            <input
-                type="checkbox"
-                checked={checked}
-                onChange={(e) => onChange(e.target.checked)}
-                className="h-5 w-5 shrink-0 cursor-pointer"
-                style={{ accentColor: "var(--red)" }}
-            />
-            <span
-                className="text-sm font-semibold"
-                style={{ color: "var(--ink)" }}
-            >
-                {label}
-            </span>
-        </label>
     );
 }
