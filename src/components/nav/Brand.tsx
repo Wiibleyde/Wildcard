@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 
 type Size = "sm" | "md";
@@ -8,10 +9,12 @@ const LOGO = {
 } as const;
 
 export function Brand({ size }: { size: Size }) {
+    const t = useTranslations("home");
     const s = LOGO[size];
     return (
         <Link href="/" className="flex items-center gap-2.75">
             <span
+                aria-hidden="true"
                 className="wc-logo-mark shrink-0 rounded-wc-icon"
                 style={{
                     width: s.box,
@@ -29,7 +32,7 @@ export function Brand({ size }: { size: Size }) {
                     letterSpacing: "0.01em",
                 }}
             >
-                Wildcard
+                {t("title")}
             </span>
         </Link>
     );

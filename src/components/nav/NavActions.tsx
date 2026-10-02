@@ -1,6 +1,6 @@
 "use client";
 
-import { useLocale, useTranslations } from "next-intl";
+import { type Locale, useLocale, useTranslations } from "next-intl";
 import { useSignOut } from "@/hooks/auth/useSignOut";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { routing } from "@/i18n/routing";
@@ -38,13 +38,11 @@ export function NavActions({ variant }: Props) {
         routing.locales.find((l) => l !== locale) ?? routing.defaultLocale;
     const switchLabel = t("switch_lang", { lang: otherLang.toUpperCase() });
 
-    function switchLang() {
-        // Keep the query string and hash (e.g. history filters, replay step):
-        // `pathname` from next-intl is locale-less and carries neither. Read at
-        // click time rather than via useSearchParams, which would force a
-        // Suspense boundary around the whole nav during prerender.
+    function switchLang(target: Locale) {
+        // Keep query and hash (next-intl's pathname has neither). Read at click
+        // time: useSearchParams would force a Suspense boundary around the nav.
         const { search, hash } = window.location;
-        router.replace(`${pathname}${search}${hash}`, { locale: otherLang });
+        router.replace(`${pathname}${search}${hash}`, { locale: target });
     }
 
     if (variant === "sidebar") {
@@ -60,11 +58,15 @@ export function NavActions({ variant }: Props) {
                             <button
                                 key={l}
                                 type="button"
-                                onClick={l !== locale ? switchLang : undefined}
+                                onClick={() => switchLang(l)}
                                 disabled={l === locale}
                                 aria-pressed={l === locale}
                                 aria-label={
-                                    l === locale ? undefined : switchLabel
+                                    l === locale
+                                        ? undefined
+                                        : t("switch_lang", {
+                                              lang: l.toUpperCase(),
+                                          })
                                 }
                                 className="px-2 py-0.5 rounded text-xs font-bold uppercase transition-colors"
                                 style={
@@ -98,7 +100,7 @@ export function NavActions({ variant }: Props) {
         <div className="flex items-center gap-1">
             <button
                 type="button"
-                onClick={switchLang}
+                onClick={() => switchLang(otherLang)}
                 className="flex items-center justify-center w-8 h-8 rounded-lg transition-colors hover:bg-white/5"
                 style={{ color: "var(--muted)" }}
                 aria-label={switchLabel}
