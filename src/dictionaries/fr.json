@@ -257,6 +257,66 @@
             "slam": {
                 "label": "Chelem",
                 "description": "±200 si un camp remporte tous les plis (chelem non annoncé)."
+            },
+            "threeCardWar": {
+                "label": "Bataille à 3 cartes",
+                "description": "Sur une égalité, chacun pose trois cartes face cachée au lieu d’une."
+            },
+            "drawThree": {
+                "label": "Pioche par 3",
+                "description": "La pioche retourne trois cartes à la fois ; seule celle du dessus se joue."
+            },
+            "limitedPasses": {
+                "label": "Passes limitées (Vegas)",
+                "description": "Un seul passage dans la pioche (trois en pioche par 3)."
+            }
+        },
+        "mode_title": "Mode de jeu",
+        "mode_custom": "Mode personnalisé — règles ajustées à la main.",
+        "modes": {
+            "bataille_fr": {
+                "label": "Française",
+                "description": "Règles françaises : sur une égalité, une carte cachée puis une carte retournée."
+            },
+            "bataille_war": {
+                "label": "War (anglaise)",
+                "description": "Variante anglaise : trois cartes cachées à chaque bataille, les égalités rapportent gros."
+            },
+            "president_fr": {
+                "label": "Française",
+                "description": "Règles de table françaises : le 2 ferme le pli, « ou rien », le carré ferme le pli, interdit de finir par un 2."
+            },
+            "president_revolution": {
+                "label": "Avec révolution",
+                "description": "Règles françaises + révolution : un carré inverse l’ordre des cartes."
+            },
+            "president_simple": {
+                "label": "Classique",
+                "description": "Le jeu de base sans règle annexe : monter avec le même nombre de cartes, ou passer."
+            },
+            "solitaire_classic": {
+                "label": "Classique",
+                "description": "Klondike : pioche une carte à la fois, redistributions illimitées."
+            },
+            "solitaire_draw3": {
+                "label": "Pioche 3",
+                "description": "Trois cartes retournées à la fois, redistributions illimitées."
+            },
+            "solitaire_vegas": {
+                "label": "Vegas",
+                "description": "Pioche 1, un seul passage dans la pioche."
+            },
+            "solitaire_vegas3": {
+                "label": "Vegas pioche 3",
+                "description": "Pioche 3, trois passages dans la pioche."
+            },
+            "tarot_fft": {
+                "label": "FFT",
+                "description": "Règles de la Fédération Française de Tarot : Garde Sans / Contre, petit au bout, chelem."
+            },
+            "tarot_simple": {
+                "label": "Simplifié",
+                "description": "Pour débuter : Petite et Garde seulement, sans prime."
             }
         }
     },

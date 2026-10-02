@@ -5,8 +5,15 @@ import { useEffect, useRef, useState } from "react";
 import { ReconnectingBanner } from "@/components/realtime/ReconnectingBanner";
 import { useRoomRefresh } from "@/hooks/lobby/useRoomRefresh";
 import { useRouter } from "@/i18n/navigation";
-import { type GameRuleToggle, resolveRuleToggles } from "@/lib/engine/types";
+import {
+    type GameRuleMode,
+    type GameRuleToggle,
+    matchRuleMode,
+    resolveRuleToggles,
+    ruleModeValues,
+} from "@/lib/engine/types";
 import { RoomActions } from "./room/RoomActions";
+import { RuleModePicker } from "./room/RuleModePicker";
 import { RuleToggle } from "./room/RuleToggle";
 import { SeatPanel } from "./room/SeatPanel";
 import { SpectatorList } from "./room/SpectatorList";
@@ -28,6 +35,7 @@ interface Props {
     seated: boolean;
     initialRole: Role;
     ruleToggles: readonly GameRuleToggle[];
+    ruleModes: readonly GameRuleMode[];
     initialRules: Record<string, boolean>;
 }
 
@@ -45,6 +53,7 @@ export function RoomClient({
     seated,
     initialRole,
     ruleToggles,
+    ruleModes,
     initialRules,
 }: Props) {
     const t = useTranslations("room");
@@ -145,11 +154,18 @@ export function RoomClient({
 
     function setRule(key: string, value: boolean) {
         // Resolve locally so a dependency flip shows instantly; server re-resolves.
+        return saveRules(
+            resolveRuleToggles(ruleToggles, { ...rules, [key]: value }),
+        );
+    }
+
+    /** A mode is just a full toggle map — saved through the same route. */
+    function pickMode(mode: GameRuleMode) {
+        return saveRules(ruleModeValues(ruleToggles, mode));
+    }
+
+    function saveRules(next: Record<string, boolean>) {
         const previous = rules;
-        const next = resolveRuleToggles(ruleToggles, {
-            ...rules,
-            [key]: value,
-        });
         return mutateSetting(
             () => {
                 setRules(next);
@@ -329,6 +345,27 @@ export function RoomClient({
                 botCount={botCount}
                 onSetBots={setBots}
             />
+
+            {ruleModes.length > 0 && (
+                <div className="flex flex-col gap-3">
+                    <h3
+                        className="font-display text-base"
+                        style={{ color: "var(--cream)" }}
+                    >
+                        {t("mode_title")}
+                    </h3>
+                    <RuleModePicker
+                        modes={ruleModes}
+                        activeKey={
+                            matchRuleMode(ruleModes, ruleToggles, rules)?.key ??
+                            null
+                        }
+                        isHost={isHost}
+                        busy={busy || settingsBusy}
+                        onPick={pickMode}
+                    />
+                </div>
+            )}
 
             {ruleToggles.length > 0 && (
                 <div className="flex flex-col gap-3">

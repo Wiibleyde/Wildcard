@@ -13,11 +13,13 @@ import type {
     ApplyResult,
     GameEvent,
     GameModule,
+    GameRuleMode,
+    GameRuleToggle,
     GameState,
 } from "@/lib/engine/types";
 
 /**
- * Solitaire (Klondike, draw-one) — the platform's first single-player module.
+ * Solitaire (Klondike) — the platform's first single-player module.
  *
  * It proves the engine contract is not multiplayer-bound: the same
  * `apply(state, action)` reducer drives a solo game, with `currentPlayerId`
@@ -28,9 +30,16 @@ import type {
  *
  * Rules modelled: build the four foundations up by suit A→K; build the seven
  * tableau columns down in alternating colours; only a King fills an empty
- * column; the stock deals one card at a time to the waste and recycles
- * (unlimited redeals, order preserved) when exhausted. The game is won when
- * all 52 cards reach the foundations.
+ * column; the stock deals to the waste and recycles (order preserved) when
+ * exhausted. The game is won when all 52 cards reach the foundations.
+ *
+ * Variants (https://en.wikipedia.org/wiki/Klondike_(solitaire)) — Klondike has
+ * no French-specific rulebook, so the default is the classic draw-one,
+ * unlimited-redeal deal:
+ * - `drawThree` — the stock turns three cards at a time (only the top of the
+ *   waste plays), the harder Windows-style game.
+ * - `limitedPasses` — « Vegas »: a single pass through the stock in draw-one,
+ *   three passes (two redeals) in draw-three.
  *
  * Not every Klondike deal is winnable, and unlimited redeals mean a stuck board
  * never ends on its own — so the player may `resign`, closing the game as a
@@ -59,6 +68,63 @@ const ORDER = buildRankOrder(RANKS);
 const COLUMNS = 7;
 const FULL_FOUNDATION = 13;
 
+/** Table rules (see the module doc). */
+export interface SolitaireRules {
+    /** Turn three stock cards at a time instead of one. */
+    readonly drawThree: boolean;
+    /** Vegas: one pass in draw-one, three passes in draw-three. */
+    readonly limitedPasses: boolean;
+}
+
+export const DEFAULT_SOLITAIRE_RULES: SolitaireRules = {
+    drawThree: false,
+    limitedPasses: false,
+};
+
+export const SOLITAIRE_RULE_TOGGLES: readonly GameRuleToggle[] = [
+    { key: "drawThree", default: false },
+    { key: "limitedPasses", default: false },
+];
+
+/** Launch presets — classic draw-one first (the default). */
+export const SOLITAIRE_RULE_MODES: readonly GameRuleMode[] = [
+    {
+        key: "solitaire_classic",
+        rules: { drawThree: false, limitedPasses: false },
+    },
+    {
+        key: "solitaire_draw3",
+        rules: { drawThree: true, limitedPasses: false },
+    },
+    {
+        key: "solitaire_vegas",
+        rules: { drawThree: false, limitedPasses: true },
+    },
+    {
+        key: "solitaire_vegas3",
+        rules: { drawThree: true, limitedPasses: true },
+    },
+];
+
+function rulesOf(state: SolitaireState): SolitaireRules {
+    return state.rules ?? DEFAULT_SOLITAIRE_RULES;
+}
+
+/** Cards turned per draw under the game's rules. */
+function drawSize(state: SolitaireState): number {
+    return rulesOf(state).drawThree ? 3 : 1;
+}
+
+/** May the waste be turned back into the stock once more? */
+function canRecycle(state: SolitaireState): boolean {
+    if (state.stock.length > 0 || state.waste.length === 0) return false;
+    const rules = rulesOf(state);
+    if (!rules.limitedPasses) return true;
+    // Vegas: 1 pass (0 redeals) in draw-one, 3 passes (2 redeals) in draw-three.
+    const maxRedeals = rules.drawThree ? 2 : 0;
+    return (state.redeals ?? 0) < maxRedeals;
+}
+
 /** One tableau column: hidden `down` cards under the visible `up` run. */
 export interface SolitaireColumn {
     readonly down: readonly CardDescriptor[];
@@ -76,6 +142,11 @@ export interface SolitaireState extends GameState {
     readonly tableau: readonly SolitaireColumn[];
     /** Total moves played — the score (fewer is better). */
     readonly moves: number;
+    /** Table rules this game was dealt with. Absent on games recorded before
+     * rules existed — those used the classic rules, the default. */
+    readonly rules?: SolitaireRules;
+    /** Waste → stock recycles so far (tracked only when rules are bound). */
+    readonly redeals?: number;
 }
 
 export type SolitaireAction =
@@ -216,7 +287,13 @@ function isValidRun(cards: readonly CardDescriptor[]): boolean {
  */
 function isWinAssured(state: SolitaireState): boolean {
     if (state.phase !== "playing") return false;
-    return state.tableau.every((col) => col.down.length === 0);
+    if (!state.tableau.every((col) => col.down.length === 0)) return false;
+    // The "whole stock is reachable" argument only holds for draw-one with
+    // unlimited redeals: three-at-a-time can bury a card behind the cadence,
+    // and a spent Vegas stock is gone. Otherwise demand an empty stock.
+    const rules = rulesOf(state);
+    if (!rules.drawThree && !rules.limitedPasses) return true;
+    return state.stock.length === 0 && state.waste.length === 0;
 }
 
 /** A complete A→K foundation pile for `suit` (the finished state of each suit). */
@@ -273,43 +350,17 @@ function commit(
     };
 }
 
-export const solitaire: GameModule<
-    SolitaireState,
-    SolitaireAction,
-    SolitaireView
+const base: Omit<
+    GameModule<SolitaireState, SolitaireAction, SolitaireView>,
+    "setup"
 > = {
     id: "solitaire",
     name: "Solitaire",
     deck: french52,
     minPlayers: 1,
     maxPlayers: 1,
-
-    setup(players, rng, seed, gameId) {
-        const deck = rng.shuffle(buildDeck(french52));
-        const tableau: SolitaireColumn[] = [];
-        let cursor = 0;
-        for (let col = 0; col < COLUMNS; col++) {
-            const down = deck.slice(cursor, cursor + col);
-            cursor += col;
-            const up = [deck[cursor]];
-            cursor += 1;
-            tableau.push({ down, up });
-        }
-        return {
-            gameId,
-            players,
-            phase: "playing",
-            currentPlayerId: players[0].id,
-            turn: 0,
-            seed,
-            rngState: rng.state,
-            stock: deck.slice(cursor),
-            waste: [],
-            foundations: { spades: [], hearts: [], diamonds: [], clubs: [] },
-            tableau,
-            moves: 0,
-        };
-    },
+    ruleToggles: SOLITAIRE_RULE_TOGGLES,
+    ruleModes: SOLITAIRE_RULE_MODES,
 
     legalActions(state, playerId) {
         if (state.phase !== "playing") return [];
@@ -322,8 +373,8 @@ export const solitaire: GameModule<
             acts.push({ type: "autoFinish", playerId });
         }
 
-        // Draw one, or recycle the waste once the stock is empty.
-        if (state.stock.length > 0 || state.waste.length > 0) {
+        // Draw, or recycle the waste once the stock is empty (if allowed).
+        if (state.stock.length > 0 || canRecycle(state)) {
             acts.push({ type: "draw", playerId });
         }
 
@@ -402,29 +453,39 @@ export const solitaire: GameModule<
 
         switch (action.type) {
             case "draw": {
-                if (state.stock.length === 0 && state.waste.length === 0) {
-                    return fail(
-                        "illegal_move",
-                        "Stock and waste are both empty.",
-                    );
-                }
                 if (state.stock.length > 0) {
-                    // Deal one card face-up onto the waste (only the top plays).
-                    const card = state.stock[state.stock.length - 1];
+                    // Turn one (or three) cards face-up onto the waste, top of
+                    // the stock first — the last one turned is the playable top.
+                    const n = Math.min(drawSize(state), state.stock.length);
+                    const turned = state.stock.slice(-n).reverse();
                     return commit(
                         state,
                         {
-                            stock: state.stock.slice(0, -1),
-                            waste: [...state.waste, card],
+                            stock: state.stock.slice(0, -n),
+                            waste: [...state.waste, ...turned],
                         },
-                        [{ type: "draw" }],
+                        [{ type: "draw", payload: { count: n } }],
                         rng,
+                    );
+                }
+                if (!canRecycle(state)) {
+                    return fail(
+                        "illegal_move",
+                        state.waste.length === 0
+                            ? "Stock and waste are both empty."
+                            : "No passes left through the stock.",
                     );
                 }
                 // Recycle: turn the waste back over, order preserved.
                 return commit(
                     state,
-                    { stock: [...state.waste].reverse(), waste: [] },
+                    {
+                        stock: [...state.waste].reverse(),
+                        waste: [],
+                        ...(state.redeals === undefined
+                            ? {}
+                            : { redeals: state.redeals + 1 }),
+                    },
                     [{ type: "recycle" }],
                     rng,
                 );
@@ -741,3 +802,59 @@ export const solitaire: GameModule<
         };
     },
 };
+
+/**
+ * Build a Solitaire module bound to a rule set. Bound rules (and the redeal
+ * counter Vegas needs) are stamped into the state so a saved game replays
+ * identically. The unbound module stamps nothing — how games recorded before
+ * rules existed were dealt, so their replays still match byte for byte.
+ */
+export function createSolitaire(
+    rules?: SolitaireRules,
+): GameModule<SolitaireState, SolitaireAction, SolitaireView> {
+    return {
+        ...base,
+        withRules(chosen) {
+            const pick = (key: keyof SolitaireRules): boolean =>
+                chosen[key] ?? DEFAULT_SOLITAIRE_RULES[key];
+            return createSolitaire({
+                drawThree: pick("drawThree"),
+                limitedPasses: pick("limitedPasses"),
+            });
+        },
+        setup(players, rng, seed, gameId) {
+            const deck = rng.shuffle(buildDeck(french52));
+            const tableau: SolitaireColumn[] = [];
+            let cursor = 0;
+            for (let col = 0; col < COLUMNS; col++) {
+                const down = deck.slice(cursor, cursor + col);
+                cursor += col;
+                const up = [deck[cursor]];
+                cursor += 1;
+                tableau.push({ down, up });
+            }
+            return {
+                gameId,
+                players,
+                phase: "playing",
+                currentPlayerId: players[0].id,
+                turn: 0,
+                seed,
+                rngState: rng.state,
+                stock: deck.slice(cursor),
+                waste: [],
+                foundations: {
+                    spades: [],
+                    hearts: [],
+                    diamonds: [],
+                    clubs: [],
+                },
+                tableau,
+                moves: 0,
+                ...(rules ? { rules, redeals: 0 } : {}),
+            };
+        },
+    };
+}
+
+export const solitaire = createSolitaire();

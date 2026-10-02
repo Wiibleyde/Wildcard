@@ -257,6 +257,66 @@
             "slam": {
                 "label": "Slam",
                 "description": "±200 when one side wins every trick (unannounced slam)."
+            },
+            "threeCardWar": {
+                "label": "Three-card war",
+                "description": "On a tie, each player stakes three face-down cards instead of one."
+            },
+            "drawThree": {
+                "label": "Draw three",
+                "description": "The stock turns three cards at a time; only the top one plays."
+            },
+            "limitedPasses": {
+                "label": "Limited passes (Vegas)",
+                "description": "A single pass through the stock (three in draw-three)."
+            }
+        },
+        "mode_title": "Game mode",
+        "mode_custom": "Custom mode — rules tweaked by hand.",
+        "modes": {
+            "bataille_fr": {
+                "label": "French",
+                "description": "French rules: on a tie, one face-down card then one face-up card."
+            },
+            "bataille_war": {
+                "label": "War (English)",
+                "description": "English variant: three face-down cards per war, ties swing big."
+            },
+            "president_fr": {
+                "label": "French",
+                "description": "French table rules: 2 closes the trick, « or nothing », a quad closes the trick, no finishing on a 2."
+            },
+            "president_revolution": {
+                "label": "With revolution",
+                "description": "French rules + revolution: four of a kind inverts the card order."
+            },
+            "president_simple": {
+                "label": "Classic",
+                "description": "The bare game with no table rule: beat with the same number of cards, or pass."
+            },
+            "solitaire_classic": {
+                "label": "Classic",
+                "description": "Klondike: draw one card at a time, unlimited redeals."
+            },
+            "solitaire_draw3": {
+                "label": "Draw three",
+                "description": "Three cards turned at a time, unlimited redeals."
+            },
+            "solitaire_vegas": {
+                "label": "Vegas",
+                "description": "Draw one, a single pass through the stock."
+            },
+            "solitaire_vegas3": {
+                "label": "Vegas draw three",
+                "description": "Draw three, three passes through the stock."
+            },
+            "tarot_fft": {
+                "label": "FFT",
+                "description": "French Tarot Federation rules: Garde Sans / Contre, petit au bout, slam."
+            },
+            "tarot_simple": {
+                "label": "Simplified",
+                "description": "For beginners: Petite and Garde only, no bonuses."
             }
         }
     },

@@ -9,6 +9,7 @@ import { fail, seatOrder } from "@/lib/engine/rules";
 import type {
     GameEvent,
     GameModule,
+    GameRuleMode,
     GameRuleToggle,
     GameState,
     Player,
@@ -577,6 +578,19 @@ export const TAROT_RULE_TOGGLES: readonly GameRuleToggle[] = [
     { key: "slam", default: true },
 ];
 
+/**
+ * Launch presets. The FFT rules (Fédération Française de Tarot, the reference
+ * rulebook) first — the default; then a beginner table with only Petite/Garde
+ * and none of the bonus primes.
+ */
+export const TAROT_RULE_MODES: readonly GameRuleMode[] = [
+    { key: "tarot_fft", rules: {} },
+    {
+        key: "tarot_simple",
+        rules: { gardeSansContre: false, petitAuBout: false, slam: false },
+    },
+];
+
 const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
     id: "tarot",
     name: "Tarot",
@@ -584,6 +598,7 @@ const base: Omit<GameModule<TarotState, TarotAction, TarotView>, "setup"> = {
     minPlayers: 3,
     maxPlayers: 4,
     ruleToggles: TAROT_RULE_TOGGLES,
+    ruleModes: TAROT_RULE_MODES,
 
     legalActions(state, playerId) {
         if (state.phase === "done") return [];
