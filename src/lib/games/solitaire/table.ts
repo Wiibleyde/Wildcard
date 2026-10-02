@@ -67,7 +67,7 @@ function banner(view: SolitaireView, ctx: TableContext): TableBanner {
  * card's `action`: foundation first, else the leftmost column). Drawing and
  * recycling live on the stock zone itself, which stays clickable when empty.
  */
-export const solitaireTable = registerTable<SolitaireView>({
+export const solitaireTable = registerTable<SolitaireView, SolitaireAction>({
     zones: [
         { id: "stock", placement: "top", arrangement: "stack", cardSize: "sm" },
         { id: "waste", placement: "top", arrangement: "stack", cardSize: "sm" },
@@ -89,8 +89,7 @@ export const solitaireTable = registerTable<SolitaireView>({
      * Not predicted (they reveal hidden cards): draw/autoFinish, a foundation
      * card coming back down, and emptying a column onto its face-down cards.
      */
-    predict(view, action) {
-        const a = action as SolitaireAction;
+    predict(view, a) {
         switch (a.type) {
             case "wasteToFoundation": {
                 const card = view.waste.at(-1);
@@ -151,7 +150,7 @@ export const solitaireTable = registerTable<SolitaireView>({
     },
 
     mapView(view, ctx) {
-        const legal = ctx.legalActions as readonly SolitaireAction[];
+        const legal = ctx.legalActions;
         const find = (
             match: (a: SolitaireAction) => boolean,
         ): SolitaireAction | undefined => legal.find(match);

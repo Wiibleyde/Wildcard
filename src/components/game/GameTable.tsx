@@ -18,8 +18,8 @@ import type {
     TableContext,
     TableControl,
     TableData,
-    TableText,
     TableZoneTemplate,
+    Translate,
     ZonePlacement,
 } from "@/lib/games/table/types";
 import type { GameClientPayload } from "@/lib/models/game";
@@ -62,7 +62,7 @@ export function GameTable({
     const labelOf = useCardLabel();
     // Tables build their keys at runtime; narrow to the namespace's keys here only.
     type GameKey = Parameters<typeof t>[0];
-    const text: TableText = useCallback(
+    const text: Translate = useCallback(
         (key, values) => t(key as GameKey, values),
         [t],
     );

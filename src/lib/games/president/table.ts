@@ -48,7 +48,7 @@ function payloadRank(ctx: TableContext, rank: unknown): string {
     return isRank(rank) ? rankLabel(ctx.t, rank) : "?";
 }
 
-export const presidentTable = registerTable<PresidentView>({
+export const presidentTable = registerTable<PresidentView, PresidentAction>({
     zones: [
         {
             id: "trick",
@@ -66,9 +66,8 @@ export const presidentTable = registerTable<PresidentView>({
      * The played cards leave the hand and land on the trick; sweeps (a 2, a
      * carré, the last pass) are left to the server.
      */
-    predict(view, action, viewerId) {
+    predict(view, a, viewerId) {
         if (viewerId === null) return null;
-        const a = action as PresidentAction;
         if (a.type !== "play" && a.type !== "pass") return null;
         const self = view.players.find((p) => p.playerId === viewerId);
         if (!self || view.currentPlayerId !== viewerId) return null;
@@ -148,7 +147,7 @@ export const presidentTable = registerTable<PresidentView>({
         ];
 
         // Legal actions come from this module — safe narrow.
-        const legal = ctx.legalActions as readonly PresidentAction[];
+        const legal = ctx.legalActions;
 
         // Combo picker: one (rank, count) entry per legal play; a rank with
         // no legal play at any size is flagged illegal on your turn.

@@ -1,38 +1,20 @@
-import type { CardDescriptor, Suit } from "@/lib/card/types";
+import { suitColor } from "@/lib/card/rank";
+import type { CardDescriptor } from "@/lib/card/types";
+import { isCardDescriptor, SUIT_SYMBOL } from "@/lib/card/utils";
 import type { GameEvent } from "@/lib/engine/types";
-import { isRecord } from "./schema";
+import type { Translate } from "@/lib/games/table/types";
 
 /** Narration shared by the live table log and the Studio sandbox. Pure. */
 
-const SUIT_GLYPH: Record<Suit, string> = {
-    spades: "♠",
-    hearts: "♥",
-    diamonds: "♦",
-    clubs: "♣",
-};
-
-function isSuitedCard(
-    value: unknown,
-): value is Extract<CardDescriptor, { type: "suited" }> {
-    return (
-        isRecord(value) &&
-        value.type === "suited" &&
-        typeof value.rank === "string" &&
-        typeof value.suit === "string" &&
-        Object.hasOwn(SUIT_GLYPH, value.suit)
-    );
-}
-
 /** "7♥", or "?" for anything face-down or unknown. */
 export function ecaCardLabel(value: unknown): string {
-    return isSuitedCard(value) ? `${value.rank}${SUIT_GLYPH[value.suit]}` : "?";
+    return isCardDescriptor(value) && value.type === "suited"
+        ? `${value.rank}${SUIT_SYMBOL[value.suit]}`
+        : "?";
 }
 
 export function isRedSuit(card: CardDescriptor): boolean {
-    return (
-        card.type === "suited" &&
-        (card.suit === "hearts" || card.suit === "diamonds")
-    );
+    return card.type === "suited" && suitColor(card.suit) === "red";
 }
 
 /** Present in both the `game` and `studio` namespaces. */
@@ -45,10 +27,11 @@ type EcaLogKey =
     | "log_turn_advanced"
     | "log_game_ended";
 
-type EcaLogText = (
-    key: EcaLogKey,
-    values?: Record<string, string | number>,
-) => string;
+/**
+ * Narrower than `Translate` on purpose: the Studio passes its typed
+ * `useTranslations("studio")`, which only accepts known keys.
+ */
+type EcaLogText = (key: EcaLogKey, values?: Parameters<Translate>[1]) => string;
 
 export function describeEcaEvent(
     event: GameEvent,

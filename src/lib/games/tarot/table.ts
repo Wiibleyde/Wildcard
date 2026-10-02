@@ -110,7 +110,7 @@ const YOUR_TURN_KEY: Record<TarotView["phase"], string> = {
  * one-tap picker (bury for the écart, then play). Bids, the slam decision
  * and poignées are controls.
  */
-export const tarotTable = registerTable<TarotView>({
+export const tarotTable = registerTable<TarotView, TarotAction>({
     zones: [
         {
             id: "chien",
@@ -138,9 +138,8 @@ export const tarotTable = registerTable<TarotView>({
     ],
 
     /** Card plays only: the card leaves the hand and lands on the trick; closes are the server's. */
-    predict(view, action, viewerId) {
+    predict(view, a, viewerId) {
         if (viewerId === null) return null;
-        const a = action as TarotAction;
         if (a.type !== "play") return null;
         const self = view.players.find((p) => p.playerId === viewerId);
         if (!self?.hand || view.currentPlayerId !== viewerId) return null;
@@ -236,7 +235,7 @@ export const tarotTable = registerTable<TarotView>({
         }
 
         // Legal actions come from this module — safe narrow.
-        const legal = ctx.legalActions as readonly TarotAction[];
+        const legal = ctx.legalActions;
         const cardPhase = view.phase === "dog" || view.phase === "playing";
 
         if (self?.hand) {

@@ -128,38 +128,40 @@ export type Translate = (
     values?: Record<string, string | number>,
 ) => string;
 
-/** @deprecated Use {@link Translate}. */
-export type TableText = Translate;
-
-export interface TableContext {
+/** `A`: the game's action type — `legalActions` come from that game's module. */
+export interface TableContext<A extends GameAction = GameAction> {
     /** `null` for spectators. */
     readonly viewerId: string | null;
     readonly players: readonly TablePlayer[];
-    readonly legalActions: readonly GameAction[];
+    readonly legalActions: readonly A[];
     readonly isOver: boolean;
     readonly t: Translate;
 }
 
-export interface GameTableConfig<V> {
+export interface GameTableConfig<V, A extends GameAction = GameAction> {
     readonly zones: readonly TableZoneTemplate[];
-    mapView(view: V, ctx: TableContext): TableData;
+    mapView(view: V, ctx: TableContext<A>): TableData;
     /**
      * Optimistic view after the viewer's own move, or `null` to wait for the
      * server (which always overwrites it). Never predict a move that reveals
      * a hidden card — the prediction would be a guess.
      */
-    predict?(view: V, action: GameAction, viewerId: string | null): V | null;
+    predict?(view: V, action: A, viewerId: string | null): V | null;
     /** One log line per event; `null` hides it. No hook ⇒ no log feed. */
-    logLine?(event: GameEvent, ctx: TableContext): string | null;
+    logLine?(event: GameEvent, ctx: TableContext<A>): string | null;
     /** Game-over title for a 1-based rank (e.g. Président, Trou du cul); `null` ⇒ bare position. */
-    rankTitle?(rank: number, total: number, ctx: TableContext): string | null;
+    rankTitle?(
+        rank: number,
+        total: number,
+        ctx: TableContext<A>,
+    ): string | null;
 }
 
 export type AnyGameTableConfig = GameTableConfig<unknown>;
 
 /** Cast-free erasure — keep `mapView`/`predict` as methods (bivariant), like `registerGame`. */
-export function registerTable<V>(
-    config: GameTableConfig<V>,
+export function registerTable<V, A extends GameAction = GameAction>(
+    config: GameTableConfig<V, A>,
 ): AnyGameTableConfig {
     return config;
 }
