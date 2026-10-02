@@ -1,3 +1,4 @@
+import { type ApiErrorKey, apiErrorKey } from "@/lib/api/errorKeys";
 import type { GameOutcome } from "@/lib/engine/types";
 import type {
     GameClientPayload,
@@ -6,24 +7,30 @@ import type {
 } from "@/lib/models/game";
 import type { ReplayPayload } from "@/lib/models/replay";
 
-export type ActionErrorKey =
+type GameErrorKey =
     | "error_illegal"
     | "error_conflict"
-    | "error_generic"
-    | "error_rate_limited"
-    | "error_maintenance"
-    | "error_payload_too_large"
     | "error_no_access"
     | "error_leave_failed";
 
-export function statusToErrorKey(status: number): ActionErrorKey {
-    if (status === 422) return "error_illegal";
-    if (status === 409) return "error_conflict";
-    if (status === 429) return "error_rate_limited";
-    if (status === 503) return "error_maintenance";
-    if (status === 413) return "error_payload_too_large";
-    if (status === 403 || status === 404) return "error_no_access";
-    return "error_generic";
+/** Full dictionary path: in-game wording where it differs, else the shared `errors`. */
+export type ActionErrorKey = `game.${GameErrorKey}` | `errors.${ApiErrorKey}`;
+
+/** For bodies without an `error` code (e.g. a proxy's 413). */
+const STATUS_CODES: Partial<Record<number, string>> = {
+    413: "payload_too_large",
+    429: "rate_limited",
+    503: "maintenance",
+};
+
+export function actionErrorKey(
+    status: number,
+    code: string | null = null,
+): ActionErrorKey {
+    if (status === 422) return "game.error_illegal";
+    if (status === 409) return "game.error_conflict";
+    if (status === 403 || status === 404) return "game.error_no_access";
+    return `errors.${apiErrorKey(code ?? STATUS_CODES[status])}`;
 }
 
 type BoardBase = Pick<

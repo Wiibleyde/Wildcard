@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GameClientPayload } from "@/lib/models/game";
 import type { ReplayPayload } from "@/lib/models/replay";
-import { frameBoard, replayBoard, statusToErrorKey } from "./gamePayload";
+import { actionErrorKey, frameBoard, replayBoard } from "./gamePayload";
 import { buildLogLines } from "./logLines";
 
 const head: GameClientPayload = {
@@ -74,11 +74,19 @@ describe("replayBoard", () => {
     });
 });
 
-describe("statusToErrorKey", () => {
-    it("maps HTTP statuses to notice keys", () => {
-        expect(statusToErrorKey(422)).toBe("error_illegal");
-        expect(statusToErrorKey(404)).toBe("error_no_access");
-        expect(statusToErrorKey(500)).toBe("error_generic");
+describe("actionErrorKey", () => {
+    it("keeps in-game wording for move outcomes", () => {
+        expect(actionErrorKey(422, "illegal_move")).toBe("game.error_illegal");
+        expect(actionErrorKey(404)).toBe("game.error_no_access");
+    });
+
+    it("maps the rest to the shared errors namespace", () => {
+        expect(actionErrorKey(429, "rate_limited")).toBe("errors.rate_limited");
+        expect(actionErrorKey(413)).toBe("errors.payload_too_large");
+        expect(actionErrorKey(401, "token_expired")).toBe(
+            "errors.unauthorized",
+        );
+        expect(actionErrorKey(500)).toBe("errors.generic");
     });
 });
 

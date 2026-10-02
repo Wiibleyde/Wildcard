@@ -2,17 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTransientNotice } from "@/hooks/game/useTransientNotice";
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, readApiError, readApiJson } from "@/lib/api/client";
 import type { GameAction } from "@/lib/engine/types";
 import type { AnyGameTableConfig } from "@/lib/games/table/types";
 import type { GameClientPayload, GameSyncPayload } from "@/lib/models/game";
 import { useGameChannel } from "@/lib/realtime/useGameChannel";
 import type { RealtimeStatus } from "@/lib/realtime/useRealtimeSync";
-import {
-    type ActionErrorKey,
-    frameBoard,
-    statusToErrorKey,
-} from "./gamePayload";
+import { type ActionErrorKey, actionErrorKey, frameBoard } from "./gamePayload";
 
 // Just over the longest card landing (0.55s), under the server's bot pacing (900ms).
 const FRAME_MS = 650;
@@ -135,11 +131,11 @@ export function useGameSync(
             if (!alive()) return;
             if (!res.ok) {
                 // Other failures stay silent: the next poll retries.
-                if (res.status === 404) showError("error_no_access", 5000);
+                if (res.status === 404) showError("game.error_no_access", 5000);
                 return;
             }
-            const next = (await res.json()) as GameClientPayload;
-            if (alive()) adoptNow(next, force);
+            const next = await readApiJson<GameClientPayload>(res);
+            if (next && alive()) adoptNow(next, force);
         },
         [gameId, get, alive, adoptNow, showError],
     );
@@ -162,13 +158,13 @@ export function useGameSync(
                     if (!alive()) return;
                     if (!res.ok) {
                         if (res.status === 404) {
-                            showError("error_no_access", 5000);
+                            showError("game.error_no_access", 5000);
                         }
                         return;
                     }
-                    const { frames, ...head } =
-                        (await res.json()) as GameSyncPayload;
-                    if (!alive()) return;
+                    const body = await readApiJson<GameSyncPayload>(res);
+                    if (!body || !alive()) return;
+                    const { frames, ...head } = body;
                     enqueue([
                         ...(frames ?? []).map((f) => frameBoard(head, f)),
                         head,
@@ -205,8 +201,8 @@ export function useGameSync(
             try {
                 const res = await get(`/api/games/${gameId}/version`);
                 if (!alive() || !res.ok) return;
-                const info = (await res.json()) as { version: number };
-                if (alive() && info.version > versionRef.current) {
+                const info = await readApiJson<{ version: number }>(res);
+                if (info && alive() && info.version > versionRef.current) {
                     await catchUp(info.version);
                 }
             } catch {
@@ -255,19 +251,22 @@ export function useGameSync(
                 });
                 if (!alive()) return;
                 if (res.ok) {
-                    const data = (await res.json().catch(() => ({}))) as {
+                    const data = await readApiJson<{
                         payload?: GameClientPayload;
-                    };
+                    }>(res);
                     if (!alive()) return;
-                    if (data.payload) adoptNow(data.payload);
+                    if (data?.payload) adoptNow(data.payload);
                     else await refetchFull(true);
                     return;
                 }
-                showError(statusToErrorKey(res.status), 3500);
+                showError(
+                    actionErrorKey(res.status, await readApiError(res)),
+                    3500,
+                );
             } catch {
                 if (!alive()) return;
                 // The move's fate is unknown: fall through to rollback + forced resync.
-                showError("error_generic", 3500);
+                showError("errors.generic", 3500);
             } finally {
                 actingRef.current = false;
                 if (alive()) {

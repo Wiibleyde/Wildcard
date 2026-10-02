@@ -7,10 +7,10 @@ import { GameTable } from "@/components/game/GameTable";
 import { ReconnectingBanner } from "@/components/realtime/ReconnectingBanner";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { GameButton } from "@/components/ui/GameButton";
-import { statusToErrorKey } from "@/hooks/game/gamePayload";
+import { actionErrorKey } from "@/hooks/game/gamePayload";
 import { useGameSync } from "@/hooks/game/useGameSync";
 import { useRouter } from "@/i18n/navigation";
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, readApiError } from "@/lib/api/client";
 import { getBoardTheme } from "@/lib/board/themes";
 import { getCardTheme } from "@/lib/card/themes";
 import { getGameTable } from "@/lib/games";
@@ -33,6 +33,7 @@ export function GamePlayClient({
     boardStyleId,
 }: Props) {
     const t = useTranslations("game");
+    const tAll = useTranslations();
     const router = useRouter();
     const confirm = useConfirm();
     const table = getGameTable(initial.moduleId);
@@ -47,7 +48,7 @@ export function GamePlayClient({
     } = useGameSync(initial.gameId, initial, table, currentUserId);
 
     const onIllegal = useCallback(
-        () => showError("error_illegal", 3500),
+        () => showError("game.error_illegal", 3500),
         [showError],
     );
 
@@ -75,14 +76,17 @@ export function GamePlayClient({
                 if (!res.ok) {
                     showError(
                         res.status === 429 || res.status === 503
-                            ? statusToErrorKey(res.status)
-                            : "error_leave_failed",
+                            ? actionErrorKey(
+                                  res.status,
+                                  await readApiError(res),
+                              )
+                            : "game.error_leave_failed",
                         3500,
                     );
                     return;
                 }
             } catch {
-                showError("error_leave_failed", 3500);
+                showError("game.error_leave_failed", 3500);
                 return;
             } finally {
                 setPending(false);
@@ -137,7 +141,7 @@ export function GamePlayClient({
                             }}
                             role="alert"
                         >
-                            {t(actionError)}
+                            {tAll(actionError)}
                         </div>
                     )}
                 </div>
