@@ -54,19 +54,30 @@ export function useRealtimeSync(
      * the game channel) so no update is ever skipped.
      */
     pollMs?: number,
+    /**
+     * Slower poll used while the channel is connected. Only pass it when the
+     * channel carries a signal that does not depend on CDC — a server-sent
+     * Broadcast — so "connected" really means "receiving". The poll then
+     * becomes a heartbeat (missed ring, stalled server work) instead of the
+     * main delivery path. Omitted: `pollMs` applies regardless of status.
+     */
+    connectedPollMs?: number,
 ): RealtimeStatus {
     const [status, setStatus] = useState<RealtimeStatus>("connecting");
 
-    // Backstop polling — runs continuously at `pollMs`, NOT gated on connection
-    // status. A channel can report "connected" while postgres_changes silently
-    // delivers nothing (self-hosted Realtime CDC quirk), which would otherwise
-    // freeze the board/lobby on its last snapshot. Realtime, when it works, just
-    // updates sooner; the poll guarantees every change is eventually caught.
+    // Backstop polling — runs continuously, connected or not. A channel can
+    // report "connected" while postgres_changes silently delivers nothing
+    // (self-hosted Realtime CDC quirk), which would otherwise freeze the
+    // board/lobby on its last snapshot. Realtime, when it works, just updates
+    // sooner; the poll guarantees every change is eventually caught. Channels
+    // fed by a server Broadcast relax it to `connectedPollMs` once connected.
+    const interval =
+        status === "connected" && connectedPollMs ? connectedPollMs : pollMs;
     useEffect(() => {
-        if (!pollMs) return;
-        const id = setInterval(onChange, pollMs);
+        if (!interval) return;
+        const id = setInterval(() => onChange(), interval);
         return () => clearInterval(id);
-    }, [pollMs, onChange]);
+    }, [interval, onChange]);
 
     useEffect(() => {
         const supabase = createClient();

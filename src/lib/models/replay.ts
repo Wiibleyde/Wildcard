@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isEcaModuleId } from "@/lib/eca/id";
 import type { EcaState } from "@/lib/eca/types";
-import { replayFrames } from "@/lib/engine/runner";
+import { persistedRules, replayFrames } from "@/lib/engine/runner";
 import type {
     AnyGameModule,
     GameAction,
@@ -58,20 +58,6 @@ export interface ReplayPayload {
 }
 
 type LoadError = "not_found" | "unknown_game";
-
-/**
- * The table rules a game was dealt with, read back from its persisted state
- * (configurable modules stamp them as `state.rules`, a `key → boolean` map).
- */
-function persistedRules(state: GameState): Record<string, boolean> | undefined {
-    const raw = (state as GameState & { rules?: unknown }).rules;
-    if (typeof raw !== "object" || raw === null) return undefined;
-    const rules: Record<string, boolean> = {};
-    for (const [key, value] of Object.entries(raw)) {
-        if (typeof value === "boolean") rules[key] = value;
-    }
-    return rules;
-}
 
 /**
  * Structural equality of two JSON values, ignoring object key order — the

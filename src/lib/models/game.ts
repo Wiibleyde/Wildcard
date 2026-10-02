@@ -2,7 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { after } from "next/server";
 import { isEcaModuleId } from "@/lib/eca/id";
 import type { EcaState } from "@/lib/eca/types";
-import { clientState, dispatch } from "@/lib/engine/runner";
+import {
+    clientState,
+    dispatch,
+    persistedRules,
+    replayFrames,
+} from "@/lib/engine/runner";
 import type {
     AnyGameModule,
     ApplyResult,
@@ -24,6 +29,7 @@ import {
     resolveEndOutcome,
 } from "@/lib/models/gameEnd";
 import { xpAwardsForGame } from "@/lib/models/xp";
+import { notifyGameVersion } from "@/lib/realtime/notifyGameVersion";
 import type { Database, GameEndReason } from "@/lib/supabase/types";
 
 type Admin = SupabaseClient<Database>;
@@ -85,6 +91,33 @@ export interface GameClientPayload {
     /** The viewer this payload was built for; `null` = spectator. */
     readonly viewerId: string | null;
 }
+
+/**
+ * One intermediate board a client missed between two reads: the viewer's
+ * redacted projection right after move `version`. Lets the client play every
+ * move back one at a time instead of jumping straight to the latest state.
+ */
+export interface GameFrame {
+    readonly version: number;
+    readonly phase: string;
+    readonly currentPlayerId: string | null;
+    readonly view: unknown;
+}
+
+/**
+ * A catch-up read (`GET /api/games/[id]?since=N`): the authoritative head
+ * payload plus the frames strictly between `N` and the head, oldest first.
+ */
+export interface GameSyncPayload extends GameClientPayload {
+    readonly frames: readonly GameFrame[];
+}
+
+/**
+ * Most frames a catch-up returns. A client further behind than this (long
+ * background tab, reconnect) plays only the tail — replaying a minute of moves
+ * at animation speed would leave it acting on a stale board for just as long.
+ */
+const MAX_CATCHUP_FRAMES = 8;
 
 type LoadError = "not_found" | "unknown_game";
 
@@ -289,6 +322,26 @@ export async function getGameClientState(
 ): Promise<
     { ok: true; payload: GameClientPayload } | { ok: false; error: LoadError }
 > {
+    const result = await getGameSync(admin, gameId, viewerId, null);
+    if (!result.ok) return result;
+    const { frames: _frames, ...payload } = result.payload;
+    return { ok: true, payload };
+}
+
+/**
+ * {@link getGameClientState} plus the moves the client has not seen yet.
+ * `since` is the last version the client holds (`null` = no catch-up). When it
+ * is exactly one move behind — the usual case, one doorbell per move — the
+ * head *is* that move and no frame is computed.
+ */
+export async function getGameSync(
+    admin: Admin,
+    gameId: string,
+    viewerId: string | null,
+    since: number | null,
+): Promise<
+    { ok: true; payload: GameSyncPayload } | { ok: false; error: LoadError }
+> {
     const loaded = await loadGame(admin, gameId);
     if (!loaded.ok) return loaded;
 
@@ -303,22 +356,97 @@ export async function getGameClientState(
         viewerId !== null && state.players.some((p) => p.id === viewerId);
     const effectiveViewer = isPlayer ? viewerId : null;
 
-    const [players, log] = await Promise.all([
+    const [players, log, frames] = await Promise.all([
         playersOf(admin, state),
         logOf(admin, gameId),
+        since === null
+            ? []
+            : catchUpFrames(
+                  admin,
+                  gameId,
+                  module,
+                  state,
+                  meta.version,
+                  since,
+                  effectiveViewer,
+              ),
     ]);
 
     return {
         ok: true,
-        payload: buildClientPayload(
-            payloadMetaOf(meta),
-            module,
-            state,
-            effectiveViewer,
-            players,
-            log,
-        ),
+        payload: {
+            ...buildClientPayload(
+                payloadMetaOf(meta),
+                module,
+                state,
+                effectiveViewer,
+                players,
+                log,
+            ),
+            frames,
+        },
     };
+}
+
+/**
+ * The boards between `since` (exclusive) and `head` (exclusive), redacted for
+ * `viewerId`. Only the head state is stored, so intermediate states are
+ * re-derived from `(seed, rules, action log)` — the deterministic engine's
+ * replay, reused for live catch-up. Each frame goes through `view()`, so a
+ * client receives exactly what it would have seen live, nothing more.
+ *
+ * Purely cosmetic: on any doubt (pruned or holed log, divergence, module
+ * fault) it returns no frames and the client just jumps to the head.
+ */
+async function catchUpFrames(
+    admin: Admin,
+    gameId: string,
+    module: AnyGameModule,
+    state: GameState,
+    head: number,
+    since: number,
+    viewerId: string | null,
+): Promise<GameFrame[]> {
+    const from = Math.max(since + 1, head - MAX_CATCHUP_FRAMES);
+    if (from >= head) return [];
+
+    const { data: rows, error } = await admin
+        .from("game_actions")
+        .select("seq, action")
+        .eq("game_id", gameId)
+        .lte("seq", head)
+        .order("seq", { ascending: true });
+    if (error || !rows) return [];
+    // The fold needs the whole log 1..head; anything else can't re-derive.
+    if (rows.length !== head || rows.some((r, i) => r.seq !== i + 1)) {
+        return [];
+    }
+
+    const out: GameFrame[] = [];
+    try {
+        const frames = replayFrames(
+            module,
+            state.players,
+            state.seed,
+            rows.map((r) => r.action as unknown as GameAction),
+            { gameId: state.gameId, rules: persistedRules(state) },
+        );
+        for (const { index, state: s } of frames) {
+            const version = index + 1;
+            if (version < from) continue;
+            if (version >= head) break;
+            out.push({
+                version,
+                phase: s.phase,
+                currentPlayerId: s.currentPlayerId,
+                view: module.view(s, viewerId),
+            });
+        }
+    } catch (err) {
+        console.error(`[game] catch-up replay failed (${gameId}):`, err);
+        return [];
+    }
+    return out;
 }
 
 export interface GameVersionInfo {
@@ -539,6 +667,10 @@ async function commitStep(
     });
     if (error) return { ok: false, error: "db_error", message: error.message };
     if (data === null) return { ok: false, error: "version_conflict" };
+    // Push the new version to every client on the game topic. Not awaited:
+    // the doorbell must never delay the actor's response or pace the bot
+    // chain, and a missed ring is caught by the clients' heartbeat poll.
+    void notifyGameVersion(admin, gameId, data);
     return { ok: true, version: data };
 }
 

@@ -38,6 +38,23 @@ export function withGameRules<S extends GameState, A extends GameAction, V>(
     return module.withRules(rules);
 }
 
+/**
+ * The table rules a game was dealt with, read back from its persisted state
+ * (configurable modules stamp them as `state.rules`, a `key → boolean` map) —
+ * what a re-derivation must bind to deal the same game again.
+ */
+export function persistedRules(
+    state: GameState,
+): Record<string, boolean> | undefined {
+    const raw = (state as GameState & { rules?: unknown }).rules;
+    if (typeof raw !== "object" || raw === null) return undefined;
+    const rules: Record<string, boolean> = {};
+    for (const [key, value] of Object.entries(raw)) {
+        if (typeof value === "boolean") rules[key] = value;
+    }
+    return rules;
+}
+
 function isCreateGameOptions(
     value: GameSeed | CreateGameOptions | undefined,
 ): value is CreateGameOptions {
