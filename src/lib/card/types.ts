@@ -17,7 +17,7 @@ export type Rank =
     | "Q"
     | "K";
 
-/** Ranks that have a center illustration slot (non-pip face cards + Ace) */
+/** Ranks with a center illustration slot instead of pips. */
 export type FaceRank = "A" | "J" | "C" | "Q" | "K";
 
 /** Tarot trump index — 1 (Petit) through 21 (Le Monde) */
@@ -46,22 +46,16 @@ export type TrumpIndex =
 
 export type JokerVariant = "red" | "black";
 
-/**
- * Discriminated union covering every card across all supported deck types.
- * Use this as the canonical card identity in game state and UI props.
- */
 export type CardDescriptor =
     | { type: "suited"; suit: Suit; rank: Rank }
     | { type: "trump"; index: TrumpIndex } // Tarot atouts I–XXI
     | { type: "fool" } // Tarot L'Excuse
     | { type: "joker"; variant?: JokerVariant };
 
-/** A standard suit+rank card — the `suited` arm of {@link CardDescriptor}. */
 export type SuitedCard = Extract<CardDescriptor, { type: "suited" }>;
 
 export const SUITS: readonly Suit[] = ["spades", "hearts", "diamonds", "clubs"];
 
-/** Universe of all ranks across all supported deck types */
 export const RANKS: readonly Rank[] = [
     "A",
     "2",
@@ -181,16 +175,7 @@ export interface BrandInfo {
     tagline?: string;
 }
 
-/**
- * Monetization tier — drives UI badges and unlock flows.
- * - common    — included for all users
- * - uncommon  — slightly rare
- * - rare      — rare
- * - epic      — quite rare
- * - legendary — very rare
- * - mystical  — extremely rare
- * - ethereal  — quasi-unique (top tier)
- */
+/** Monetization tier, common → ethereal (rarest); drives badges and unlocks. */
 export type ThemeTier =
     | "common"
     | "uncommon"
@@ -205,7 +190,6 @@ export type ThemeTier =
 export interface CardTheme {
     id: string;
     name: string;
-    /** Monetization tier */
     tier: ThemeTier;
 
     suits: Record<Suit, SuitStyle>;

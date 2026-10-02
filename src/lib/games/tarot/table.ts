@@ -1,16 +1,29 @@
-import type { CardDescriptor, Suit } from "@/lib/card/types";
-import { cardKey } from "@/lib/card/utils";
-import type { GameAction } from "@/lib/engine/types";
-import { playerName } from "../table/helpers";
+import type { CardDescriptor } from "@/lib/card/types";
+import {
+    cardKey,
+    isCardDescriptor,
+    rankLabel,
+    SUIT_DISPLAY_ORDER,
+    SUIT_SYMBOL,
+} from "@/lib/card/utils";
+import {
+    handFromActions,
+    playerName,
+    seatChips,
+    turnBanner,
+} from "../table/helpers";
 import {
     registerTable,
-    type TableCardItem,
     type TableContext,
     type TableControl,
-    type TableSeat,
     type TableZoneInstance,
 } from "../table/types";
-import type { Bid, HandfulLevel } from "./scoring";
+import {
+    BID_RANK,
+    type Bid,
+    HANDFUL_LEVELS,
+    type HandfulLevel,
+} from "./scoring";
 import {
     SUIT_STRENGTH,
     type TarotAction,
@@ -18,57 +31,43 @@ import {
     type TarotView,
 } from "./tarot";
 
-/** Hand reading order: suits grouped low→high, then trumps, then the Excuse. */
-const SUIT_GROUP: Record<Suit, number> = {
-    spades: 0,
-    hearts: 1,
-    diamonds: 2,
-    clubs: 3,
-};
+/** Suits grouped low → high, then trumps, then the Excuse. */
 function handOrder(card: CardDescriptor): number {
     if (card.type === "suited") {
-        return SUIT_GROUP[card.suit] * 100 + SUIT_STRENGTH[card.rank];
+        return SUIT_DISPLAY_ORDER[card.suit] * 100 + SUIT_STRENGTH[card.rank];
     }
     if (card.type === "trump") return 400 + card.index;
-    return 500; // the Excuse sits at the end
+    return 500;
 }
 
-const SUIT_SYMBOL: Record<Suit, string> = {
-    spades: "♠",
-    hearts: "♥",
-    diamonds: "♦",
-    clubs: "♣",
-};
-
-function bidLabel(ctx: TableContext, bid: Bid): string {
-    return ctx.t(`tarot_bid_${bid.replace(/-/g, "_")}`);
+function isBid(value: unknown): value is Bid {
+    return typeof value === "string" && Object.hasOwn(BID_RANK, value);
 }
 
-/** Human, localized name of a card for the log feed. */
-function cardLabel(ctx: TableContext, card: CardDescriptor): string {
+function isHandfulLevel(value: unknown): value is HandfulLevel {
+    return HANDFUL_LEVELS.some((level) => level === value);
+}
+
+function bidLabel(ctx: TableContext, bid: unknown): string {
+    return isBid(bid) ? ctx.t(`tarot_bid_${bid.replace(/-/g, "_")}`) : "?";
+}
+
+function cardLabel(ctx: TableContext, card: unknown): string {
+    if (!isCardDescriptor(card)) return "?";
     if (card.type === "fool") return ctx.t("tarot_excuse");
     if (card.type === "trump") {
         return ctx.t("tarot_trump", { index: card.index });
     }
     if (card.type === "suited") {
-        const rank =
-            card.rank === "J" ||
-            card.rank === "C" ||
-            card.rank === "Q" ||
-            card.rank === "K" ||
-            card.rank === "A"
-                ? ctx.t(`rank_${card.rank}`)
-                : card.rank;
-        return `${rank} ${SUIT_SYMBOL[card.suit]}`;
+        return `${rankLabel(ctx.t, card.rank)} ${SUIT_SYMBOL[card.suit]}`;
     }
     return "?";
 }
 
-function handfulLabel(ctx: TableContext, level: HandfulLevel): string {
-    return ctx.t(`tarot_handful_${level}`);
+function handfulLabel(ctx: TableContext, level: unknown): string {
+    return isHandfulLevel(level) ? ctx.t(`tarot_handful_${level}`) : "?";
 }
 
-/** Short status line under an opponent's seat chip. */
 function seatStatus(
     ctx: TableContext,
     view: TarotView,
@@ -98,12 +97,18 @@ function seatBaseStatus(
     return ctx.t("cards_left", { n: p.handCount });
 }
 
+const YOUR_TURN_KEY: Record<TarotView["phase"], string> = {
+    bidding: "tarot_your_bid",
+    dog: "tarot_your_ecart",
+    slam: "tarot_your_slam",
+    playing: "your_turn",
+    done: "your_turn",
+};
+
 /**
- * Tarot table — opponents on top, a framed center holding the revealed chien
- * (bidding-then-dog) or the running trick (jeu de la carte), the viewer's fan
- * below. The phase drives the controls: bid buttons while bidding, then the
- * hand becomes a one-tap card picker (bury for the écart, then play to the
- * trick). Every card is skinned with its player's own deck style.
+ * The center holds the revealed chien or the running trick; the hand is a
+ * one-tap picker (bury for the écart, then play). Bids, the slam decision
+ * and poignées are controls.
  */
 export const tarotTable = registerTable<TarotView>({
     zones: [
@@ -121,10 +126,8 @@ export const tarotTable = registerTable<TarotView>({
             cardSize: "md",
             framed: true,
         },
-        // Poignées shown during the first trick — public, one per declarer.
-        // Top band, not center: on a height-bounded board every center row is
-        // sized to the region's height, so a second one would overflow. Who
-        // showed it reads on their seat chip and in the log, so no caption.
+        // Top band, not center: on a height-bounded board a second center row
+        // would overflow. The seat chip and log say who showed it.
         {
             id: "handful",
             placement: "top",
@@ -134,13 +137,7 @@ export const tarotTable = registerTable<TarotView>({
         { id: "hand", placement: "bottom", arrangement: "fan", cardSize: "lg" },
     ],
 
-    /**
-     * Optimistic prediction of the viewer's own play: the card leaves the hand
-     * and lands on the trick at once, no round-trip. The turn is blanked so
-     * `mapView` stops treating it as ours until the server reconciles; trick
-     * closes (winner, sweep) are the server's to settle a beat later. Bids and
-     * discards aren't predicted — they reconcile on the near-instant refetch.
-     */
+    /** Card plays only: the card leaves the hand and lands on the trick; closes are the server's. */
     predict(view, action, viewerId) {
         if (viewerId === null) return null;
         const a = action as TarotAction;
@@ -148,18 +145,17 @@ export const tarotTable = registerTable<TarotView>({
         const self = view.players.find((p) => p.playerId === viewerId);
         if (!self?.hand || view.currentPlayerId !== viewerId) return null;
         const key = cardKey(a.card);
-        if (!self.hand.some((c) => cardKey(c) === key)) return null;
+        // The hand's own copy, mirroring the server — never the action's.
+        const card = self.hand.find((c) => cardKey(c) === key);
+        if (!card) return null;
 
-        const leadingNow = view.pile.length === 0;
         const nextHand = self.hand.filter((c) => cardKey(c) !== key);
+        const pile = [...view.pile, { playerId: viewerId, card }];
         return {
             ...view,
-            currentPlayerId: "",
-            pile: [
-                ...(leadingNow ? [] : view.pile),
-                { playerId: viewerId, card: a.card },
-            ],
-            lastTrick: leadingNow ? null : view.lastTrick,
+            currentPlayerId: null,
+            pile,
+            displayTrick: { plays: pile, wonBy: null },
             players: view.players.map((p) =>
                 p.playerId === viewerId
                     ? { ...p, hand: nextHand, handCount: nextHand.length }
@@ -170,39 +166,19 @@ export const tarotTable = registerTable<TarotView>({
 
     mapView(view, ctx) {
         const self = view.players.find((p) => p.playerId === ctx.viewerId);
-        const isYourTurn = !ctx.isOver && view.currentPlayerId === ctx.viewerId;
+        const banner = turnBanner(
+            ctx,
+            view.currentPlayerId,
+            YOUR_TURN_KEY[view.phase],
+        );
+        const isYourTurn = banner.highlight;
 
-        const bannerKey =
-            view.phase === "bidding"
-                ? "tarot_your_bid"
-                : view.phase === "dog"
-                  ? "tarot_your_ecart"
-                  : view.phase === "slam"
-                    ? "tarot_your_slam"
-                    : "your_turn";
-        const banner = ctx.isOver
-            ? ctx.t("game_over")
-            : isYourTurn
-              ? ctx.t(bannerKey)
-              : self
-                ? ctx.t("waiting_for", {
-                      name: playerName(ctx, view.currentPlayerId),
-                  })
-                : ctx.t("spectating");
-
-        const seats: TableSeat[] = view.players
-            .filter((p) => p.playerId !== ctx.viewerId)
-            .map((p) => ({
-                playerId: p.playerId,
-                name: p.name,
-                handCount: p.handCount,
-                isTurn: !ctx.isOver && p.playerId === view.currentPlayerId,
-                status: seatStatus(ctx, view, p),
-            }));
+        const seats = seatChips(view.players, ctx, view.currentPlayerId, (p) =>
+            seatStatus(ctx, view, p),
+        );
 
         const zones: TableZoneInstance[] = [];
 
-        // The chien, face up, while it is revealed (dog phase and at game end).
         if (view.chienRevealed && view.chien.length > 0) {
             zones.push({
                 key: "chien",
@@ -236,14 +212,11 @@ export const tarotTable = registerTable<TarotView>({
             }
         }
 
-        // The running trick (or the just-won one, kept until the next lead).
         if (view.phase === "playing" || view.phase === "done") {
-            const showingLast = view.pile.length === 0 && view.lastTrick;
-            const plays = showingLast ? view.lastTrick.plays : view.pile;
+            const { plays, wonBy } = view.displayTrick;
             const top = plays.at(-1);
-            // The empty « en jeu » placeholder has a fixed card size; next to a
-            // handful row it would overflow a height-bounded board, so it
-            // waits for the first card (real cards size to the region).
+            // The empty placeholder has a fixed size: next to a handful row
+            // it would overflow, so it waits for the first card.
             if (plays.length > 0 || !showingHandful)
                 zones.push({
                     key: "trick",
@@ -253,10 +226,8 @@ export const tarotTable = registerTable<TarotView>({
                         card: play.card,
                         ownerId: play.playerId,
                     })),
-                    caption: showingLast
-                        ? ctx.t("trick_won", {
-                              name: playerName(ctx, view.lastTrick.winnerId),
-                          })
+                    caption: wonBy
+                        ? ctx.t("trick_won", { name: playerName(ctx, wonBy) })
                         : top
                           ? playerName(ctx, top.playerId)
                           : undefined,
@@ -264,16 +235,8 @@ export const tarotTable = registerTable<TarotView>({
                 });
         }
 
-        // The hand becomes a one-tap picker: each legal card carries its play /
-        // discard action; on your turn, a card with no legal action is flagged
-        // illegal so a tap explains why instead of doing nothing.
+        // Legal actions come from this module — safe narrow.
         const legal = ctx.legalActions as readonly TarotAction[];
-        const actionFor = new Map<string, GameAction>();
-        for (const a of legal) {
-            if (a.type === "play" || a.type === "discard") {
-                actionFor.set(cardKey(a.card), a);
-            }
-        }
         const cardPhase = view.phase === "dog" || view.phase === "playing";
 
         if (self?.hand) {
@@ -283,15 +246,13 @@ export const tarotTable = registerTable<TarotView>({
             zones.push({
                 key: "hand",
                 zone: "hand",
-                cards: hand.map((card): TableCardItem => {
-                    const action = actionFor.get(cardKey(card));
-                    return {
-                        id: `hand:${cardKey(card)}`,
-                        card,
-                        action,
-                        illegal: isYourTurn && cardPhase && !action,
-                    };
-                }),
+                cards: handFromActions(
+                    hand,
+                    legal.filter(
+                        (a) => a.type === "play" || a.type === "discard",
+                    ),
+                    isYourTurn && cardPhase,
+                ),
                 badge:
                     view.phase === "dog" && self.isTaker
                         ? ctx.t("tarot_ecart_progress", { n: view.ecartCount })
@@ -299,7 +260,6 @@ export const tarotTable = registerTable<TarotView>({
             });
         }
 
-        // Bidding controls: one button per legal overcall, plus pass.
         const controls: TableControl[] = [];
         if (view.phase === "bidding" && isYourTurn) {
             for (const a of legal) {
@@ -323,7 +283,6 @@ export const tarotTable = registerTable<TarotView>({
             }
         }
 
-        // Slam decision (FFT « chelem annoncé »): the taker, before any card.
         if (view.phase === "slam" && isYourTurn) {
             const announce = legal.find((a) => a.type === "announceSlam");
             const pass = legal.find((a) => a.type === "pass");
@@ -345,7 +304,6 @@ export const tarotTable = registerTable<TarotView>({
             }
         }
 
-        // Poignée: offered alongside the hand, just before your first card.
         const handful = legal.find((a) => a.type === "handful");
         if (view.phase === "playing" && isYourTurn && handful) {
             controls.push({
@@ -359,7 +317,7 @@ export const tarotTable = registerTable<TarotView>({
         }
 
         return {
-            banner: { label: banner, highlight: isYourTurn },
+            banner,
             seats,
             zones,
             controls,
@@ -369,15 +327,12 @@ export const tarotTable = registerTable<TarotView>({
 
     logLine(event, ctx) {
         const p = event.payload ?? {};
-        const name = playerName(
-            ctx,
-            typeof p.playerId === "string" ? p.playerId : null,
-        );
+        const name = playerName(ctx, p.playerId);
         switch (event.type) {
             case "bid":
                 return ctx.t("tarot_log_bid", {
                     name,
-                    bid: bidLabel(ctx, p.bid as Bid),
+                    bid: bidLabel(ctx, p.bid),
                 });
             case "passed":
                 return ctx.t("log_passed", { name });
@@ -386,7 +341,7 @@ export const tarotTable = registerTable<TarotView>({
             case "contract":
                 return ctx.t("tarot_log_contract", {
                     name,
-                    contract: bidLabel(ctx, p.contract as Bid),
+                    contract: bidLabel(ctx, p.contract),
                 });
             case "chien_revealed":
                 return ctx.t("tarot_log_chien");
@@ -395,34 +350,30 @@ export const tarotTable = registerTable<TarotView>({
             case "handful":
                 return ctx.t("tarot_log_handful", {
                     name,
-                    level: handfulLabel(ctx, p.level as HandfulLevel),
+                    level: handfulLabel(ctx, p.level),
                 });
             case "ecart_done":
                 return ctx.t("tarot_log_ecart");
             case "played":
                 return ctx.t("tarot_log_played", {
                     name,
-                    card: cardLabel(ctx, p.card as CardDescriptor),
+                    card: cardLabel(ctx, p.card),
                 });
             case "trick_won":
                 return ctx.t("tarot_log_trick", { name });
             case "game_over":
                 return ctx.t("tarot_log_over", {
-                    name: playerName(
-                        ctx,
-                        typeof p.taker === "string" ? p.taker : null,
-                    ),
+                    name: playerName(ctx, p.taker),
                     result: ctx.t(
                         p.made === true ? "tarot_made" : "tarot_failed",
                     ),
                 });
             default:
-                return null; // per-discard noise stays out of the feed
+                return null;
         }
     },
 });
 
-/** Accent status line under the center zone — phase-specific context. */
 function statusLine(ctx: TableContext, view: TarotView): string | undefined {
     if (view.phase === "bidding") {
         return view.highestBid

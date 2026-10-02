@@ -209,7 +209,7 @@ function ok(s: TarotState, action: TarotAction): TarotState {
 
 /** B takes a Garde Contre (no dog) — the game sits in the slam phase. */
 function intoSlam(): TarotState {
-    let s = createGame(tarot, P4, 1, "g");
+    let s = createGame(tarot, P4, { seed: 1, gameId: "g" });
     s = ok(s, { type: "pass", playerId: "a" });
     s = ok(s, { type: "bid", playerId: "b", bid: "garde-contre" });
     s = ok(s, { type: "pass", playerId: "c" });
@@ -371,7 +371,7 @@ describe("legacy deals (rules predating poignée / chelem annoncé)", () => {
 
     it("skip the slam phase and never offer a handful", () => {
         if (!legacy) throw new Error("withRules missing");
-        let s = createGame(legacy, P4, 1, "g");
+        let s = createGame(legacy, P4, { seed: 1, gameId: "g" });
         expect(s.rules).toEqual({
             gardeSansContre: true,
             petitAuBout: true,

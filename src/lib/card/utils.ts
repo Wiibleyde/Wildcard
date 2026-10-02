@@ -1,32 +1,25 @@
-import { type CardDescriptor, RANKS, type Rank, SUITS } from "./types";
+import {
+    type CardDescriptor,
+    RANKS,
+    type Rank,
+    SUITS,
+    type Suit,
+} from "./types";
 
 const PIP_INDEX: Partial<Record<string, number>> = {
     A: 1,
     J: 11,
-    C: 12, // Cavalier
+    C: 12,
     Q: 13,
     K: 14,
 };
 
-/**
- * Returns the numeric key used to look up pip layouts in PIP_LAYOUTS.
- * A=1, 2–10 as-is, J=11, C=12, Q=13, K=14.
- *
- * Not for game logic — ranking rules are game-specific (e.g. Ace is
- * highest in Bataille but context-dependent in Belote/Coinche).
- */
+/** Pip-layout lookup key — not a game ranking (those are per game). */
 export function rankToPipIndex(rank: Rank): number {
     return PIP_INDEX[rank] ?? Number.parseInt(rank, 10);
 }
 
-/**
- * Stable identity string for a descriptor — React keys, ref maps, equality
- * checks, logs. The single source of truth for card identity: the engine
- * re-exports it from `@/lib/engine/deck`.
- *
- * Unique within a single-copy deck. Doubled decks (Pinochle) hold two cards
- * per key — callers needing per-copy identity must add their own index.
- */
+/** Unique within a single-copy deck; doubled decks need a per-copy index on top. */
 export function cardKey(card: CardDescriptor): string {
     switch (card.type) {
         case "suited":
@@ -40,24 +33,30 @@ export function cardKey(card: CardDescriptor): string {
     }
 }
 
+export function isSuit(value: unknown): value is Suit {
+    return (
+        typeof value === "string" &&
+        (SUITS as readonly string[]).includes(value)
+    );
+}
+
+export function isRank(value: unknown): value is Rank {
+    return (
+        typeof value === "string" &&
+        (RANKS as readonly string[]).includes(value)
+    );
+}
+
 /**
- * Strict runtime check of an untrusted value (client action payload) against
- * {@link CardDescriptor}: exact field types, known suits/ranks, integer trump
- * index. `cardKey` alone is NOT a validator — it stringifies, so `rank: 2`
- * and `rank: "2"` collide. Game modules must still store the canonical card
- * taken from the hand, never the client object.
+ * Strict check of an untrusted payload. `cardKey` is not a validator — it
+ * stringifies, so `rank: 2` and `rank: "2"` would collide.
  */
 export function isCardDescriptor(value: unknown): value is CardDescriptor {
     if (typeof value !== "object" || value === null) return false;
     const card = value as Record<string, unknown>;
     switch (card.type) {
         case "suited":
-            return (
-                typeof card.suit === "string" &&
-                (SUITS as readonly string[]).includes(card.suit) &&
-                typeof card.rank === "string" &&
-                (RANKS as readonly string[]).includes(card.rank)
-            );
+            return isSuit(card.suit) && isRank(card.rank);
         case "trump":
             return (
                 typeof card.index === "number" &&
@@ -78,12 +77,31 @@ export function isCardDescriptor(value: unknown): value is CardDescriptor {
     }
 }
 
-/**
- * Placeholder descriptor for cards rendered exclusively face-down (opponent
- * hands, deck-back thumbnails): only `theme.back` is shown, never this face.
- */
+/** Face of a card only ever rendered face-down (only the theme's back shows). */
 export const FACE_DOWN_CARD: CardDescriptor = {
     type: "suited",
     suit: "spades",
     rank: "A",
 };
+
+export const SUIT_SYMBOL: Record<Suit, string> = {
+    spades: "♠",
+    hearts: "♥",
+    diamonds: "♦",
+    clubs: "♣",
+};
+
+/** Hand reading order: colours alternate so two red suits never sit side by side. */
+export const SUIT_DISPLAY_ORDER: Record<Suit, number> = {
+    spades: 0,
+    hearts: 1,
+    clubs: 2,
+    diamonds: 3,
+};
+
+const FACE_RANKS: ReadonlySet<Rank> = new Set(["A", "J", "C", "Q", "K"]);
+
+/** Localized face name (`rank_<R>` in the game dictionary), pips as digits. */
+export function rankLabel(t: (key: string) => string, rank: Rank): string {
+    return FACE_RANKS.has(rank) ? t(`rank_${rank}`) : rank;
+}

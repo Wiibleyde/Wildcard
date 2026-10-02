@@ -70,7 +70,7 @@ function playOut(
 
 describe("setup & deal", () => {
     it("deals 78 cards into hands of 18 plus a six-card chien (4p)", () => {
-        const s = createGame(tarot, P4, 1, "g");
+        const s = createGame(tarot, P4, { seed: 1, gameId: "g" });
         const inHands = Object.values(s.hands).reduce(
             (n, h) => n + h.length,
             0,
@@ -83,27 +83,27 @@ describe("setup & deal", () => {
     });
 
     it("deals hands of 24 for three players", () => {
-        const s = createGame(tarot, P3, 1, "g");
+        const s = createGame(tarot, P3, { seed: 1, gameId: "g" });
         for (const p of P3) expect(s.hands[p.id].length).toBe(24);
         expect(s.chien.length).toBe(6);
     });
 
     it("is deterministic — same seed deals the same cards", () => {
-        const a = createGame(tarot, P4, 4242, "g");
-        const b = createGame(tarot, P4, 4242, "g");
+        const a = createGame(tarot, P4, { seed: 4242, gameId: "g" });
+        const b = createGame(tarot, P4, { seed: 4242, gameId: "g" });
         expect(a.hands).toEqual(b.hands);
         expect(a.chien).toEqual(b.chien);
     });
 
     it("uses every card of the deck exactly once", () => {
-        const s = createGame(tarot, P4, 7, "g");
+        const s = createGame(tarot, P4, { seed: 7, gameId: "g" });
         const all = [...Object.values(s.hands).flat(), ...s.chien];
         expect(new Set(all.map(cardKey)).size).toBe(78);
     });
 });
 
 describe("bidding", () => {
-    const fresh = () => createGame(tarot, P4, 1, "g");
+    const fresh = () => createGame(tarot, P4, { seed: 1, gameId: "g" });
 
     it("offers every overcall plus pass to the opener", () => {
         const s = fresh();
@@ -175,13 +175,13 @@ describe("bidding", () => {
     });
 
     it("replays a redealt game identically", () => {
-        let s = createGame(tarot, P4, 31, "g");
+        let s = createGame(tarot, P4, { seed: 31, gameId: "g" });
         const actions: TarotAction[] = P4.map((p) => ({
             type: "pass",
             playerId: p.id,
         }));
         for (const a of actions) s = ok(s, a);
-        expect(replay(tarot, P4, 31, actions, "g")).toEqual(s);
+        expect(replay(tarot, P4, 31, actions, { gameId: "g" })).toEqual(s);
     });
 
     it("refuses an unknown contract", () => {
@@ -227,7 +227,7 @@ describe("bidding", () => {
             slam: true,
         });
         if (!noSans) throw new Error("withRules missing");
-        const s = createGame(noSans, P4, 1, "g");
+        const s = createGame(noSans, P4, { seed: 1, gameId: "g" });
         const kinds = noSans
             .legalActions(s, "a")
             .map((x) => (x.type === "bid" ? x.bid : x.type));
@@ -237,7 +237,7 @@ describe("bidding", () => {
 
 describe("écart (the dog)", () => {
     function intoDog(): TarotState {
-        let s = createGame(tarot, P4, 1, "g");
+        let s = createGame(tarot, P4, { seed: 1, gameId: "g" });
         s = ok(s, { type: "bid", playerId: "a", bid: "petite" });
         for (const p of ["b", "c", "d"])
             s = ok(s, { type: "pass", playerId: p });
@@ -360,14 +360,14 @@ describe("trickWinner", () => {
 
 describe("turn enforcement", () => {
     it("refuses an action from a player off turn", () => {
-        const s = createGame(tarot, P4, 1, "g");
+        const s = createGame(tarot, P4, { seed: 1, gameId: "g" });
         const res = step(s, { type: "pass", playerId: "b" });
         expect(res.ok).toBe(false);
         if (!res.ok) expect(res.error.code).toBe("not_your_turn");
     });
 
     it("refuses a play during the bidding phase", () => {
-        const s = createGame(tarot, P4, 1, "g");
+        const s = createGame(tarot, P4, { seed: 1, gameId: "g" });
         const res = step(s, {
             type: "play",
             playerId: "a",
@@ -380,7 +380,7 @@ describe("turn enforcement", () => {
 
 describe("a full deal", () => {
     it("plays to completion and scores a zero-sum result", () => {
-        const s = createGame(tarot, P4, 12345, "g");
+        const s = createGame(tarot, P4, { seed: 12345, gameId: "g" });
         const { state } = playOut(s);
         expect(state.phase).toBe("done");
         expect(state.tricks.length).toBe(18);
@@ -396,14 +396,14 @@ describe("a full deal", () => {
     });
 
     it("replays identically from the recorded action log", () => {
-        const s = createGame(tarot, P4, 999, "g");
+        const s = createGame(tarot, P4, { seed: 999, gameId: "g" });
         const { state, actions } = playOut(s);
-        const replayed = replay(tarot, P4, 999, actions, "g");
+        const replayed = replay(tarot, P4, 999, actions, { gameId: "g" });
         expect(replayed).toEqual(state);
     });
 
     it("conserves the 91-point total across the two sides", () => {
-        const s = createGame(tarot, P4, 808, "g");
+        const s = createGame(tarot, P4, { seed: 808, gameId: "g" });
         const { state } = playOut(s);
         const r = state.result;
         expect(r).not.toBeNull();
@@ -413,7 +413,7 @@ describe("a full deal", () => {
 
 describe("view — RLS in code", () => {
     it("shows only the viewer's own hand", () => {
-        const s = createGame(tarot, P4, 1, "g");
+        const s = createGame(tarot, P4, { seed: 1, gameId: "g" });
         const view = tarot.view(s, "a");
         const self = view.players.find((p) => p.playerId === "a");
         const other = view.players.find((p) => p.playerId === "b");
@@ -423,7 +423,7 @@ describe("view — RLS in code", () => {
     });
 
     it("hides the chien until it is revealed", () => {
-        let s = createGame(tarot, P4, 1, "g");
+        let s = createGame(tarot, P4, { seed: 1, gameId: "g" });
         expect(tarot.view(s, "a").chien.length).toBe(0); // bidding — hidden
         s = ok(s, { type: "bid", playerId: "a", bid: "petite" });
         for (const p of ["b", "c", "d"])
@@ -433,7 +433,7 @@ describe("view — RLS in code", () => {
     });
 
     it("never leaks a hand to a spectator", () => {
-        const s = createGame(tarot, P4, 1, "g");
+        const s = createGame(tarot, P4, { seed: 1, gameId: "g" });
         const view = tarot.view(s, null);
         expect(view.players.every((p) => p.hand === undefined)).toBe(true);
         expect(view.self).toBeNull();
@@ -445,7 +445,7 @@ function playing(
     hands: Record<string, CardDescriptor[]>,
     patch: Partial<TarotState> = {},
 ): TarotState {
-    const base = createGame(tarot, P4, 1, "g");
+    const base = createGame(tarot, P4, { seed: 1, gameId: "g" });
     return {
         ...base,
         phase: "playing",
@@ -504,7 +504,7 @@ describe("client cards are untrusted — canonical cards only", () => {
     });
 
     it("buries the canonical card in the écart", () => {
-        let s = createGame(tarot, P4, 1, "g");
+        let s = createGame(tarot, P4, { seed: 1, gameId: "g" });
         s = ok(s, { type: "bid", playerId: "a", bid: "petite" });
         for (const p of ["b", "c", "d"])
             s = ok(s, { type: "pass", playerId: p });
@@ -608,7 +608,7 @@ describe("Excuse au chelem", () => {
 describe("rules binding", () => {
     it("withRules keeps only the declared rule keys", () => {
         const bound = tarot.withRules?.({ slam: false, junk: true });
-        const s = createGame(bound ?? tarot, P4, 1, "g");
+        const s = createGame(bound ?? tarot, P4, { seed: 1, gameId: "g" });
         expect(s.rules).toEqual({
             gardeSansContre: true,
             petitAuBout: true,
