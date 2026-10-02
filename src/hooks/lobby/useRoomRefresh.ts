@@ -1,13 +1,14 @@
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type {
-    Role,
-    SeatRow,
-    SpectatorRow,
-} from "@/components/lobby/room/types";
 import { useRouter } from "@/i18n/navigation";
 import { apiFetch } from "@/lib/api/client";
 import { type GameRuleToggle, resolveRuleToggles } from "@/lib/engine/types";
+import {
+    type Role,
+    type SeatRow,
+    type SpectatorRow,
+    splitRoster,
+} from "@/lib/lobby/roster";
 import { usernamesByIds } from "@/lib/models/identities";
 import { useRoomChannel } from "@/lib/realtime/useRoomChannel";
 import { createClient } from "@/lib/supabase/client";
@@ -23,7 +24,7 @@ type Params = {
     initialBotCount: number;
     initialRole: Role;
     initialRules: Record<string, boolean>;
-    seated: boolean;
+    isMember: boolean;
 };
 
 export function useRoomRefresh({
@@ -37,7 +38,7 @@ export function useRoomRefresh({
     initialBotCount,
     initialRole,
     initialRules,
-    seated,
+    isMember,
 }: Params) {
     const router = useRouter();
     const t = useTranslations("room");
@@ -52,9 +53,8 @@ export function useRoomRefresh({
         resolveRuleToggles(ruleToggles, initialRules),
     );
 
-    const joinedRef = useRef(seated);
-    // Once the user left (or the component unmounted), late refreshes must
-    // neither update state nor yank them back into the game page.
+    const joinedRef = useRef(isMember);
+    // Once left or unmounted, late refreshes must not update state nor navigate.
     const closedRef = useRef(false);
     useEffect(() => {
         closedRef.current = false;
@@ -63,12 +63,10 @@ export function useRoomRefresh({
         };
     }, []);
 
-    // Overlapping refreshes (3s poll + realtime doorbell + post-mutation
-    // reconcile) can resolve out of order: only the latest one may commit.
+    // Poll, doorbell and post-mutation refreshes can resolve out of order: only the latest commits.
     const seqRef = useRef(0);
-    // >0 while a host mutation (bots / rules) is in flight: a refresh landing
-    // mid-POST would read the pre-mutation row and stomp the optimistic value,
-    // so those fields are left alone until the mutation reconciles itself.
+    // >0 while a host mutation is in flight: a refresh landing mid-POST would
+    // read the pre-mutation row and stomp the optimistic bots/rules.
     const mutatingRef = useRef(0);
 
     const refresh = useCallback(async () => {
@@ -104,31 +102,15 @@ export function useRoomRefresh({
             }
         }
 
-        const rows = players;
         const nameOf = await usernamesByIds(
             supabase,
-            rows.map((r) => r.user_id),
+            players.map((r) => r.user_id),
         ).catch(() => new Map<string, string>());
         if (isStale()) return;
-        setSeats(
-            rows
-                .filter((r) => r.role === "player" && r.seat !== null)
-                .map((r) => ({
-                    userId: r.user_id,
-                    seat: r.seat as number,
-                    username: nameOf.get(r.user_id) ?? fallbackName,
-                })),
-        );
-        setSpectators(
-            rows
-                .filter((r) => r.role === "spectator")
-                .map((r) => ({
-                    userId: r.user_id,
-                    username: nameOf.get(r.user_id) ?? fallbackName,
-                })),
-        );
-        const mine = rows.find((r) => r.user_id === currentUserId);
-        // Not (or no longer) a member → never offer player-only controls.
+        const roster = splitRoster(players, nameOf, fallbackName);
+        setSeats(roster.seats);
+        setSpectators(roster.spectators);
+        const mine = players.find((r) => r.user_id === currentUserId);
         setRole(mine?.role === "player" ? "player" : "spectator");
     }, [roomId, router, currentUserId, ruleToggles, fallbackName]);
 
@@ -136,9 +118,8 @@ export function useRoomRefresh({
         async function bootstrap() {
             if (!joinedRef.current) {
                 joinedRef.current = true;
-                // The join may seat us as a spectator (full table) or fail
-                // (started / gone): the refresh below reads the role the server
-                // actually recorded instead of assuming "player".
+                // The join may seat us as a spectator or fail: the refresh reads
+                // the role the server actually recorded.
                 await apiFetch(`/api/rooms/${code}/join`, {
                     method: "POST",
                 }).catch(() => null);

@@ -13,15 +13,11 @@ interface Props {
     readonly categoryLabel: string;
     readonly description: string;
     readonly meta: MetaLabels;
-    /** Action area (buttons / link). Rendered only for available games. */
+    /** Rendered only for available games. */
     readonly footer?: ReactNode;
 }
 
-/**
- * One game tile, shared by the home showcase and the play hub. Purely
- * presentational (no hooks) so it renders in both server and client trees; the
- * caller supplies already-translated labels and the action footer.
- */
+/** Hook-free so it renders in both the server home page and the client play hub. */
 export function GameCard({
     game,
     categoryLabel,
@@ -37,9 +33,8 @@ export function GameCard({
             className={`group panel relative flex flex-col overflow-hidden p-5 ${available ? "lift" : ""}`}
             style={{ opacity: available ? 1 : 0.85 }}
         >
-            {/* Faint suit watermark for flair — low-opacity ink on cream. */}
             <span
-                aria-hidden
+                aria-hidden="true"
                 className="font-display pointer-events-none absolute -top-8 -right-3 select-none leading-none"
                 style={{
                     fontSize: "10rem",
@@ -53,12 +48,12 @@ export function GameCard({
 
             <div className="relative z-10 flex flex-1 flex-col gap-4">
                 <div className="flex items-start justify-between gap-3">
-                    {/* Chunky rotated glyph tile holding the game's suits. */}
                     <span
+                        aria-hidden="true"
                         className="flex h-12 items-center justify-center rounded-xl px-3 font-display text-xl leading-none"
                         style={{
                             background: available ? accent : "var(--cream2)",
-                            color: available ? "var(--ink)" : "#5a5340",
+                            color: available ? "var(--ink)" : "var(--ink-soft)",
                             border: "2.5px solid var(--ink)",
                             boxShadow: "0 4px 0 var(--ink)",
                             transform: "rotate(-4deg)",
@@ -92,7 +87,7 @@ export function GameCard({
                             className="stamp mt-1"
                             style={{
                                 background: "var(--cream2)",
-                                color: "#5a5340",
+                                color: "var(--ink-soft)",
                             }}
                         >
                             {meta.comingSoon}
@@ -105,7 +100,9 @@ export function GameCard({
                         <h3
                             className="font-display text-2xl leading-tight"
                             style={{
-                                color: available ? "var(--ink)" : "#5a5340",
+                                color: available
+                                    ? "var(--ink)"
+                                    : "var(--ink-soft)",
                             }}
                         >
                             {game.name}
@@ -116,7 +113,9 @@ export function GameCard({
                                 background: available
                                     ? accent
                                     : "var(--cream2)",
-                                color: available ? "var(--ink)" : "#5a5340",
+                                color: available
+                                    ? "var(--ink)"
+                                    : "var(--ink-soft)",
                             }}
                         >
                             {categoryLabel}
@@ -124,7 +123,7 @@ export function GameCard({
                     </div>
                     <p
                         className="text-sm font-semibold leading-snug"
-                        style={{ color: "#5a5340" }}
+                        style={{ color: "var(--ink-soft)" }}
                     >
                         {description}
                     </p>
