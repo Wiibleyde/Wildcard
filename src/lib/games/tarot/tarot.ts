@@ -333,7 +333,7 @@ export function trickWinner(
     if (bestTrump) return bestTrump.playerId;
 
     const lead = plays.find((p) => p.card.type !== "fool");
-    if (!lead || lead.card.type !== "suited") {
+    if (lead?.card.type !== "suited") {
         return (lead ?? plays[0]).playerId;
     }
     const suit = lead.card.suit;

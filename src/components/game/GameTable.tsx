@@ -105,23 +105,21 @@ export function GameTable({
             table.logLine
                 ? // Newest first — across entries AND within one entry, so a
                   // step's last event ("game over") sits on top of its group.
-                  [...payload.log]
-                      .reverse()
-                      .flatMap((entry) =>
-                          entry.events
-                              .flatMap((event, eventIndex) => {
-                                  const line = table.logLine?.(event, ctx);
-                                  return line
-                                      ? [
-                                            {
-                                                id: `${entry.seq}.${eventIndex}`,
-                                                text: line,
-                                            },
-                                        ]
-                                      : [];
-                              })
-                              .reverse(),
-                      )
+                  [...payload.log].reverse().flatMap((entry) =>
+                      entry.events
+                          .flatMap((event, eventIndex) => {
+                              const line = table.logLine?.(event, ctx);
+                              return line
+                                  ? [
+                                        {
+                                            id: `${entry.seq}.${eventIndex}`,
+                                            text: line,
+                                        },
+                                    ]
+                                  : [];
+                          })
+                          .reverse(),
+                  )
                 : null,
         [table, payload.log, ctx],
     );
