@@ -457,7 +457,13 @@
         "tarot_handful_double": "double handful",
         "tarot_handful_triple": "triple handful",
         "tarot_log_slam": "{name} announces a slam!",
-        "tarot_log_handful": "{name} shows a {level}"
+        "tarot_log_handful": "{name} shows a {level}",
+        "xp_unit": "XP",
+        "unknown_player": "Unknown player",
+        "hand_play": "{n, plural, one {{label}} other {{label} ×#}}",
+        "zone_empty": "empty spot",
+        "danger_title": "Irreversible action",
+        "danger_confirm_label": "Confirm"
     },
     "realtime": {
         "reconnecting": "Reconnecting…"

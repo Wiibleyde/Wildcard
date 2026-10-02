@@ -457,7 +457,13 @@
         "tarot_handful_double": "poignée double",
         "tarot_handful_triple": "poignée triple",
         "tarot_log_slam": "{name} annonce le chelem !",
-        "tarot_log_handful": "{name} montre une {level}"
+        "tarot_log_handful": "{name} montre une {level}",
+        "xp_unit": "XP",
+        "unknown_player": "Joueur inconnu",
+        "hand_play": "{n, plural, one {{label}} other {{label} ×#}}",
+        "zone_empty": "emplacement vide",
+        "danger_title": "Action définitive",
+        "danger_confirm_label": "Confirmer"
     },
     "realtime": {
         "reconnecting": "Reconnexion en cours…"
