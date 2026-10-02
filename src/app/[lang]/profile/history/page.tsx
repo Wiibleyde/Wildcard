@@ -1,10 +1,22 @@
+import type { Metadata } from "next";
 import type { Locale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { MatchHistoryClient } from "@/components/profile/MatchHistoryClient";
-import { Link } from "@/i18n/navigation";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { PageShell } from "@/components/ui/PageShell";
 import { requireAuthUser } from "@/lib/auth/session";
 import { getMatchHistory } from "@/lib/models/history";
 import { createAdminClient } from "@/lib/supabase/admin";
+
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ lang: Locale }>;
+}): Promise<Metadata> {
+    const { lang } = await params;
+    const t = await getTranslations({ locale: lang, namespace: "history" });
+    return { title: t("title") };
+}
 
 export default async function Page({
     params,
@@ -16,38 +28,17 @@ export default async function Page({
     const t = await getTranslations("history");
 
     const user = await requireAuthUser(lang, `/${lang}/profile/history`);
-
-    // Service-role read: participation lives in RLS-denied engine state; only the public-safe projection reaches the page.
-    const admin = createAdminClient();
-    const entries = await getMatchHistory(admin, user.id);
+    // Service role: participation lives in RLS-denied engine state; only the public-safe projection is returned.
+    const entries = await getMatchHistory(createAdminClient(), user.id);
 
     return (
-        <div className="min-h-screen px-4 pt-6 pb-16 md:pt-10 xl:px-10">
-            <div className="mx-auto flex max-w-lg flex-col gap-6 lg:max-w-3xl xl:max-w-5xl 2xl:max-w-6xl">
-                <div className="flex flex-col gap-2">
-                    <Link
-                        href="/profile"
-                        className="w-fit font-display text-sm"
-                        style={{ color: "var(--muted)" }}
-                    >
-                        ← {t("back_to_profile")}
-                    </Link>
-                    <h1
-                        className="font-display text-3xl xl:text-4xl"
-                        style={{ color: "var(--cream)" }}
-                    >
-                        {t("title")}
-                    </h1>
-                    <p
-                        className="text-sm font-semibold"
-                        style={{ color: "var(--muted)" }}
-                    >
-                        {t("subtitle")}
-                    </p>
-                </div>
-
-                <MatchHistoryClient entries={entries} />
-            </div>
-        </div>
+        <PageShell width="narrow">
+            <PageHeader
+                title={t("title")}
+                subtitle={t("subtitle")}
+                back={{ href: "/profile", label: t("back_to_profile") }}
+            />
+            <MatchHistoryClient entries={entries} />
+        </PageShell>
     );
 }
