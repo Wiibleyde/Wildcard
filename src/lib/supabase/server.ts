@@ -8,11 +8,7 @@ import {
 } from "./env";
 import type { Database } from "./types";
 
-/**
- * RLS-scoped client acting as the holder of `accessToken` — for API routes,
- * which authenticate by `Authorization: Bearer` rather than the session cookie
- * (see `@/lib/auth/bearer`). Stateless: no cookie, no refresh, no storage.
- */
+/** Stateless RLS client acting as the bearer token's user (API routes). */
 export function createTokenClient(accessToken: string) {
     const { url, anonKey } = getServerSupabaseEnv();
     return createSupabaseClient<Database>(url, anonKey, {
@@ -26,13 +22,12 @@ export function createTokenClient(accessToken: string) {
     });
 }
 
+/** Cookie-session RLS client for Server Components. */
 export async function createClient() {
     const cookieStore = await cookies();
     const { url, anonKey } = getServerSupabaseEnv();
 
     return createServerClient<Database>(url, anonKey, {
-        // Same cookie name/encoding/domain as the browser client and the portal
-        // (server talks to Kong directly, browser to the public URL) — see env.ts.
         ...supabaseSharedOptions(),
         cookies: {
             getAll: () => cookieStore.getAll(),
@@ -42,7 +37,7 @@ export async function createClient() {
                         cookieStore.set(name, value, options);
                     });
                 } catch {
-                    // Called from a Server Component — session refresh is handled by proxy.ts
+                    // Server Components cannot write cookies; proxy.ts refreshes the session.
                 }
             },
         },

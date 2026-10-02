@@ -1,4 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { ecaModuleIdFor, isEcaCoverImagePath, isUuid } from "@/lib/eca/id";
 import type { EcaDefinition } from "@/lib/eca/types";
 import {
@@ -9,11 +8,11 @@ import {
     validateEcaDefinition,
     validateEcaDefinitionForWrite,
 } from "@/lib/eca/validate";
+import type { AdminClient } from "@/lib/supabase/admin";
+import { CHECK_VIOLATION } from "@/lib/supabase/pgErrors";
 import { ecaImagesBucket, publicStorageUrl } from "@/lib/supabase/storage";
 import type { Database } from "@/lib/supabase/types";
 import { usernamesByIds } from "./identities";
-
-type Admin = SupabaseClient<Database>;
 
 /**
  * Studio persistence — CRUD over `eca_games`, the table of creator-authored
@@ -166,7 +165,7 @@ function isValidImagePath(
  * storage failure leaves an orphan object, never a failed request.
  */
 async function removeCoverObject(
-    admin: Admin,
+    admin: AdminClient,
     path: string | null,
     ownerId: string,
     gameId: string,
@@ -202,7 +201,7 @@ function withMeta(
 
 /** The creator's own games, most recently edited first. */
 export async function listEcaGames(
-    admin: Admin,
+    admin: AdminClient,
     ownerId: string,
 ): Promise<Result<{ games: readonly EcaGameSummary[] }>> {
     const { data, error } = await admin
@@ -222,7 +221,7 @@ export async function listEcaGames(
  * grants, re-enforced here because the admin client bypasses RLS.
  */
 export async function getEcaGame(
-    admin: Admin,
+    admin: AdminClient,
     id: string,
     requesterId: string,
 ): Promise<Result<{ game: EcaGameRow }>> {
@@ -267,7 +266,7 @@ export async function getEcaGame(
  * `check_violation` surfaces as `limit_reached`.
  */
 export async function createEcaGame(
-    admin: Admin,
+    admin: AdminClient,
     ownerId: string,
     input: unknown,
 ): Promise<Result<{ id: string }>> {
@@ -312,7 +311,8 @@ export async function createEcaGame(
         // The cap trigger raises check_violation past the cap.
         return {
             ok: false,
-            error: error.code === "23514" ? "limit_reached" : "db_error",
+            error:
+                error.code === CHECK_VIOLATION ? "limit_reached" : "db_error",
             message: error.message,
         };
     }
@@ -332,7 +332,7 @@ export async function createEcaGame(
  * `moderation_locked` until an admin restores it.
  */
 export async function updateEcaGame(
-    admin: Admin,
+    admin: AdminClient,
     id: string,
     ownerId: string,
     patch: unknown,
@@ -465,7 +465,7 @@ export async function updateEcaGame(
     if (error) {
         // check_violation on a publish = the moderation-lock CHECK: an admin
         // took the game down between our read and this write.
-        if (error.code === "23514" && statusPatch === "published") {
+        if (error.code === CHECK_VIOLATION && statusPatch === "published") {
             return { ok: false, error: "moderation_locked" };
         }
         return { ok: false, error: "db_error", message: error.message };
@@ -505,7 +505,7 @@ const COMMUNITY_LIMIT = 48;
  * stored `meta`/`rules` for the card, and owner names resolved in one lookup.
  */
 export async function listPublishedEcaGames(
-    client: Admin,
+    client: AdminClient,
 ): Promise<PublishedEcaGame[]> {
     const { data, error } = await client
         .from("eca_games")
@@ -549,7 +549,7 @@ export async function listPublishedEcaGames(
 
 /** Delete an owned game, and its cover object. */
 export async function deleteEcaGame(
-    admin: Admin,
+    admin: AdminClient,
     id: string,
     ownerId: string,
 ): Promise<{ ok: true } | Failure> {

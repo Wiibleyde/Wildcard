@@ -4,6 +4,7 @@ import { PreviewPage } from "@/components/pages/PreviewPage";
 import { requireAuthUser } from "@/lib/auth/session";
 import { BOARD_THEMES } from "@/lib/board/themes";
 import { THEMES } from "@/lib/card/themes";
+import { getPlayerStyles } from "@/lib/models/customization";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function Page({
@@ -18,19 +19,14 @@ export default async function Page({
     const { deck, board } = await searchParams;
 
     const user = await requireAuthUser(lang, `/${lang}/customize/preview`);
-    const supabase = await createClient();
 
     let deckId = deck && THEMES[deck] ? deck : null;
     let boardId = board && BOARD_THEMES[board] ? board : null;
 
     if (!deckId || !boardId) {
-        const { data: custom } = await supabase
-            .from("player_customizations")
-            .select("deck_style_id, board_style_id")
-            .eq("user_id", user.id)
-            .single();
-        deckId ??= custom?.deck_style_id ?? "free";
-        boardId ??= custom?.board_style_id ?? "green_felt";
+        const styles = await getPlayerStyles(await createClient(), user.id);
+        deckId ??= styles.deckStyleId;
+        boardId ??= styles.boardStyleId;
     }
 
     return (

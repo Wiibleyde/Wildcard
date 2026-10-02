@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/api/auth";
-import { readJsonObject } from "@/lib/api/body";
-import { rateLimit } from "@/lib/api/rateLimit";
 import { failureResponse } from "@/lib/api/respond";
+import { apiRoute } from "@/lib/api/route";
+import { stringField } from "@/lib/api/validate";
 import {
     clearTicket,
     enqueue,
@@ -10,62 +9,36 @@ import {
     leaveQueue,
     MATCH_ERROR_STATUS,
 } from "@/lib/models/matchmaking";
-import { createAdminClient } from "@/lib/supabase/admin";
 
-/** POST — join the quick-match queue for a game and try to form a match. */
-export async function POST(request: Request) {
-    const auth = await requireUser(request);
-    if (!auth.ok) return auth.response;
+export const POST = apiRoute(
+    { rateLimit: "matchmaking", body: true },
+    async ({ body, user, admin }) => {
+        const moduleId = stringField(body, "moduleId");
+        const result = await enqueue(admin, user.id, moduleId);
+        if (!result.ok) {
+            return failureResponse(
+                "matchmaking.enqueue",
+                result,
+                MATCH_ERROR_STATUS,
+            );
+        }
+        const { ok: _ok, ...status } = result;
+        return NextResponse.json(status);
+    },
+);
 
-    const limited = rateLimit("matchmaking", auth.user.id);
-    if (limited) return limited;
+export const GET = apiRoute({}, async ({ user, admin }) =>
+    NextResponse.json(await getMatchStatus(admin, user.id)),
+);
 
-    const parsed = await readJsonObject(request);
-    if (!parsed.ok) return parsed.response;
-    const { moduleId } = parsed.body;
-    if (typeof moduleId !== "string") {
-        return NextResponse.json(
-            { error: "moduleId is required" },
-            { status: 400 },
-        );
-    }
-
-    const admin = createAdminClient();
-    const result = await enqueue(admin, auth.user.id, moduleId);
-    if (!result.ok) {
-        return failureResponse(
-            "matchmaking.enqueue",
-            result,
-            MATCH_ERROR_STATUS,
-        );
-    }
-
-    const { ok: _ok, ...status } = result;
-    return NextResponse.json(status);
-}
-
-/** GET — the caller's current ticket status (idle | searching | matched). */
-export async function GET(request: Request) {
-    const auth = await requireUser(request);
-    if (!auth.ok) return auth.response;
-
-    const admin = createAdminClient();
-    const status = await getMatchStatus(admin, auth.user.id);
-    return NextResponse.json(status);
-}
-
-/**
- * DELETE — leave the queue. Default drops only a still-searching ticket (the
- * "Annuler" button); `?all=1` drops it unconditionally to consume a spent match
- * once the player has entered the game.
- */
-export async function DELETE(request: Request) {
-    const auth = await requireUser(request);
-    if (!auth.ok) return auth.response;
-
+/** Drops a searching ticket; `?all=1` also consumes a spent match. */
+export const DELETE = apiRoute({}, async ({ request, user, admin }) => {
     const all = new URL(request.url).searchParams.get("all") === "1";
-    const admin = createAdminClient();
-    if (all) await clearTicket(admin, auth.user.id);
-    else await leaveQueue(admin, auth.user.id);
+    const result = all
+        ? await clearTicket(admin, user.id)
+        : await leaveQueue(admin, user.id);
+    if (!result.ok) {
+        return failureResponse("matchmaking.leave", result, MATCH_ERROR_STATUS);
+    }
     return NextResponse.json({ ok: true });
-}
+});

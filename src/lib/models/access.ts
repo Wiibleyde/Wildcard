@@ -1,16 +1,9 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { getUserRole, roleAtLeast } from "@/lib/auth/roles";
-import type { Database } from "@/lib/supabase/types";
-
-type Admin = SupabaseClient<Database>;
+import type { AdminClient } from "@/lib/supabase/admin";
 
 /**
- * Positive decisions are memoised briefly: the version probe is polled every
- * ~800ms per viewer, and re-running four lookups on each tick would multiply
- * the hot path's DB load. Access is effectively monotonic during a game (a
- * room never turns private mid-game; a seat is never revoked), so a short TTL
- * is safe. Negative decisions are never cached — joining a room takes effect
- * immediately. Process-local, bounded, like the rate limiter.
+ * Positive decisions only, briefly: the version probe is polled per viewer,
+ * and access is monotonic during a game. Negative decisions are never cached.
  */
 const GRANT_TTL_MS = 30_000;
 const GRANT_CACHE_MAX = 5_000;
@@ -27,7 +20,6 @@ function cachedGrant(key: string, now: number): boolean {
 function rememberGrant(key: string, now: number): void {
     if (grants.size >= GRANT_CACHE_MAX) {
         for (const [k, exp] of grants) if (exp <= now) grants.delete(k);
-        // Still full of live entries: drop the oldest insertion.
         if (grants.size >= GRANT_CACHE_MAX) {
             const oldest = grants.keys().next();
             if (!oldest.done) grants.delete(oldest.value);
@@ -37,29 +29,13 @@ function rememberGrant(key: string, now: number): void {
 }
 
 /**
- * May `userId` read game `gameId` (full redacted payload or version probe)?
- *
- * The game routes read through the service-role client — RLS does not apply —
- * so this is the authorization step that RLS would otherwise perform. Access is
- * granted, cheapest check first, when any of these holds:
- *
- * 1. the game's room is **public** — spectator mode is a feature: anyone
- *    signed in may watch a public table;
- * 2. the user has a `room_players` row in that room (seated player or a
- *    spectator who joined the lobby by code);
- * 3. the user is seated in the engine state (`state.players`) — covers a
- *    player who has since left the lobby row but still owns the seat;
- * 4. the user is a moderator+ (the live-games dashboard links to any game).
- *
- * Returns `false` for an unknown game as well, so callers answer 404 in both
- * cases and a private game's existence is not disclosed.
- *
- * Note: `view()` still redacts per viewer — granting read access to a
- * spectator never reveals a hand. This check only stops strangers from
- * watching private games (and from kicking their bot loop via the read path).
+ * Authorization for service-role game reads (RLS does not apply): public room,
+ * room member, seated in the state, or moderator+. Fails closed, and an
+ * unknown game is `false` too, so a private game's existence is not disclosed.
+ * `view()` still redacts per viewer.
  */
 export async function canViewGame(
-    admin: Admin,
+    admin: AdminClient,
     gameId: string,
     userId: string,
 ): Promise<boolean> {
@@ -72,7 +48,7 @@ export async function canViewGame(
 }
 
 async function checkViewAccess(
-    admin: Admin,
+    admin: AdminClient,
     gameId: string,
     userId: string,
 ): Promise<boolean> {
@@ -111,8 +87,6 @@ async function checkViewAccess(
     if (membership.data) return true;
     if (seat.data) return true;
 
-    // Fail closed on errors, but leave a trace: a silent DB failure here would
-    // look like "this game doesn't exist" to a legitimate player.
     for (const res of [room, membership, seat]) {
         if (res.error) {
             console.error(

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
+import { isJsonObject } from "@/lib/json";
 
-/** Default JSON body cap for game/room/matchmaking routes. */
 export const DEFAULT_MAX_BODY_BYTES = 16 * 1024;
 
 export type BodyResult<T> =
@@ -12,10 +12,8 @@ function fail(error: string, status: number): BodyResult<never> {
 }
 
 /**
- * Read the raw body as UTF-8, refusing anything over `maxBytes` *before* it is
- * buffered in full: a lying/absent `Content-Length` is backed by counting the
- * streamed bytes and cancelling the stream as soon as the cap is crossed. So an
- * oversized payload costs at most `maxBytes` of memory, never its full size.
+ * Counts streamed bytes and cancels past `maxBytes`, so a lying or absent
+ * Content-Length never makes the server buffer an oversized payload.
  */
 async function readCappedText(
     request: Request,
@@ -48,11 +46,7 @@ async function readCappedText(
     return { ok: true, text: new TextDecoder().decode(bytes) };
 }
 
-/**
- * Parse a size-capped JSON body. `413 payload_too_large` past `maxBytes`,
- * `400 invalid_json` when malformed. An empty body parses to `undefined`
- * (routes without a body stay callable with a bare POST).
- */
+/** 413 `payload_too_large`, 400 `invalid_json`; an empty body is `undefined`. */
 export async function readJsonBody(
     request: Request,
     maxBytes: number = DEFAULT_MAX_BODY_BYTES,
@@ -68,16 +62,7 @@ export async function readJsonBody(
     }
 }
 
-/** True for a plain JSON object (not null, not an array). */
-export function isJsonObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-/**
- * {@link readJsonBody} for routes whose body must be a JSON object. An empty
- * body yields `{}` so field validation reports the precise missing field; any
- * other non-object JSON (array, string, number…) is a `400 invalid_body`.
- */
+/** Empty body → `{}` (field validation names the missing field); non-object → 400 `invalid_body`. */
 export async function readJsonObject(
     request: Request,
     maxBytes: number = DEFAULT_MAX_BODY_BYTES,

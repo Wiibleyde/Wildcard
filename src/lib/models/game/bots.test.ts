@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GameAction } from "@/lib/engine/types";
-import { chooseBotAction } from "./game";
+import { chooseBotAction } from "./bots";
 
 const act = (type: string): GameAction => ({ type, playerId: "bot" });
 

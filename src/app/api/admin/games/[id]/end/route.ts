@@ -1,24 +1,21 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/api/auth";
 import { failureResponse } from "@/lib/api/respond";
-import { APPLY_ERROR_STATUS, endGame } from "@/lib/models/game";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { apiRoute } from "@/lib/api/route";
+import { GAME_ERROR_STATUS } from "@/lib/models/game/errors";
+import { endGame } from "@/lib/models/game/settle";
 
-// Force-end a live game. Dashboard is moderator-reachable, but only admins may abort, so the role is
-// re-checked server-side (defense in depth) before the service-role write.
-export async function POST(
-    request: Request,
-    ctx: { params: Promise<{ id: string }> },
-) {
-    const { id } = await ctx.params;
-    const auth = await requireRole(request, "admin");
-    if (!auth.ok) return auth.response;
-
-    const admin = createAdminClient();
-    const result = await endGame(admin, id, { reason: "admin" });
-    if (!result.ok) {
-        return failureResponse("admin.games.end", result, APPLY_ERROR_STATUS);
-    }
-
-    return NextResponse.json({ ok: true, version: result.version });
-}
+// Moderators reach the dashboard, but only admins may abort.
+export const POST = apiRoute<{ id: string }>(
+    { role: "admin" },
+    async ({ params, admin }) => {
+        const result = await endGame(admin, params.id, { reason: "admin" });
+        if (!result.ok) {
+            return failureResponse(
+                "admin.games.end",
+                result,
+                GAME_ERROR_STATUS,
+            );
+        }
+        return NextResponse.json({ ok: true, version: result.version });
+    },
+);

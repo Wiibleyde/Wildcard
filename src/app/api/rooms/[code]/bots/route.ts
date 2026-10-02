@@ -1,33 +1,17 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/api/auth";
-import { readJsonObject } from "@/lib/api/body";
 import { failureResponse } from "@/lib/api/respond";
+import { apiRoute } from "@/lib/api/route";
+import { numberField } from "@/lib/api/validate";
 import { ROOM_ERROR_STATUS, setBotCount } from "@/lib/models/room";
-import { createAdminClient } from "@/lib/supabase/admin";
 
-export async function POST(
-    request: Request,
-    ctx: { params: Promise<{ code: string }> },
-) {
-    const { code } = await ctx.params;
-    const auth = await requireUser(request);
-    if (!auth.ok) return auth.response;
-
-    const parsed = await readJsonObject(request);
-    if (!parsed.ok) return parsed.response;
-    const { count } = parsed.body;
-    if (typeof count !== "number") {
-        return NextResponse.json(
-            { error: "count (number) is required" },
-            { status: 400 },
-        );
-    }
-
-    const admin = createAdminClient();
-    const result = await setBotCount(admin, auth.user.id, code, count);
-    if (!result.ok) {
-        return failureResponse("rooms.bots", result, ROOM_ERROR_STATUS);
-    }
-
-    return NextResponse.json({ botCount: result.botCount });
-}
+export const POST = apiRoute<{ code: string }>(
+    { rateLimit: "roomCode", body: true },
+    async ({ params, body, user, admin }) => {
+        const count = numberField(body, "count");
+        const result = await setBotCount(admin, user.id, params.code, count);
+        if (!result.ok) {
+            return failureResponse("rooms.bots", result, ROOM_ERROR_STATUS);
+        }
+        return NextResponse.json({ botCount: result.botCount });
+    },
+);

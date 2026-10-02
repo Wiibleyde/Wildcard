@@ -8,7 +8,7 @@ import {
     president,
 } from "@/lib/games/president/president";
 import type { Database } from "@/lib/supabase/types";
-import { getGameSync } from "./game";
+import { getGameSync } from "./payload";
 
 const FOUR: Player[] = [
     { id: "a", name: "A", seat: 0 },
