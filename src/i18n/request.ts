@@ -2,6 +2,7 @@ import { hasLocale } from "next-intl";
 import { getRequestConfig } from "next-intl/server";
 import enMessages from "../dictionaries/en.json";
 import frMessages from "../dictionaries/fr.json";
+import { formats } from "./formats";
 import { routing } from "./routing";
 
 const messages = {
@@ -15,8 +16,5 @@ export default getRequestConfig(async ({ requestLocale }) => {
         ? requested
         : routing.defaultLocale;
 
-    return {
-        locale,
-        messages: messages[locale as keyof typeof messages],
-    };
+    return { locale, messages: messages[locale], formats };
 });
