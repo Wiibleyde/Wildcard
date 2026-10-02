@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { GameChat } from "@/components/game/GameChat";
 import { GameTable } from "@/components/game/GameTable";
 import { ReconnectingBanner } from "@/components/realtime/ReconnectingBanner";
@@ -15,7 +15,11 @@ import { THEMES } from "@/lib/card/themes";
 import { freeTheme } from "@/lib/card/themes/free";
 import type { GameAction } from "@/lib/engine/types";
 import { getGameTable } from "@/lib/games";
-import type { GameClientPayload } from "@/lib/models/game";
+import type {
+    GameClientPayload,
+    GameFrame,
+    GameSyncPayload,
+} from "@/lib/models/game";
 import { useGameChannel } from "@/lib/realtime/useGameChannel";
 
 type ActionErrorKey =
@@ -36,6 +40,36 @@ function statusToErrorKey(status: number): ActionErrorKey {
     if (status === 413) return "error_payload_too_large";
     if (status === 403 || status === 404) return "error_no_access";
     return "error_generic";
+}
+
+/**
+ * Minimum time each move stays on screen before the next queued one replaces
+ * it — just over the longest card landing (0.55s), and under the server's bot
+ * pacing (900ms) so playback never falls behind a live game.
+ */
+const FRAME_MS = 650;
+
+/**
+ * An intermediate board for playback: the head's metadata with that move's
+ * view. Never actionable (no legal moves) and never the end — only the head
+ * carries those.
+ */
+function frameBoard(
+    head: GameClientPayload,
+    frame: GameFrame,
+): GameClientPayload {
+    return {
+        ...head,
+        version: frame.version,
+        phase: frame.phase,
+        currentPlayerId: frame.currentPlayerId,
+        view: frame.view,
+        legalActions: [],
+        isOver: false,
+        outcome: null,
+        end: null,
+        log: head.log.filter((entry) => entry.seq <= frame.version),
+    };
 }
 
 interface Props {
@@ -60,9 +94,9 @@ export function GamePlayClient({
     const [payload, setPayload] = useState<GameClientPayload>(initial);
     const [pending, setPending] = useState(false);
     const [actionError, showError] = useTransientNotice<ActionErrorKey>();
-    // Latest version we hold, mirrored outside React so the cheap probe can gate
-    // the full fetch without making the poll callback depend on (and churn with)
-    // `payload`.
+    // Highest version we hold — on screen OR waiting in the playback queue.
+    // Mirrored outside React so the doorbell/poll can gate fetches without
+    // making their callbacks depend on (and churn with) `payload`.
     const versionRef = useRef(initial.version);
     // Latest payload, mirrored so the action handler can snapshot the pre-move
     // state (for the optimistic rollback) without depending on `payload` and
@@ -70,21 +104,78 @@ export function GamePlayClient({
     const payloadRef = useRef(payload);
     payloadRef.current = payload;
 
-    // Adopt a payload only if it is strictly newer than what we hold: equal/
-    // stale ones keep the same object so React skips re-render — else the fan
-    // churns mid-selection. Shared by the full GET and the action POST response.
-    // `force` bypasses the version gate: after a failed action the board may
-    // show a prediction at an unchanged version, and only the server's view
-    // can clear it.
-    const adopt = useCallback((next: GameClientPayload, force = false) => {
-        setPayload((prev) => {
-            if (!force && next.version <= prev.version) return prev;
-            versionRef.current = next.version;
-            return next;
-        });
+    // ── Move playback ────────────────────────────────────────────────────
+    // Each move the server commits is shown as its own board for at least
+    // FRAME_MS, so a burst (bots chaining, a fast opponent, a late ring)
+    // plays back one card at a time instead of two landing in one render.
+    const queueRef = useRef<GameClientPayload[]>([]);
+    const shownAtRef = useRef(0);
+    const timerRef = useRef<number | null>(null);
+
+    useEffect(
+        () => () => {
+            if (timerRef.current !== null) clearTimeout(timerRef.current);
+        },
+        [],
+    );
+
+    const show = useCallback((next: GameClientPayload) => {
+        shownAtRef.current = Date.now();
+        setPayload(next);
     }, []);
 
-    // Pull the full redacted payload (poll/doorbell reconcile path).
+    const pump = useCallback(
+        function pumpQueue() {
+            if (timerRef.current !== null || queueRef.current.length === 0) {
+                return;
+            }
+            const wait = Math.max(
+                0,
+                shownAtRef.current + FRAME_MS - Date.now(),
+            );
+            timerRef.current = window.setTimeout(() => {
+                timerRef.current = null;
+                const next = queueRef.current.shift();
+                if (next) show(next);
+                pumpQueue();
+            }, wait);
+        },
+        [show],
+    );
+
+    // Queue boards strictly newer than everything we hold, in order.
+    const enqueue = useCallback(
+        (boards: readonly GameClientPayload[]) => {
+            for (const board of boards) {
+                if (board.version <= versionRef.current) continue;
+                versionRef.current = board.version;
+                queueRef.current.push(board);
+            }
+            pump();
+        },
+        [pump],
+    );
+
+    // Show a board right now, dropping any pending playback. For the actor's
+    // own commit (already predicted on screen) and forced resyncs. Equal/stale
+    // payloads are ignored unless `force`: after a failed action the board may
+    // show a prediction at an unchanged version, and only the server's view
+    // can clear it.
+    const adoptNow = useCallback(
+        (next: GameClientPayload, force = false) => {
+            if (!force && next.version <= versionRef.current) return;
+            if (timerRef.current !== null) {
+                clearTimeout(timerRef.current);
+                timerRef.current = null;
+            }
+            queueRef.current = [];
+            versionRef.current = next.version;
+            show(next);
+        },
+        [show],
+    );
+
+    // Pull the full redacted payload and show it at once (resync path).
     const refetchFull = useCallback(
         async (force = false) => {
             const res = await fetch(`/api/games/${initial.gameId}`, {
@@ -96,31 +187,102 @@ export function GamePlayClient({
                 if (res.status === 404) showError("error_no_access", 5000);
                 return;
             }
-            adopt((await res.json()) as GameClientPayload, force);
+            adoptNow((await res.json()) as GameClientPayload, force);
         },
-        [initial.gameId, adopt, showError],
+        [initial.gameId, adoptNow, showError],
     );
 
-    // Poll/doorbell entry point: hit the few-byte version probe and only pull
-    // the heavy payload when the server has actually advanced. Steady-state
-    // polling is then off the secret state, the log and the view projection, and
-    // the board never re-renders on an unchanged tick.
-    const sync = useCallback(async () => {
-        const res = await fetch(`/api/games/${initial.gameId}/version`, {
-            cache: "no-store",
-        });
-        if (!res.ok) return;
-        const info = (await res.json()) as { version: number };
-        if (info.version <= versionRef.current) return;
-        await refetchFull();
-    }, [initial.gameId, refetchFull]);
+    // Catch-up read: the head plus every move since the version we hold,
+    // queued for playback. Each caller states the version it knows exists;
+    // rings arriving while a read is in flight only raise that target, and a
+    // follow-up read runs only if the first one did not already reach it — so
+    // the double ring (Broadcast + CDC) of one move costs a single request.
+    const inFlightRef = useRef(false);
+    const wantedRef = useRef(0);
+    const catchUp = useCallback(
+        async (target: number) => {
+            wantedRef.current = Math.max(wantedRef.current, target);
+            if (inFlightRef.current) return;
+            inFlightRef.current = true;
+            try {
+                while (wantedRef.current > versionRef.current) {
+                    const before = versionRef.current;
+                    const res = await fetch(
+                        `/api/games/${initial.gameId}?since=${before}`,
+                        { cache: "no-store" },
+                    );
+                    if (!res.ok) {
+                        if (res.status === 404) {
+                            showError("error_no_access", 5000);
+                        }
+                        return;
+                    }
+                    const { frames, ...head } =
+                        (await res.json()) as GameSyncPayload;
+                    enqueue([
+                        ...(frames ?? []).map((f) => frameBoard(head, f)),
+                        head,
+                    ]);
+                    // A forged/stale ring announcing a version the server
+                    // doesn't have must not loop: no progress, stop.
+                    if (versionRef.current === before) return;
+                }
+            } catch {
+                // Network blip — the next ring or heartbeat retries.
+            } finally {
+                inFlightRef.current = false;
+            }
+        },
+        [initial.gameId, enqueue, showError],
+    );
 
-    // Poll slow on your turn (nobody else can act), fast otherwise to catch moves —
-    // postgres_changes is unreliable on self-hosted stacks, so the poll is the dependable path.
+    // Doorbell/poll entry point. A ring carries the new version, so a stale
+    // or duplicate one (Broadcast + CDC both fire) costs no request at all.
+    // A bare resync (poll tick, reconnect, refocus) asks the few-byte version
+    // probe first and pulls the heavy payload only when the game has moved.
+    // While our own action is in flight its POST response is about to bring
+    // the new board — rings (including our own move's) are parked here and
+    // replayed after, instead of racing the response with a duplicate read.
+    // A bare resync parks as +∞: replayed as a probe, its target is unknown.
+    const actingRef = useRef(false);
+    const parkedRef = useRef(0);
+    const sync = useCallback(
+        async (announced?: number) => {
+            if (actingRef.current) {
+                parkedRef.current = Math.max(
+                    parkedRef.current,
+                    announced ?? Number.POSITIVE_INFINITY,
+                );
+                return;
+            }
+            if (announced !== undefined) {
+                if (announced > versionRef.current) await catchUp(announced);
+                return;
+            }
+            try {
+                const res = await fetch(
+                    `/api/games/${initial.gameId}/version`,
+                    { cache: "no-store" },
+                );
+                if (!res.ok) return;
+                const info = (await res.json()) as { version: number };
+                if (info.version > versionRef.current) {
+                    await catchUp(info.version);
+                }
+            } catch {
+                // Offline — the reconnect resync covers it.
+            }
+        },
+        [initial.gameId, catchUp],
+    );
+
+    // Broadcast-fed: while connected the poll is a slow heartbeat (set in the
+    // hook). Disconnected, poll slow on your turn (nobody else can act) and
+    // fast otherwise to keep catching moves.
     const myTurn =
         payload.currentPlayerId !== null &&
         payload.currentPlayerId === currentUserId;
-    const conn = useGameChannel(initial.gameId, sync, myTurn ? 4000 : 800);
+    const conn = useGameChannel(initial.gameId, sync, myTurn ? 4000 : 1000);
 
     // Resolve the game's table config once — the module never changes mid-game.
     const table = getGameTable(initial.moduleId);
@@ -128,6 +290,8 @@ export function GamePlayClient({
     const onAction = useCallback(
         async (action: GameAction) => {
             const snapshot = payloadRef.current;
+            actingRef.current = true;
+            parkedRef.current = 0;
             // UI-first: apply the move locally the instant the player acts, so
             // the board reacts without waiting on the round-trip. `predict`
             // returns `null` for moves it can't safely guess (hidden reveals),
@@ -139,7 +303,7 @@ export function GamePlayClient({
             if (predicted !== null) {
                 // Freeze input until the server reconciles: blank the turn and
                 // drop the legal actions so the board offers nothing to click.
-                setPayload({
+                show({
                     ...snapshot,
                     view: predicted,
                     legalActions: [],
@@ -167,7 +331,7 @@ export function GamePlayClient({
                     const data = (await res.json().catch(() => ({}))) as {
                         payload?: GameClientPayload;
                     };
-                    if (data.payload) adopt(data.payload);
+                    if (data.payload) adoptNow(data.payload);
                     else await refetchFull(true);
                     return;
                 }
@@ -178,6 +342,14 @@ export function GamePlayClient({
                 showError("error_generic", 3500);
             } finally {
                 setPending(false);
+                actingRef.current = false;
+                // Our own move's ring is now stale (the response carried it);
+                // anything newer parked meanwhile — a bot already answered —
+                // is caught up now.
+                const parked = parkedRef.current;
+                parkedRef.current = 0;
+                if (parked === Number.POSITIVE_INFINITY) void sync();
+                else if (parked > versionRef.current) void catchUp(parked);
             }
 
             // The move was refused or lost — roll the board back to the
@@ -193,7 +365,17 @@ export function GamePlayClient({
             // version so any leftover prediction is cleared.
             await refetchFull(true).catch(() => {});
         },
-        [initial.gameId, table, currentUserId, adopt, refetchFull, showError],
+        [
+            initial.gameId,
+            table,
+            currentUserId,
+            show,
+            adoptNow,
+            refetchFull,
+            catchUp,
+            sync,
+            showError,
+        ],
     );
 
     const onIllegal = useCallback(

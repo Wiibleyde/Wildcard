@@ -218,6 +218,76 @@ if (mode === "play") {
     console.log(`screenshots: ${SHOTS}play-before.png / play-after.png`);
 }
 
+if (mode === "netwatch") {
+    // Plays a Président game vs 3 bots for ~25s, clicking whenever it is our
+    // turn, and reports how the client syncs: HTTP calls per endpoint and the
+    // Realtime "version" broadcasts received on the game channel.
+    const seconds = Number(opt("seconds", ["25"])[0]);
+    const room = await post("/api/rooms", { moduleId: "president" });
+    await post(`/api/rooms/${room.code}/bots`, { count: 3 });
+    const { gameId } = await post(`/api/rooms/${room.code}/start`);
+
+    const page = await ctx.newPage();
+    const errors = [];
+    watchErrors(page, errors);
+    const t0 = Date.now();
+    const http = [];
+    const rings = [];
+    page.on("request", (r) => {
+        const u = new URL(r.url());
+        if (u.pathname.startsWith("/api/games/"))
+            http.push({
+                at: Date.now() - t0,
+                method: r.method(),
+                path: u.pathname.replace(gameId, ":id") + u.search,
+            });
+    });
+    page.on("websocket", (ws) => {
+        ws.on("framereceived", ({ payload }) => {
+            const text = typeof payload === "string" ? payload : "";
+            if (text.includes('"version"') && text.includes("broadcast"))
+                rings.push(Date.now() - t0);
+        });
+    });
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto(`${BASE}/fr/game/${gameId}`, {
+        waitUntil: "load",
+        timeout: 45000,
+    });
+    const button = page
+        .locator("button.wc-btn:enabled")
+        .filter({ hasNotText: /Envoyer|Send|Quitter|Leave/ })
+        .first();
+    let clicks = 0;
+    while (Date.now() - t0 < seconds * 1000) {
+        if (await button.isVisible().catch(() => false)) {
+            await button.click().catch(() => {});
+            clicks++;
+        }
+        await page.waitForTimeout(400);
+    }
+    const byPath = {};
+    for (const r of http) {
+        const key = `${r.method} ${r.path.replace(/since=\d+/, "since=N")}`;
+        byPath[key] = (byPath[key] ?? 0) + 1;
+    }
+    console.log(
+        JSON.stringify(
+            {
+                gameId,
+                seconds,
+                clicks,
+                broadcastRings: rings.length,
+                httpTotal: http.length,
+                byPath,
+                consoleErrors: errors.slice(0, 8),
+            },
+            null,
+            1,
+        ),
+    );
+}
+
 if (mode === "solplay") {
     const room = await post("/api/rooms", { moduleId: "solitaire" });
     const { gameId } = await post(`/api/rooms/${room.code}/start`);
