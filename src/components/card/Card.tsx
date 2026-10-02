@@ -1,14 +1,15 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import {
-    type CSSProperties,
-    type MouseEvent,
-    type Ref,
-    useCallback,
-} from "react";
+import { type CSSProperties, type MouseEvent, useCallback } from "react";
 import { freeTheme } from "@/lib/card/themes/free";
-import type { CardDescriptor, CardTheme, Rank, Suit } from "@/lib/card/types";
+import type {
+    CardDescriptor,
+    CardEffect,
+    CardTheme,
+    Rank,
+    Suit,
+} from "@/lib/card/types";
 import { CardBack } from "./CardBack";
 import { FoolContent, JokerContent } from "./SpecialCards";
 import { SuitedContent } from "./SuitedCard";
@@ -30,9 +31,12 @@ function buildBorderStyle(theme: CardTheme): CSSProperties {
     return { border };
 }
 
-function cardEffectsAttr(theme: CardTheme): string | undefined {
-    const types = theme.effects?.map((e) => e.type);
-    return types?.length ? types.join(" ") : undefined;
+// Only the colour is consumed by globals.css (`--card-effect-color`); speed has no CSS hook yet.
+function effectStyle(
+    effects: readonly CardEffect[] | undefined,
+): CSSProperties {
+    const color = effects?.find((e) => e.color)?.color;
+    return color ? ({ "--card-effect-color": color } as CSSProperties) : {};
 }
 
 function CardFaceContent({
@@ -64,11 +68,6 @@ const SUIT_KEY: Record<
     clubs: "suit_clubs",
 };
 
-/**
- * Localised accessible name for a card ("10 de pique", "Dame de cœur",
- * "Atout 21", "Carte face cachée") — the visual pips/indices read as noise to
- * a screen reader, and a face-down card would otherwise be an empty button.
- */
 export function useCardLabel(): (
     card: CardDescriptor,
     faceDown?: boolean,
@@ -101,62 +100,43 @@ export interface CardProps {
     card: CardDescriptor;
     theme?: CardTheme;
     faceDown?: boolean;
-    selected?: boolean;
-    /** Strip CSS transitions/transforms whenever GSAP (or D&D) drives position. */
-    disableTransitions?: boolean;
     onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
-    /** Toggle state for a selectable card (`aria-pressed`). */
+    /** `aria-pressed` for a selectable card. */
     pressed?: boolean;
-    className?: string;
-    /** Required for GSAP targets. */
-    ref?: Ref<HTMLElement>;
 }
 
 export function Card({
     card,
     theme = freeTheme,
     faceDown = false,
-    selected = false,
-    disableTransitions = false,
     onClick,
     pressed,
-    className = "",
-    ref,
 }: CardProps) {
     const labelOf = useCardLabel();
     const label = labelOf(card, faceDown);
-    const base: CSSProperties = {
+    const effects = faceDown ? theme.back.effects : theme.effects;
+    const style: CSSProperties = {
         aspectRatio: "5 / 7",
         containerType: "inline-size",
         borderRadius: "6%",
         fontFamily: theme.font?.family,
         ...buildBorderStyle(theme),
+        ...effectStyle(effects),
+        ...(faceDown
+            ? {
+                  background: theme.back.artwork
+                      ? undefined
+                      : (theme.back.pattern ?? theme.back.color),
+                  backgroundColor: theme.back.artwork
+                      ? undefined
+                      : theme.back.color,
+              }
+            : { backgroundColor: theme.backgroundColor }),
     };
-
-    const cls = [
-        "relative block w-full select-none overflow-hidden",
-        !disableTransitions && "transition-transform duration-150",
-        !disableTransitions &&
-            onClick &&
-            "hover:-translate-y-1 active:scale-95",
-        !disableTransitions && selected && "-translate-y-3",
-        onClick ? "cursor-pointer" : "",
-        className,
-    ]
-        .filter(Boolean)
-        .join(" ");
-
-    const style: CSSProperties = faceDown
-        ? {
-              ...base,
-              background: theme.back.artwork
-                  ? undefined
-                  : (theme.back.pattern ?? theme.back.color),
-              backgroundColor: theme.back.artwork
-                  ? undefined
-                  : theme.back.color,
-          }
-        : { ...base, backgroundColor: theme.backgroundColor };
+    const cls = `relative block w-full select-none overflow-hidden${onClick ? " cursor-pointer" : ""}`;
+    const effectAttr = effects?.length
+        ? effects.map((e) => e.type).join(" ")
+        : undefined;
 
     const content = faceDown ? (
         <CardBack theme={theme} />
@@ -167,11 +147,10 @@ export function Card({
     if (onClick) {
         return (
             <button
-                ref={ref as Ref<HTMLButtonElement>}
                 type="button"
                 className={cls}
                 style={style}
-                data-card-effect={faceDown ? undefined : cardEffectsAttr(theme)}
+                data-card-effect={effectAttr}
                 aria-label={label}
                 aria-pressed={pressed}
                 onClick={onClick}
@@ -183,10 +162,9 @@ export function Card({
 
     return (
         <div
-            ref={ref as Ref<HTMLDivElement>}
             className={cls}
             style={style}
-            data-card-effect={faceDown ? undefined : cardEffectsAttr(theme)}
+            data-card-effect={effectAttr}
             role="img"
             aria-label={label}
         >

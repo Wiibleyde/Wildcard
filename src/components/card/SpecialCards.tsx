@@ -1,80 +1,51 @@
-import type { CardTheme, JokerVariant } from "@/lib/card/types";
-import { ArtworkFill, CardBody, CenterBox, CenteredArtwork } from "./CardBody";
-import { Corner } from "./Corner";
+import type { CardArtwork, CardTheme, JokerVariant } from "@/lib/card/types";
+import { CenterBox } from "./CardBody";
+import { CardFace } from "./CardFace";
+
+function StarFace({
+    artwork,
+    color,
+    theme,
+}: {
+    artwork: CardArtwork | undefined;
+    color: string;
+    theme: CardTheme;
+}) {
+    return (
+        <CardFace artwork={artwork} color={color} font={theme.font} label="★">
+            <CenterBox style={{ fontSize: "54cqi", color, lineHeight: 1 }}>
+                ★
+            </CenterBox>
+        </CardFace>
+    );
+}
 
 export function FoolContent({ theme }: { theme: CardTheme }) {
-    const color = theme.trumpColor ?? theme.textColor;
-    const artwork = theme.artwork?.fool;
-    const showCorners = artwork ? artwork.showCorners !== false : true;
-    const showCenter = artwork?.fill ? artwork.showCenter === true : true;
-
     return (
-        <>
-            {artwork?.fill && <ArtworkFill artwork={artwork} />}
-            {showCorners && (
-                <Corner label="★" color={color} font={theme.font} />
-            )}
-            {showCenter && (
-                <CardBody>
-                    {artwork?.center !== undefined ? (
-                        <CenteredArtwork
-                            artwork={artwork.center}
-                            color={color}
-                        />
-                    ) : (
-                        <CenterBox
-                            style={{ fontSize: "54cqi", color, lineHeight: 1 }}
-                        >
-                            ★
-                        </CenterBox>
-                    )}
-                </CardBody>
-            )}
-            {showCorners && (
-                <Corner label="★" color={color} font={theme.font} flipped />
-            )}
-        </>
+        <StarFace
+            artwork={theme.artwork?.fool}
+            color={theme.trumpColor ?? theme.textColor}
+            theme={theme}
+        />
     );
 }
 
 export function JokerContent({
-    variant,
+    variant = "red",
     theme,
 }: {
     variant: JokerVariant | undefined;
     theme: CardTheme;
 }) {
-    const color =
-        variant === "red" ? theme.suits.hearts.color : theme.suits.spades.color;
-    const artwork = variant ? theme.artwork?.joker?.[variant] : undefined;
-    const showCorners = artwork ? artwork.showCorners !== false : true;
-    const showCenter = artwork?.fill ? artwork.showCenter === true : true;
-
     return (
-        <>
-            {artwork?.fill && <ArtworkFill artwork={artwork} />}
-            {showCorners && (
-                <Corner label="★" color={color} font={theme.font} />
-            )}
-            {showCenter && (
-                <CardBody>
-                    {artwork?.center !== undefined ? (
-                        <CenteredArtwork
-                            artwork={artwork.center}
-                            color={color}
-                        />
-                    ) : (
-                        <CenterBox
-                            style={{ fontSize: "54cqi", color, lineHeight: 1 }}
-                        >
-                            ★
-                        </CenterBox>
-                    )}
-                </CardBody>
-            )}
-            {showCorners && (
-                <Corner label="★" color={color} font={theme.font} flipped />
-            )}
-        </>
+        <StarFace
+            artwork={theme.artwork?.joker?.[variant]}
+            color={
+                variant === "red"
+                    ? theme.suits.hearts.color
+                    : theme.suits.spades.color
+            }
+            theme={theme}
+        />
     );
 }

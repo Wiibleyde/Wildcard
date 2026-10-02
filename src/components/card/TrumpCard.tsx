@@ -1,6 +1,6 @@
 import type { CardTheme, TrumpIndex } from "@/lib/card/types";
-import { ArtworkFill, CardBody, CenterBox, CenteredArtwork } from "./CardBody";
-import { Corner } from "./Corner";
+import { CenterBox } from "./CardBody";
+import { CardFace } from "./CardFace";
 
 const ROMAN: Record<TrumpIndex, string> = {
     1: "I",
@@ -34,55 +34,34 @@ export function TrumpContent({
     theme: CardTheme;
 }) {
     const color = theme.trumpColor ?? theme.textColor;
-    const artwork = theme.artwork?.trump?.[index];
-    const showCorners = artwork ? artwork.showCorners !== false : true;
-    const showCenter = artwork?.fill ? artwork.showCenter === true : true;
 
     return (
-        <>
-            {artwork?.fill && <ArtworkFill artwork={artwork} />}
-            {showCorners && (
-                <Corner label={String(index)} color={color} font={theme.font} />
-            )}
-            {showCenter && (
-                <CardBody>
-                    {artwork?.center !== undefined ? (
-                        <CenteredArtwork
-                            artwork={artwork.center}
-                            color={color}
-                        />
-                    ) : (
-                        <CenterBox col style={{ color, gap: "4%" }}>
-                            <span
-                                style={{
-                                    fontSize: "44cqi",
-                                    fontWeight: 700,
-                                    lineHeight: 1,
-                                }}
-                            >
-                                {index}
-                            </span>
-                            <span
-                                style={{
-                                    fontSize: "13cqi",
-                                    lineHeight: 1,
-                                    opacity: 0.65,
-                                }}
-                            >
-                                {ROMAN[index]}
-                            </span>
-                        </CenterBox>
-                    )}
-                </CardBody>
-            )}
-            {showCorners && (
-                <Corner
-                    label={String(index)}
-                    color={color}
-                    font={theme.font}
-                    flipped
-                />
-            )}
-        </>
+        <CardFace
+            artwork={theme.artwork?.trump?.[index]}
+            color={color}
+            font={theme.font}
+            label={String(index)}
+        >
+            <CenterBox col style={{ color, gap: "4%" }}>
+                <span
+                    style={{
+                        fontSize: "44cqi",
+                        fontWeight: 700,
+                        lineHeight: 1,
+                    }}
+                >
+                    {index}
+                </span>
+                <span
+                    style={{
+                        fontSize: "13cqi",
+                        lineHeight: 1,
+                        opacity: 0.65,
+                    }}
+                >
+                    {ROMAN[index]}
+                </span>
+            </CenterBox>
+        </CardFace>
     );
 }

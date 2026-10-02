@@ -1,7 +1,7 @@
-import type { CSSProperties, ReactElement } from "react";
+import type { CSSProperties, ReactElement, ReactNode } from "react";
 import type { CardArtwork } from "@/lib/card/types";
 
-export function CardBody({ children }: { children: React.ReactNode }) {
+export function CardBody({ children }: { children: ReactNode }) {
     return (
         <div
             className="absolute"
@@ -12,13 +12,12 @@ export function CardBody({ children }: { children: React.ReactNode }) {
     );
 }
 
-/** Centered flex container; `col` stacks children vertically. */
 export function CenterBox({
     children,
     col = false,
     style,
 }: {
-    children: React.ReactNode;
+    children: ReactNode;
     col?: boolean;
     style?: CSSProperties;
 }) {
@@ -32,7 +31,6 @@ export function CenterBox({
     );
 }
 
-/** Full-bleed artwork layer — renders below corners and body content */
 export function ArtworkFill({ artwork }: { artwork: CardArtwork }) {
     const { fill, objectFit = "cover", tint } = artwork;
     if (!fill) return null;

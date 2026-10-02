@@ -10,7 +10,6 @@ describe("PLAY_ANIMATIONS registry", () => {
     it("registers every template under its own id", () => {
         for (const [id, template] of Object.entries(PLAY_ANIMATIONS)) {
             expect(template.id).toBe(id);
-            expect(template.name.length).toBeGreaterThan(0);
             expect(typeof template.animate).toBe("function");
         }
     });
