@@ -26,12 +26,17 @@ export function MatchHistoryItem({
     onTogglePin,
 }: Props) {
     const t = useTranslations("history");
+    const tCommon = useTranslations("common");
     const format = useFormatter();
     const rs = RESULT_STYLE[entry.result];
     const opponents = format.list(
         entry.players
             .filter((p) => !p.isYou)
-            .map((p) => (p.isBot ? t("bot_name", { name: p.name }) : p.name)),
+            .map((p) =>
+                p.botNumber === null
+                    ? p.name
+                    : tCommon("computer", { n: p.botNumber }),
+            ),
         { type: "unit" },
     );
 

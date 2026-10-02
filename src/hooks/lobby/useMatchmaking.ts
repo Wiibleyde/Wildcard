@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, readApiError, readApiJson } from "@/lib/api/client";
 import { useTicketChannel } from "@/lib/realtime/useTicketChannel";
 
 type ServerStatus =
@@ -66,7 +66,8 @@ export function useMatchmaking(userId: string) {
     const refresh = useCallback(async () => {
         try {
             const res = await apiFetch("/api/matchmaking");
-            if (res.ok) handleStatus((await res.json()) as ServerStatus);
+            const status = res.ok ? await readApiJson<ServerStatus>(res) : null;
+            if (status) handleStatus(status);
         } catch {
             // Transient: the ticket channel's next doorbell/poll retries.
         }
@@ -91,20 +92,22 @@ export function useMatchmaking(userId: string) {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ moduleId }),
                 });
-                const data = (await res.json().catch(() => ({}))) as {
-                    error?: string;
-                };
                 if (!res.ok) {
+                    const error = await readApiError(res);
                     // Already matched: the game exists, walk in rather than error.
-                    if (data.error === "match_in_progress") {
+                    if (error === "match_in_progress") {
                         await refresh();
                         return;
                     }
                     active.current = false;
-                    setState({ phase: "error", code: data.error ?? "generic" });
+                    setState({ phase: "error", code: error ?? "generic" });
                     return;
                 }
-                handleStatus(data as ServerStatus);
+                handleStatus(
+                    (await readApiJson<ServerStatus>(res)) ?? {
+                        status: "idle",
+                    },
+                );
             } catch {
                 active.current = false;
                 setState({ phase: "error", code: "generic" });
@@ -136,15 +139,18 @@ export function useMatchmaking(userId: string) {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ moduleId }),
                 });
-                const data = (await res.json().catch(() => ({}))) as {
+                const data = await readApiJson<{
                     error?: string;
                     gameId?: string;
-                };
-                if (!res.ok || !data.gameId) {
+                }>(res);
+                if (!res.ok || !data?.gameId) {
                     navigating.current = false;
                     // A human match took our ticket meanwhile: the doorbell walks us in.
-                    if (data.error === "match_in_progress") return;
-                    setState({ phase: "error", code: data.error ?? "generic" });
+                    if (data?.error === "match_in_progress") return;
+                    setState({
+                        phase: "error",
+                        code: data?.error ?? "generic",
+                    });
                     return;
                 }
                 consumeTicket();

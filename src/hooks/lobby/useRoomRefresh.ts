@@ -9,7 +9,7 @@ import {
     type SpectatorRow,
     splitRoster,
 } from "@/lib/lobby/roster";
-import { usernamesByIds } from "@/lib/models/identities";
+import { nameTag, usernamesByIds } from "@/lib/models/identities";
 import { useRoomChannel } from "@/lib/realtime/useRoomChannel";
 import { createClient } from "@/lib/supabase/client";
 
@@ -41,8 +41,11 @@ export function useRoomRefresh({
     isMember,
 }: Params) {
     const router = useRouter();
-    const t = useTranslations("room");
-    const fallbackName = t("unknown_player");
+    const tCommon = useTranslations("common");
+    const fallbackName = useCallback(
+        (id: string) => tCommon("player_fallback", { tag: nameTag(id) }),
+        [tCommon],
+    );
     const [seats, setSeats] = useState<SeatRow[]>(initialSeats);
     const [spectators, setSpectators] =
         useState<SpectatorRow[]>(initialSpectators);

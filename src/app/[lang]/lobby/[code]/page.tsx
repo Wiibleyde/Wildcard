@@ -9,7 +9,8 @@ import { requireAuthUser } from "@/lib/auth/session";
 import { resolveRuleToggles } from "@/lib/engine/types";
 import { resolveGameModule } from "@/lib/games/resolve";
 import { type Role, splitRoster } from "@/lib/lobby/roster";
-import { usernamesByIds } from "@/lib/models/identities";
+import { nameTag, usernamesByIds } from "@/lib/models/identities";
+import { normalizeRoomCode } from "@/lib/models/roomCode";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -31,6 +32,7 @@ export default async function Page({
     const { lang, code } = await params;
     setRequestLocale(lang);
     const t = await getTranslations("room");
+    const tCommon = await getTranslations("common");
 
     const user = await requireAuthUser(lang, `/${lang}/lobby/${code}`);
     const supabase = await createClient();
@@ -40,7 +42,7 @@ export default async function Page({
         .select(
             "id, code, module_id, host_id, status, current_game_id, bot_count, rules",
         )
-        .eq("code", code.toUpperCase())
+        .eq("code", normalizeRoomCode(code))
         .maybeSingle();
 
     if (!room || room.status === "finished") {
@@ -69,10 +71,8 @@ export default async function Page({
         supabase,
         rows.map((r) => r.user_id),
     );
-    const { seats, spectators } = splitRoster(
-        rows,
-        nameOf,
-        t("unknown_player"),
+    const { seats, spectators } = splitRoster(rows, nameOf, (id) =>
+        tCommon("player_fallback", { tag: nameTag(id) }),
     );
 
     const me = rows.find((r) => r.user_id === user.id);

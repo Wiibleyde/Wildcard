@@ -5,8 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import { ReconnectingBanner } from "@/components/realtime/ReconnectingBanner";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { useRoomRefresh } from "@/hooks/lobby/useRoomRefresh";
+import { useApiErrorLabel } from "@/hooks/useApiErrorLabel";
 import { useRouter } from "@/i18n/navigation";
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, readApiError, readApiJson } from "@/lib/api/client";
 import {
     type GameRuleMode,
     type GameRuleToggle,
@@ -39,11 +40,6 @@ interface Props {
     initialRules: Record<string, boolean>;
 }
 
-async function errorCodeOf(res: Response): Promise<unknown> {
-    const data = (await res.json().catch(() => ({}))) as { error?: unknown };
-    return data.error;
-}
-
 export function RoomClient({
     roomId,
     code,
@@ -63,6 +59,7 @@ export function RoomClient({
 }: Props) {
     const t = useTranslations("room");
     const tCommon = useTranslations("common");
+    const errorLabel = useApiErrorLabel();
     const router = useRouter();
 
     const {
@@ -114,20 +111,6 @@ export function RoomClient({
         [],
     );
 
-    function apiErrorLabel(errorCode: unknown): string {
-        if (errorCode === "rate_limited") return t("error_rate_limited");
-        if (errorCode === "maintenance") return t("error_maintenance");
-        if (errorCode === "room_full") return t("error_room_full");
-        return tCommon("error");
-    }
-
-    function startErrorLabel(errorCode: unknown): string {
-        if (errorCode === "not_host") return t("error_not_host");
-        if (errorCode === "not_enough_players") return t("error_not_enough");
-        if (errorCode === "already_started") return t("error_already_started");
-        return apiErrorLabel(errorCode);
-    }
-
     /** Optimistic host mutation: apply, POST, roll back on refusal, reconcile. */
     async function mutateSetting(
         apply: () => () => void,
@@ -143,11 +126,11 @@ export function RoomClient({
             const res = await request();
             if (!res.ok) {
                 rollback();
-                setError(apiErrorLabel(await errorCodeOf(res)));
+                setError(errorLabel(await readApiError(res)));
             }
         } catch {
             rollback();
-            setError(tCommon("error"));
+            setError(errorLabel(null));
         } finally {
             mutatingRef.current -= 1;
             settingsInFlight.current = false;
@@ -208,19 +191,19 @@ export function RoomClient({
             const res = await apiFetch(`/api/rooms/${code}/start`, {
                 method: "POST",
             });
-            const data = (await res.json().catch(() => ({}))) as {
+            const data = await readApiJson<{
                 error?: string;
                 gameId?: string;
-            };
-            if (!res.ok || !data.gameId) {
-                setError(startErrorLabel(data.error));
+            }>(res);
+            if (!res.ok || !data?.gameId) {
+                setError(errorLabel(data?.error));
                 setBusy(false);
                 return;
             }
             // Stay busy while navigating so Start can't be pressed twice.
             router.push(`/game/${data.gameId}`);
         } catch {
-            setError(tCommon("error"));
+            setError(errorLabel(null));
             setBusy(false);
         }
     }
@@ -233,14 +216,14 @@ export function RoomClient({
                 method: "POST",
             });
             if (!res.ok) {
-                setError(apiErrorLabel(await errorCodeOf(res)));
+                setError(errorLabel(await readApiError(res)));
                 setBusy(false);
                 return;
             }
             closedRef.current = true;
             router.push("/lobby");
         } catch {
-            setError(tCommon("error"));
+            setError(errorLabel(null));
             setBusy(false);
         }
     }
@@ -256,14 +239,14 @@ export function RoomClient({
                 body: JSON.stringify({ role: next }),
             });
             if (!res.ok) {
-                setError(apiErrorLabel(await errorCodeOf(res)));
+                setError(errorLabel(await readApiError(res)));
                 return;
             }
             setRole(next);
             // postgres_changes can be silent on self-hosted stacks: reconcile now, not at the next poll.
             await refresh();
         } catch {
-            setError(tCommon("error"));
+            setError(errorLabel(null));
         } finally {
             setBusy(false);
         }
@@ -298,7 +281,7 @@ export function RoomClient({
         if (i < seats.length + botCount) {
             return {
                 kind: "bot",
-                label: t("computer", { n: i - seats.length + 1 }),
+                label: tCommon("computer", { n: i - seats.length + 1 }),
             };
         }
         return null;

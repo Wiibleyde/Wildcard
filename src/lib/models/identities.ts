@@ -7,7 +7,8 @@ import type { Database } from "@/lib/supabase/types";
  * read only through the security-definer `player_identities` RPC.
  */
 export interface PlayerIdentity {
-    readonly name: string;
+    /** `null` without a portal pseudo: the UI localizes the fallback. */
+    readonly name: string | null;
     /** Path in the portal's public avatars bucket. */
     readonly avatarPath: string | null;
 }
@@ -21,12 +22,12 @@ export function portalAvatarUrl(avatarPath: string | null): string | null {
         : null;
 }
 
-/** Stable id suffix keeps two pseudo-less players distinguishable. */
-export function fallbackName(userId: string): string {
-    return `Joueur ${userId.slice(0, 4)}`;
+/** Stable id prefix that keeps two pseudo-less players distinguishable. */
+export function nameTag(userId: string): string {
+    return userId.slice(0, 4);
 }
 
-/** Every requested id is present in the result (fallback name when unknown). */
+/** Every requested id is present in the result (`name: null` when unknown). */
 export async function identitiesByIds(
     client: SupabaseClient<Database>,
     ids: readonly string[],
@@ -46,7 +47,7 @@ export async function identitiesByIds(
             return [
                 id,
                 {
-                    name: row?.pseudo ?? fallbackName(id),
+                    name: row?.pseudo ?? null,
                     avatarPath: row?.avatar_path ?? null,
                 },
             ];
@@ -54,12 +55,17 @@ export async function identitiesByIds(
     );
 }
 
+/** Only ids with a pseudo are present. */
 export async function usernamesByIds(
     client: SupabaseClient<Database>,
     ids: readonly string[],
 ): Promise<Map<string, string>> {
     const identities = await identitiesByIds(client, ids);
-    return new Map([...identities].map(([id, { name }]) => [id, name]));
+    return new Map(
+        [...identities].flatMap(([id, { name }]) =>
+            name === null ? [] : [[id, name] as const],
+        ),
+    );
 }
 
 export async function identityOf(

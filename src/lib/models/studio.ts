@@ -421,7 +421,8 @@ export interface PublishedEcaGame {
     readonly description: string | null;
     /** Display-ready public URL. */
     readonly imageUrl: string | null;
-    readonly ownerName: string;
+    /** `null` without a portal pseudo. */
+    readonly ownerName: string | null;
     readonly ruleCount: number;
     readonly minPlayers: number;
     readonly maxPlayers: number;
@@ -462,7 +463,7 @@ export async function listPublishedEcaGames(
                 imageUrl: row.image_url
                     ? publicStorageUrl(ecaImagesBucket(), row.image_url)
                     : null,
-                ownerName: nameOf.get(row.owner_id) ?? "?",
+                ownerName: nameOf.get(row.owner_id) ?? null,
                 ruleCount: def.rules.length,
                 minPlayers: def.meta.minPlayers,
                 maxPlayers: def.meta.maxPlayers,

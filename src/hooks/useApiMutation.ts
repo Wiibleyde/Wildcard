@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, readApiError } from "@/lib/api/client";
 
 export type MutationStatus = "idle" | "pending" | "success" | "error";
 
@@ -63,10 +63,7 @@ export function useApiMutation<TBody = unknown>(
                 });
 
                 if (!res.ok) {
-                    const data = (await res.json().catch(() => ({}))) as {
-                        error?: string;
-                    };
-                    setError(data.error ?? "error");
+                    setError((await readApiError(res)) ?? "error");
                     setStatus("error");
                     return false;
                 }

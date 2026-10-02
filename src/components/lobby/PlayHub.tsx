@@ -6,28 +6,18 @@ import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { GameButton } from "@/components/ui/GameButton";
 import { useMatchmaking } from "@/hooks/lobby/useMatchmaking";
 import { useRoomAction } from "@/hooks/lobby/useRoomAction";
+import { useApiErrorLabel } from "@/hooks/useApiErrorLabel";
 import type { PlayGame } from "@/lib/games/catalog";
 import {
     buildPlaySections,
     gameLabels,
     type Translate,
 } from "@/lib/games/catalogView";
+import { CODE_LENGTH } from "@/lib/models/roomCode";
 import type { PublishedEcaGame } from "@/lib/models/studio";
 import { CommunityGames } from "./CommunityGames";
 import { GameCard } from "./GameCard";
 import { MatchmakingOverlay } from "./MatchmakingOverlay";
-
-const MATCHMAKING_ERROR_KEYS = {
-    rate_limited: "error_rate_limited",
-    maintenance: "error_maintenance",
-    payload_too_large: "error_payload_too_large",
-} as const;
-
-function isMatchmakingErrorCode(
-    code: string,
-): code is keyof typeof MATCHMAKING_ERROR_KEYS {
-    return Object.hasOwn(MATCHMAKING_ERROR_KEYS, code);
-}
 
 interface Props {
     readonly userId: string;
@@ -37,7 +27,7 @@ interface Props {
 
 export function PlayHub({ userId, games, community }: Props) {
     const t = useTranslations("lobby");
-    const tCommon = useTranslations("common");
+    const errorLabel = useApiErrorLabel();
     // catalogView builds its keys dynamically (`cat_${id}`) and takes a loose translator.
     const tg = useTranslations("games") as unknown as Translate;
     const { state, quickMatch, cancel, playBots } = useMatchmaking(userId);
@@ -53,11 +43,7 @@ export function PlayHub({ userId, games, community }: Props) {
             ? games.find((g) => g.id === state.moduleId)
             : undefined;
     const errorText =
-        state.phase === "error"
-            ? isMatchmakingErrorCode(state.code)
-                ? t(MATCHMAKING_ERROR_KEYS[state.code])
-                : tCommon("error")
-            : room.error;
+        state.phase === "error" ? errorLabel(state.code) : room.error;
 
     function createLabel(moduleId: string, idle: string): string {
         return room.busyModuleId === moduleId ? t("creating") : idle;
@@ -93,7 +79,7 @@ export function PlayHub({ userId, games, community }: Props) {
                         placeholder={t("code_placeholder")}
                         aria-label={t("code_label")}
                         autoComplete="off"
-                        maxLength={5}
+                        maxLength={CODE_LENGTH}
                         className="min-w-0 flex-1 rounded-xl border-nb border-wc-ink bg-wc-cream2 px-4 py-3 text-center font-pixel text-[15px] tracking-[0.3em] text-wc-ink outline-none lg:w-44"
                         style={{
                             boxShadow: "inset 0 2px 0 rgba(11,18,32,0.12)",
@@ -103,7 +89,7 @@ export function PlayHub({ userId, games, community }: Props) {
                         variant="red"
                         size="sm"
                         onClick={() => room.joinRoom(code)}
-                        disabled={busy || code.length < 3}
+                        disabled={busy || code.length !== CODE_LENGTH}
                         className="shrink-0"
                     >
                         {room.busy?.action === "join"

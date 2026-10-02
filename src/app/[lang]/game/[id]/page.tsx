@@ -1,12 +1,12 @@
 import { notFound } from "next/navigation";
 import type { Locale } from "next-intl";
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { GamePlayClient } from "@/components/game/GamePlayClient";
 import { requireAuthUser } from "@/lib/auth/session";
 import { canViewGame } from "@/lib/models/access";
 import { getPlayerStyles } from "@/lib/models/customization";
 import { getGameClientState } from "@/lib/models/game/payload";
-import { identityOf } from "@/lib/models/identities";
+import { identityOf, nameTag } from "@/lib/models/identities";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,10 +30,11 @@ export default async function Page({
         throw new Error(`game ${id} failed to load: ${result.error}`);
     }
 
-    const [styles, viewer] = await Promise.all([
+    const [styles, viewer, tCommon] = await Promise.all([
         getPlayerStyles(supabase, user.id),
         // Spectators are not in the seated roster but still need a chat name.
         identityOf(supabase, user.id),
+        getTranslations("common"),
     ]);
 
     return (
@@ -41,7 +42,10 @@ export default async function Page({
             <GamePlayClient
                 initial={result.payload}
                 currentUserId={user.id}
-                currentUserName={viewer.name}
+                currentUserName={
+                    viewer.name ??
+                    tCommon("player_fallback", { tag: nameTag(user.id) })
+                }
                 deckStyleId={styles.deckStyleId}
                 boardStyleId={styles.boardStyleId}
             />
