@@ -1,22 +1,19 @@
 "use server";
 
+// Raw redirect: `next` is already a locale-prefixed path.
 import { redirect } from "next/navigation";
+import { hasLocale } from "next-intl";
 import { routing } from "@/i18n/routing";
 import { createClient } from "@/lib/supabase/server";
 
 /** The form's `lang` is user input: only a known locale may enter a URL. */
 function safeLang(value: FormDataEntryValue | null): string {
-    return typeof value === "string" &&
-        (routing.locales as readonly string[]).includes(value)
+    return typeof value === "string" && hasLocale(routing.locales, value)
         ? value
         : routing.defaultLocale;
 }
 
-/**
- * Only same-origin paths: never bounce to an attacker-chosen site. Browsers
- * treat `\` like `/` in URLs, so `/\evil.com` would be protocol-relative —
- * any backslash is refused, as is `//` anywhere and control characters.
- */
+/** Same-origin paths only. Browsers read `\` as `/`, so `/\evil.com` would be protocol-relative. */
 function safeNext(next: FormDataEntryValue | null, lang: string): string {
     const value = typeof next === "string" ? next : "";
     const ok =
@@ -28,11 +25,7 @@ function safeNext(next: FormDataEntryValue | null, lang: string): string {
     return ok ? value : `/${lang}`;
 }
 
-/**
- * Dev-only sign-in with email/password — stands in for the portal, which cannot
- * set its `.wiibleyde.dev` cookie on localhost. The server client writes the
- * session cookie exactly as the portal would (same name, raw encoding).
- */
+/** The portal can't set its `.wiibleyde.dev` cookie on localhost; this writes the same session cookie. */
 export async function devSignIn(formData: FormData): Promise<void> {
     if (process.env.NODE_ENV !== "development") {
         throw new Error("dev-login is only available under `next dev`");

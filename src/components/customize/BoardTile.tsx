@@ -1,50 +1,10 @@
-"use client";
-
-import { useTranslations } from "next-intl";
 import type { BoardTheme } from "@/lib/board/types";
-import { TIER_LABEL_KEY, tierColor, tierTextColor } from "@/lib/customize/tier";
-import { TileShell } from "./TileShell";
 
-type Props = {
-    theme: BoardTheme;
-    selected: boolean;
-    onClick: () => void;
-    previewHref: string;
-};
-
-export function BoardTile({ theme, selected, onClick, previewHref }: Props) {
-    "use no memo";
-    const t = useTranslations("customize");
-    const tierName = t(TIER_LABEL_KEY[theme.tier]);
-
+export function BoardTile({ theme }: { theme: BoardTheme }) {
     return (
-        <TileShell
-            selected={selected}
-            onClick={onClick}
-            previewHref={previewHref}
-        >
-            <div
-                className="w-16 h-10 rounded-md overflow-hidden shrink-0"
-                style={{
-                    background: theme.surface.background,
-                    border: "2.5px solid var(--ink)",
-                }}
-            />
-            <span
-                className="text-xs font-display truncate w-full text-center"
-                style={{ color: "var(--ink)" }}
-            >
-                {theme.name}
-            </span>
-            <span
-                className="stamp"
-                style={{
-                    background: tierColor(theme.tier),
-                    color: tierTextColor(theme.tier),
-                }}
-            >
-                {tierName}
-            </span>
-        </TileShell>
+        <div
+            className="h-10 w-16 shrink-0 overflow-hidden rounded-md border-nb border-wc-ink"
+            style={{ background: theme.surface.background }}
+        />
     );
 }

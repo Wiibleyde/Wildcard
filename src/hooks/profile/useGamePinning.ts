@@ -6,7 +6,7 @@ import { apiFetch } from "@/lib/api/client";
 import type { MatchHistoryEntry } from "@/lib/models/history";
 import { MAX_PERSISTENT_REPLAYS } from "@/lib/models/persistence";
 
-// Pinned games survive the 15-day move-retention sweep; capped per account.
+/** Pinned games survive the 15-day move-retention sweep; capped per account. */
 export function useGamePinning(entries: readonly MatchHistoryEntry[]) {
     const t = useTranslations("history");
     const [pinned, setPinned] = useState<Set<string>>(

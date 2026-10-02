@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "@/i18n/navigation";
 
 type Options = {
     refreshMs: number;
@@ -9,13 +9,8 @@ type Options = {
 };
 
 /**
- * Ticks a clock so relative timestamps stay fresh without re-fetching, and
- * polls `router.refresh()` on an interval. `refreshNow` flips `refreshing` for
- * ~600ms to debounce the UI.
- *
- * `now` is `null` during SSR and the hydration render: a server timestamp
- * would never match the client's (seconds-granularity relative times →
- * hydration mismatch), so callers render time-dependent text only once it's set.
+ * Polls `router.refresh()` and ticks a clock for relative times. `now` stays
+ * `null` through SSR and hydration: a server timestamp would never match the client's.
  */
 export function usePollingWithClock({ refreshMs, clockMs = 1000 }: Options) {
     const router = useRouter();

@@ -15,11 +15,8 @@ import type { GameButtonVariant } from "./GameButton";
 export interface ConfirmOptions {
     title?: string;
     message: string;
-    /** Defaults to the localized "Confirm". */
     confirmLabel?: string;
-    /** Defaults to the localized "Cancel". */
     cancelLabel?: string;
-    /** Pass "red" for destructive actions. */
     variant?: GameButtonVariant;
 }
 
@@ -27,7 +24,7 @@ type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>;
 
 const ConfirmContext = createContext<ConfirmFn | null>(null);
 
-/** Imperative confirmation — a themed `await confirm({...})` drop-in for `window.confirm`. */
+/** Themed `await confirm({...})` replacement for `window.confirm`. */
 export function useConfirm(): ConfirmFn {
     const ctx = useContext(ConfirmContext);
     if (!ctx) {
@@ -40,7 +37,6 @@ interface DialogState extends ConfirmOptions {
     open: boolean;
 }
 
-/** Holds the single dialog instance. Mount once near the root, inside the i18n provider. */
 export function ConfirmProvider({ children }: { children: ReactNode }) {
     const t = useTranslations("common");
     const [state, setState] = useState<DialogState>({
@@ -51,8 +47,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 
     const confirm = useCallback<ConfirmFn>((options) => {
         return new Promise<boolean>((resolve) => {
-            // Only one dialog at a time — a new request cancels any pending one
-            // so its promise never dangles.
+            // One dialog at a time: settle the pending one so its promise never dangles.
             resolver.current?.(false);
             resolver.current = resolve;
             setState({ ...options, open: true });

@@ -1,28 +1,24 @@
-"use client";
-
+import { getTranslations } from "next-intl/server";
+import { Avatar } from "@/components/ui/Avatar";
 import { Link } from "@/i18n/navigation";
 import { Brand } from "./Brand";
 import { NavActions } from "./NavActions";
-import { NavAvatar } from "./NavAvatar";
 import { NavLinks } from "./NavLinks";
 
 type Props = {
     username: string;
     avatarUrl: string | null;
     level: number;
-    initial: string;
-    levelShort: string;
     canModerate: boolean;
 };
 
-export function SidebarDesktop({
+export async function SidebarDesktop({
     username,
     avatarUrl,
     level,
-    initial,
-    levelShort,
     canModerate,
 }: Props) {
+    const t = await getTranslations("profile");
     return (
         <aside
             className="fixed top-0 left-0 z-40 hidden h-screen w-55 flex-col gap-1.5 px-4 py-5 md:flex xl:w-64"
@@ -43,28 +39,13 @@ export function SidebarDesktop({
                 <NavActions variant="sidebar" />
 
                 <Link href="/profile" className="wc-me">
-                    <NavAvatar
-                        avatarUrl={avatarUrl}
-                        initial={initial}
-                        username={username}
-                        sizePx={42}
-                        initialClassName="text-lg"
-                    />
+                    <Avatar name={username} avatarUrl={avatarUrl} size={42} />
                     <div className="min-w-0">
-                        <p
-                            className="truncate font-display text-lg leading-none"
-                            style={{ color: "var(--cream)" }}
-                        >
+                        <p className="truncate font-display text-lg leading-none text-wc-cream">
                             {username}
                         </p>
-                        <p
-                            className="mt-1 font-pixel text-wc-micro uppercase"
-                            style={{
-                                color: "var(--muted)",
-                                fontFamily: "var(--pixel)",
-                            }}
-                        >
-                            {levelShort} {level}
+                        <p className="mt-1 font-pixel text-wc-micro text-wc-muted uppercase">
+                            {t("level", { level })}
                         </p>
                     </div>
                 </Link>

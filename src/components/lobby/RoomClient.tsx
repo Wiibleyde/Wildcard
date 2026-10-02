@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { ReconnectingBanner } from "@/components/realtime/ReconnectingBanner";
+import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { useRoomRefresh } from "@/hooks/lobby/useRoomRefresh";
 import { useRouter } from "@/i18n/navigation";
 import { apiFetch } from "@/lib/api/client";
@@ -13,14 +14,12 @@ import {
     resolveRuleToggles,
     ruleModeValues,
 } from "@/lib/engine/types";
+import type { Role, SeatRow, Slot, SpectatorRow } from "@/lib/lobby/roster";
 import { RoomActions } from "./room/RoomActions";
 import { RuleModePicker } from "./room/RuleModePicker";
 import { RuleToggle } from "./room/RuleToggle";
 import { SeatPanel } from "./room/SeatPanel";
 import { SpectatorList } from "./room/SpectatorList";
-import type { Role, SeatRow, Slot, SpectatorRow } from "./room/types";
-
-export type { SeatRow, SpectatorRow } from "./room/types";
 
 interface Props {
     roomId: string;
@@ -33,11 +32,16 @@ interface Props {
     initialSpectators: SpectatorRow[];
     initialHostId: string;
     initialBotCount: number;
-    seated: boolean;
+    isMember: boolean;
     initialRole: Role;
     ruleToggles: readonly GameRuleToggle[];
     ruleModes: readonly GameRuleMode[];
     initialRules: Record<string, boolean>;
+}
+
+async function errorCodeOf(res: Response): Promise<unknown> {
+    const data = (await res.json().catch(() => ({}))) as { error?: unknown };
+    return data.error;
 }
 
 export function RoomClient({
@@ -51,13 +55,14 @@ export function RoomClient({
     initialSpectators,
     initialHostId,
     initialBotCount,
-    seated,
+    isMember,
     initialRole,
     ruleToggles,
     ruleModes,
     initialRules,
 }: Props) {
     const t = useTranslations("room");
+    const tCommon = useTranslations("common");
     const router = useRouter();
 
     const {
@@ -85,7 +90,7 @@ export function RoomClient({
         initialBotCount,
         initialRole,
         initialRules,
-        seated,
+        isMember,
     });
 
     const [busy, setBusy] = useState(false);
@@ -98,9 +103,9 @@ export function RoomClient({
     const isSpectator = role === "spectator";
     const roomFull = total >= maxPlayers;
 
-    // Host setting mutations in flight — gates the +/- and toggles so a second
-    // click can't race the first, and holds off poll overwrites meanwhile.
     const [settingsBusy, setSettingsBusy] = useState(false);
+    // Synchronous guard: a second click fired before the re-render would still see settingsBusy=false.
+    const settingsInFlight = useRef(false);
     const copiedTimer = useRef<number | null>(null);
     useEffect(
         () => () => {
@@ -109,12 +114,27 @@ export function RoomClient({
         [],
     );
 
+    function apiErrorLabel(errorCode: unknown): string {
+        if (errorCode === "rate_limited") return t("error_rate_limited");
+        if (errorCode === "maintenance") return t("error_maintenance");
+        if (errorCode === "room_full") return t("error_room_full");
+        return tCommon("error");
+    }
+
+    function startErrorLabel(errorCode: unknown): string {
+        if (errorCode === "not_host") return t("error_not_host");
+        if (errorCode === "not_enough_players") return t("error_not_enough");
+        if (errorCode === "already_started") return t("error_already_started");
+        return apiErrorLabel(errorCode);
+    }
+
     /** Optimistic host mutation: apply, POST, roll back on refusal, reconcile. */
     async function mutateSetting(
         apply: () => () => void,
         request: () => Promise<Response>,
     ) {
-        if (settingsBusy) return;
+        if (settingsInFlight.current) return;
+        settingsInFlight.current = true;
         setSettingsBusy(true);
         setError(null);
         mutatingRef.current += 1;
@@ -127,9 +147,10 @@ export function RoomClient({
             }
         } catch {
             rollback();
-            setError(t("error_generic"));
+            setError(tCommon("error"));
         } finally {
             mutatingRef.current -= 1;
+            settingsInFlight.current = false;
             setSettingsBusy(false);
         }
         await refresh().catch(() => {});
@@ -153,18 +174,6 @@ export function RoomClient({
         );
     }
 
-    function setRule(key: string, value: boolean) {
-        // Resolve locally so a dependency flip shows instantly; server re-resolves.
-        return saveRules(
-            resolveRuleToggles(ruleToggles, { ...rules, [key]: value }),
-        );
-    }
-
-    /** A mode is just a full toggle map — saved through the same route. */
-    function pickMode(mode: GameRuleMode) {
-        return saveRules(ruleModeValues(ruleToggles, mode));
-    }
-
     function saveRules(next: Record<string, boolean>) {
         const previous = rules;
         return mutateSetting(
@@ -181,26 +190,15 @@ export function RoomClient({
         );
     }
 
-    /** Platform-wide refusals any mutating room route can answer with. */
-    function apiErrorLabel(errorCode: unknown): string {
-        if (errorCode === "rate_limited") return t("error_rate_limited");
-        if (errorCode === "maintenance") return t("error_maintenance");
-        if (errorCode === "room_full") return t("error_room_full");
-        return t("error_generic");
+    function setRule(key: string, value: boolean) {
+        // Resolved locally so a dependency flip shows instantly; the server re-resolves.
+        return saveRules(
+            resolveRuleToggles(ruleToggles, { ...rules, [key]: value }),
+        );
     }
 
-    function startErrorLabel(errorCode: unknown): string {
-        if (errorCode === "not_host") return t("error_not_host");
-        if (errorCode === "not_enough_players") return t("error_not_enough");
-        if (errorCode === "already_started") return t("error_already_started");
-        return apiErrorLabel(errorCode);
-    }
-
-    async function errorCodeOf(res: Response): Promise<unknown> {
-        const data = (await res.json().catch(() => ({}))) as {
-            error?: unknown;
-        };
-        return data.error;
+    function pickMode(mode: GameRuleMode) {
+        return saveRules(ruleModeValues(ruleToggles, mode));
     }
 
     async function start() {
@@ -222,7 +220,7 @@ export function RoomClient({
             // Stay busy while navigating so Start can't be pressed twice.
             router.push(`/game/${data.gameId}`);
         } catch {
-            setError(t("error_generic"));
+            setError(tCommon("error"));
             setBusy(false);
         }
     }
@@ -242,7 +240,7 @@ export function RoomClient({
             closedRef.current = true;
             router.push("/lobby");
         } catch {
-            setError(t("error_generic"));
+            setError(tCommon("error"));
             setBusy(false);
         }
     }
@@ -261,12 +259,11 @@ export function RoomClient({
                 setError(apiErrorLabel(await errorCodeOf(res)));
                 return;
             }
-            setRole(next); // optimistic button state
-            // Reconcile now: postgres_changes can be silent on self-hosted
-            // stacks, leaving you in the wrong column until the next poll.
+            setRole(next);
+            // postgres_changes can be silent on self-hosted stacks: reconcile now, not at the next poll.
             await refresh();
         } catch {
-            setError(t("error_generic"));
+            setError(tCommon("error"));
         } finally {
             setBusy(false);
         }
@@ -282,11 +279,11 @@ export function RoomClient({
                 copiedTimer.current = null;
             }, 1500);
         } catch {
-            // Clipboard unavailable (insecure context / denied) — code stays selectable by hand.
+            // Clipboard denied (insecure context): the code stays selectable by hand.
         }
     }
 
-    // next-intl types keys as a literal union, so cast the dynamic key to that param type.
+    // Rule keys come from the game module, so the message key is dynamic.
     const ruleText = (key: string, field: "label" | "description") =>
         t(`rules.${key}.${field}` as Parameters<typeof t>[0]);
 
@@ -301,7 +298,7 @@ export function RoomClient({
         if (i < seats.length + botCount) {
             return {
                 kind: "bot",
-                label: `${t("computer")} ${i - seats.length + 1}`,
+                label: t("computer", { n: i - seats.length + 1 }),
             };
         }
         return null;
@@ -319,7 +316,7 @@ export function RoomClient({
                         whiteSpace: "normal",
                     }}
                 >
-                    {moduleName} · {t("share_hint")}
+                    {t("share_title", { game: moduleName })}
                 </span>
                 <button
                     type="button"
@@ -349,10 +346,7 @@ export function RoomClient({
 
             {ruleModes.length > 0 && (
                 <div className="flex flex-col gap-3">
-                    <h3
-                        className="font-display text-base"
-                        style={{ color: "var(--cream)" }}
-                    >
+                    <h3 className="font-display text-base text-wc-cream">
                         {t("mode_title")}
                     </h3>
                     <RuleModePicker
@@ -370,10 +364,7 @@ export function RoomClient({
 
             {ruleToggles.length > 0 && (
                 <div className="flex flex-col gap-3">
-                    <h3
-                        className="font-display text-base"
-                        style={{ color: "var(--cream)" }}
-                    >
+                    <h3 className="font-display text-base text-wc-cream">
                         {t("rules_title")}
                     </h3>
                     <ul className="flex flex-col gap-2">
@@ -402,14 +393,7 @@ export function RoomClient({
 
             <SpectatorList spectators={spectators} hostId={hostId} />
 
-            {error && (
-                <p
-                    className="font-display text-sm"
-                    style={{ color: "var(--red)" }}
-                >
-                    {error}
-                </p>
-            )}
+            {error && <ErrorBanner>{error}</ErrorBanner>}
 
             <button
                 type="button"

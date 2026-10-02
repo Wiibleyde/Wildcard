@@ -1,17 +1,27 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import type { Locale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import {
-    RoomClient,
-    type SeatRow,
-    type SpectatorRow,
-} from "@/components/lobby/RoomClient";
+import { RoomClient } from "@/components/lobby/RoomClient";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { PageShell } from "@/components/ui/PageShell";
+import { redirect } from "@/i18n/navigation";
 import { requireAuthUser } from "@/lib/auth/session";
 import { resolveRuleToggles } from "@/lib/engine/types";
 import { resolveGameModule } from "@/lib/games/resolve";
+import { type Role, splitRoster } from "@/lib/lobby/roster";
 import { usernamesByIds } from "@/lib/models/identities";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ lang: Locale }>;
+}): Promise<Metadata> {
+    const { lang } = await params;
+    const t = await getTranslations({ locale: lang, namespace: "room" });
+    return { title: t("title") };
+}
 
 export default async function Page({
     params,
@@ -25,30 +35,28 @@ export default async function Page({
     const user = await requireAuthUser(lang, `/${lang}/lobby/${code}`);
     const supabase = await createClient();
 
-    const normalized = code.toUpperCase();
     const { data: room } = await supabase
         .from("rooms")
         .select(
             "id, code, module_id, host_id, status, current_game_id, bot_count, rules",
         )
-        .eq("code", normalized)
+        .eq("code", code.toUpperCase())
         .maybeSingle();
 
-    if (!room) redirect(`/${lang}/lobby`);
-    if (room.status === "playing" && room.current_game_id) {
-        redirect(`/${lang}/game/${room.current_game_id}`);
+    if (!room || room.status === "finished") {
+        return redirect({ href: "/lobby", locale: lang });
     }
-    if (room.status === "finished") redirect(`/${lang}/lobby`);
+    if (room.status === "playing" && room.current_game_id) {
+        return redirect({
+            href: `/game/${room.current_game_id}`,
+            locale: lang,
+        });
+    }
 
-    // Service-role resolve: a studio game's definition lives in `eca_games`, and
-    // a member who was invited to the host's unpublished draft can't read that
-    // row under RLS — the admin client surfaces only its public meta (name,
-    // player range) for the lobby, never the secret game state.
-    const admin = createAdminClient();
-    const module = await resolveGameModule(admin, room.module_id);
-    const ruleToggles = module?.ruleToggles ?? [];
-    const ruleModes = module?.ruleModes ?? [];
-    const initialRules = resolveRuleToggles(module?.ruleToggles, room.rules);
+    // Admin client: an invited member can't read the host's unpublished studio
+    // draft under RLS; only its public meta (name, player range) is used here.
+    const module = await resolveGameModule(createAdminClient(), room.module_id);
+    const maxPlayers = module?.maxPlayers ?? 8;
 
     const { data: memberRows } = await supabase
         .from("room_players")
@@ -61,61 +69,46 @@ export default async function Page({
         supabase,
         rows.map((r) => r.user_id),
     );
+    const { seats, spectators } = splitRoster(
+        rows,
+        nameOf,
+        t("unknown_player"),
+    );
 
-    const initialSeats: SeatRow[] = rows
-        .filter((r) => r.role === "player" && r.seat !== null)
-        .map((r) => ({
-            userId: r.user_id,
-            seat: r.seat as number,
-            username: nameOf.get(r.user_id) ?? t("unknown_player"),
-        }));
-    const initialSpectators: SpectatorRow[] = rows
-        .filter((r) => r.role === "spectator")
-        .map((r) => ({
-            userId: r.user_id,
-            username: nameOf.get(r.user_id) ?? t("unknown_player"),
-        }));
     const me = rows.find((r) => r.user_id === user.id);
-    const seated = me !== undefined;
-    // A non-member is joined on mount; mirror `joinRoom`'s rule (a full table
-    // seats newcomers as spectators) so a late arrival never briefly gets the
-    // player controls. The client refresh then adopts the recorded role.
-    const tableFull = initialSeats.length >= (module?.maxPlayers ?? 8);
-    const initialRole: "player" | "spectator" = me
+    // Mirror joinRoom: a newcomer at a full table is seated as a spectator, so a
+    // late arrival never briefly gets the player controls.
+    const initialRole: Role = me
         ? me.role === "spectator"
             ? "spectator"
             : "player"
-        : tableFull
+        : seats.length >= maxPlayers
           ? "spectator"
           : "player";
 
     return (
-        <div className="min-h-screen px-4 pt-8 pb-16 md:pt-12 xl:px-10">
-            <div className="mx-auto flex max-w-lg flex-col gap-6 lg:max-w-3xl xl:max-w-5xl 2xl:max-w-7xl">
-                <h1
-                    className="font-display text-3xl xl:text-4xl"
-                    style={{ color: "var(--cream)" }}
-                >
-                    {t("title")}
-                </h1>
-                <RoomClient
-                    roomId={room.id}
-                    code={room.code}
-                    moduleName={module?.name ?? room.module_id}
-                    minPlayers={module?.minPlayers ?? 2}
-                    maxPlayers={module?.maxPlayers ?? 8}
-                    currentUserId={user.id}
-                    initialSeats={initialSeats}
-                    initialSpectators={initialSpectators}
-                    initialHostId={room.host_id}
-                    initialBotCount={room.bot_count}
-                    seated={seated}
-                    initialRole={initialRole}
-                    ruleToggles={ruleToggles}
-                    ruleModes={ruleModes}
-                    initialRules={initialRules}
-                />
-            </div>
-        </div>
+        <PageShell width="narrow">
+            <PageHeader title={t("title")} />
+            <RoomClient
+                roomId={room.id}
+                code={room.code}
+                moduleName={module?.name ?? room.module_id}
+                minPlayers={module?.minPlayers ?? 2}
+                maxPlayers={maxPlayers}
+                currentUserId={user.id}
+                initialSeats={seats}
+                initialSpectators={spectators}
+                initialHostId={room.host_id}
+                initialBotCount={room.bot_count}
+                isMember={me !== undefined}
+                initialRole={initialRole}
+                ruleToggles={module?.ruleToggles ?? []}
+                ruleModes={module?.ruleModes ?? []}
+                initialRules={resolveRuleToggles(
+                    module?.ruleToggles,
+                    room.rules,
+                )}
+            />
+        </PageShell>
     );
 }

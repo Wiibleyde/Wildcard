@@ -10,11 +10,7 @@ type Props = {
     onPick: (mode: GameRuleMode) => void;
 };
 
-/**
- * Launch-mode presets (« règles françaises », « War », « Vegas »…). Picking one
- * rewrites every toggle below it; tweaking a toggle afterwards drops the
- * selection to « personnalisé ». The host picks, everyone else sees the mode.
- */
+/** Picking a mode rewrites every toggle; tweaking one afterwards shows « personnalisé ». */
 export function RuleModePicker({
     modes,
     activeKey,
@@ -23,6 +19,7 @@ export function RuleModePicker({
     onPick,
 }: Props) {
     const t = useTranslations("room");
+    // Mode keys come from the game module, so the message key is dynamic.
     const modeText = (key: string, field: "label" | "description") =>
         t(`modes.${key}.${field}` as Parameters<typeof t>[0]);
     const active = modes.find((m) => m.key === activeKey);

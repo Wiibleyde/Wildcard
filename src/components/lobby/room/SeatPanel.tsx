@@ -1,6 +1,6 @@
 import { useTranslations } from "next-intl";
+import type { Slot } from "@/lib/lobby/roster";
 import { SeatSlot } from "./SeatSlot";
-import type { Slot } from "./types";
 
 type Props = {
     slots: Slot[];
@@ -11,6 +11,31 @@ type Props = {
     botCount: number;
     onSetBots: (next: number) => void;
 };
+
+function StepButton({
+    glyph,
+    label,
+    disabled,
+    onClick,
+}: {
+    glyph: string;
+    label: string;
+    disabled: boolean;
+    onClick: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={disabled}
+            aria-label={label}
+            className="flex h-7 w-7 items-center justify-center rounded-lg border-nb border-wc-ink bg-wc-cream font-display text-wc-ink disabled:opacity-30"
+            style={{ boxShadow: "0 3px 0 var(--ink)" }}
+        >
+            <span aria-hidden="true">{glyph}</span>
+        </button>
+    );
+}
 
 export function SeatPanel({
     slots,
@@ -25,67 +50,39 @@ export function SeatPanel({
     return (
         <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-3">
-                <h3
-                    className="font-display text-base"
-                    style={{ color: "var(--cream)" }}
-                >
-                    {t("seats")} · {total}/{maxPlayers}
+                <h3 className="font-display text-base text-wc-cream">
+                    {t("seats", { total, max: maxPlayers })}
                 </h3>
                 {isHost && (
                     <div className="flex items-center gap-2">
-                        <span
-                            className="font-display text-xs"
-                            style={{ color: "var(--muted)" }}
-                        >
+                        <span className="font-display text-xs text-wc-muted">
                             {t("bots")}
                         </span>
-                        <button
-                            type="button"
-                            onClick={() => onSetBots(botCount - 1)}
+                        <StepButton
+                            glyph="−"
+                            label={t("remove_bot")}
                             disabled={botCount <= 0}
-                            aria-label={t("remove_bot")}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg border-nb font-display disabled:opacity-30"
-                            style={{
-                                background: "var(--cream)",
-                                color: "var(--ink)",
-                                borderColor: "var(--ink)",
-                                boxShadow: "0 3px 0 var(--ink)",
-                            }}
-                        >
-                            <span aria-hidden="true">−</span>
-                        </button>
-                        <span
-                            className="w-5 text-center font-display"
-                            style={{ color: "var(--cream)" }}
-                        >
+                            onClick={() => onSetBots(botCount - 1)}
+                        />
+                        <span className="w-5 text-center font-display text-wc-cream">
                             {botCount}
                         </span>
-                        <button
-                            type="button"
-                            onClick={() => onSetBots(botCount + 1)}
+                        <StepButton
+                            glyph="+"
+                            label={t("add_bot")}
                             disabled={total >= maxPlayers}
-                            aria-label={t("add_bot")}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg border-nb font-display disabled:opacity-30"
-                            style={{
-                                background: "var(--cream)",
-                                color: "var(--ink)",
-                                borderColor: "var(--ink)",
-                                boxShadow: "0 3px 0 var(--ink)",
-                            }}
-                        >
-                            <span aria-hidden="true">+</span>
-                        </button>
+                            onClick={() => onSetBots(botCount + 1)}
+                        />
                     </div>
                 )}
             </div>
             <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
                 {slots.map((slot, index) => {
+                    // Bots and empty seats have no identity: their position is the key.
                     const key =
                         slot?.kind === "human"
                             ? slot.userId
-                            : slot?.kind === "bot"
-                              ? `bot-${index}`
-                              : `empty-${index}`;
+                            : `${slot?.kind ?? "empty"}-${index}`;
                     return <SeatSlot key={key} slot={slot} hostId={hostId} />;
                 })}
             </ul>

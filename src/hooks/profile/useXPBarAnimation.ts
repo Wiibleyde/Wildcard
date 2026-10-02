@@ -33,8 +33,7 @@ export function useXPBarAnimation(xp: number, progress: number) {
                 "-=0.2",
             );
 
-            // Tween a proxy and write into React's own Text node — animating
-            // `textContent` would detach it and freeze later updates.
+            // Animating `textContent` would detach React's Text node and freeze later updates.
             tweenCount(
                 tl,
                 xpNumRef.current,

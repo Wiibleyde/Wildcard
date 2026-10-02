@@ -1,6 +1,7 @@
+import type { Metadata } from "next";
 import type { Locale } from "next-intl";
-import { setRequestLocale } from "next-intl/server";
-import { CustomizePage } from "@/components/pages/CustomizePage";
+import { getTranslations, setRequestLocale } from "next-intl/server";
+import { CustomizeView } from "@/components/customize/CustomizeView";
 import { requireAuthUser } from "@/lib/auth/session";
 import {
     DEFAULT_BOARD_STYLE,
@@ -8,6 +9,16 @@ import {
     getPlayerStyles,
 } from "@/lib/models/customization";
 import { createClient } from "@/lib/supabase/server";
+
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ lang: Locale }>;
+}): Promise<Metadata> {
+    const { lang } = await params;
+    const t = await getTranslations({ locale: lang, namespace: "customize" });
+    return { title: t("title"), description: t("subtitle") };
+}
 
 export default async function Page({
     params,
@@ -39,7 +50,7 @@ export default async function Page({
     ];
 
     return (
-        <CustomizePage
+        <CustomizeView
             ownedDeckStyleIds={ownedDeckStyleIds}
             ownedBoardStyleIds={ownedBoardStyleIds}
             currentDeckStyleId={styles.deckStyleId}
