@@ -2,50 +2,40 @@ import type { CardSize } from "@/lib/card/sizes";
 import type { CardDescriptor } from "@/lib/card/types";
 import type { GameAction, GameEvent } from "@/lib/engine/types";
 
-/*
- * Config-driven tables: ONE generic `GameTable` component renders every game
- * from zone templates (where cards live) plus a pure `mapView` (how the view
- * fills them). No per-game React.
- */
+/* One generic `GameTable` renders every game: zone templates + a pure `mapView`, no per-game React. */
 
 export type ZonePlacement = "top" | "center" | "bottom";
 
-/**
- * `row` side by side · `fan` overlapped hand with hover lift · `stack` a pile
- * (top cards + count) · `cascade` vertical run (solitaire columns).
- */
 export type ZoneArrangement = "row" | "fan" | "stack" | "cascade";
 
 export interface TableZoneTemplate {
     readonly id: string;
     readonly placement: ZonePlacement;
     readonly arrangement: ZoneArrangement;
-    /** Defaults to "md"; ignored with `fill`. */
+    /** Ignored with `fill`. */
     readonly cardSize?: CardSize;
     readonly framed?: boolean;
-    /** Share the row's width and size cards to the column (never wraps, mobile → 2K). */
+    /** Size cards to the row's width instead of wrapping. */
     readonly fill?: boolean;
 }
 
 export interface TableCardItem {
-    /** Unique across the table — React key and animation identity. */
+    /** Unique across the table: React key and animation identity. */
     readonly id: string;
     readonly card: CardDescriptor;
     readonly faceDown?: boolean;
-    /** Player whose deck style skins this card; omitted → the viewer's own. */
+    /** Whose deck style skins the card; omitted ⇒ the viewer's. */
     readonly ownerId?: string;
-    /** Click / double-click shortcut. */
     readonly action?: GameAction;
-    /** Combo-selection group (see {@link HandSelection}); no group ⇒ not selectable. */
+    /** No group ⇒ not selectable for a combo. */
     readonly group?: string;
-    /** The viewer's turn but this card can't be played: a click explains why. */
+    /** Still clickable, so the board can explain why it is blocked. */
     readonly illegal?: boolean;
-    /** Present ⇒ draggable; dropping on `zoneKey` dispatches `action`. */
     readonly dropTargets?: ReadonlyArray<{
         readonly zoneKey: string;
         readonly action: GameAction;
     }>;
-    /** Cards that move with this one when dragged (this card first). */
+    /** Moves with the dragged card (which comes first). */
     readonly dragStack?: ReadonlyArray<{
         readonly id: string;
         readonly card: CardDescriptor;
@@ -59,14 +49,14 @@ export interface TableHandPlay {
     readonly action: GameAction;
 }
 
-/** Tap-to-build-a-combo hand: a selection matching a play by group + size arms the commit button. */
+/** A selection matching a play by group and size arms the commit button. */
 export interface HandSelection {
     readonly plays: readonly TableHandPlay[];
     readonly playLabel: string;
 }
 
 export interface TableZoneInstance {
-    /** Unique among instances (e.g. `"reveal:p1"`, `"tableau:3"`). */
+    /** Unique among instances, e.g. `"tableau:3"`. */
     readonly key: string;
     /** Template id. */
     readonly zone: string;
@@ -75,7 +65,7 @@ export interface TableZoneInstance {
     readonly badge?: string;
     readonly emptyHint?: string;
     readonly selection?: HandSelection;
-    /** Click anywhere on the zone, even empty (e.g. the solitaire stock). */
+    /** Works on an empty zone too (the solitaire stock). */
     readonly action?: GameAction;
 }
 
@@ -94,9 +84,9 @@ export interface TableControl {
     readonly cards?: readonly CardDescriptor[];
     readonly action: GameAction;
     readonly variant?: "primary" | "success" | "danger";
-    /** Irreversible verb: the UI confirms before dispatching. */
+    /** Irreversible: the UI asks first. */
     readonly confirm?: boolean;
-    /** Greyed out rather than hidden, so the controls bar stays stable. */
+    /** Greyed out rather than hidden, so the bar does not jump. */
     readonly disabled?: boolean;
 }
 
@@ -119,10 +109,7 @@ export interface TablePlayer {
     readonly deckStyleId?: string;
 }
 
-/**
- * Loose translator both `getTranslations` and `useTranslations` satisfy once
- * cast: tables and the catalog build message keys at runtime.
- */
+/** Loose on purpose: tables and the catalog build message keys at runtime. */
 export type Translate = (
     key: string,
     values?: Record<string, string | number>,
@@ -130,7 +117,6 @@ export type Translate = (
 
 /** `A`: the game's action type — `legalActions` come from that game's module. */
 export interface TableContext<A extends GameAction = GameAction> {
-    /** `null` for spectators. */
     readonly viewerId: string | null;
     readonly players: readonly TablePlayer[];
     readonly legalActions: readonly A[];
@@ -142,14 +128,13 @@ export interface GameTableConfig<V, A extends GameAction = GameAction> {
     readonly zones: readonly TableZoneTemplate[];
     mapView(view: V, ctx: TableContext<A>): TableData;
     /**
-     * Optimistic view after the viewer's own move, or `null` to wait for the
-     * server (which always overwrites it). Never predict a move that reveals
-     * a hidden card — the prediction would be a guess.
+     * Optimistic view after the viewer's own move (the server overwrites it),
+     * or `null`. Never predict a move that reveals a hidden card.
      */
     predict?(view: V, action: A, viewerId: string | null): V | null;
-    /** One log line per event; `null` hides it. No hook ⇒ no log feed. */
+    /** `null` hides the event; no hook ⇒ no log feed. */
     logLine?(event: GameEvent, ctx: TableContext<A>): string | null;
-    /** Game-over title for a 1-based rank (e.g. Président, Trou du cul); `null` ⇒ bare position. */
+    /** Game-over title for a 1-based rank; `null` ⇒ bare position. */
     rankTitle?(
         rank: number,
         total: number,
@@ -159,7 +144,7 @@ export interface GameTableConfig<V, A extends GameAction = GameAction> {
 
 export type AnyGameTableConfig = GameTableConfig<unknown>;
 
-/** Cast-free erasure — keep `mapView`/`predict` as methods (bivariant), like `registerGame`. */
+/** Cast-free erasure: `mapView`/`predict` stay methods (bivariant), like `registerGame`. */
 export function registerTable<V, A extends GameAction = GameAction>(
     config: GameTableConfig<V, A>,
 ): AnyGameTableConfig {

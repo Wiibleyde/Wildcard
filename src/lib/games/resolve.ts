@@ -7,19 +7,9 @@ import { type AnyGameModule, registerGame } from "@/lib/engine/types";
 import type { Database } from "@/lib/supabase/types";
 import { getGameModule } from "./index";
 
-/*
- * Module resolution for native modules (static registry) and studio games
- * (`eca:` ids, a JSON definition in `eca_games`). A running game rebuilds its
- * studio module from the definition stamped in its state — no read; only
- * lobby operations, which act before any state exists, hit the database.
- */
-
 type Client = SupabaseClient<Database>;
 
-/**
- * No database round-trip, and immune to later edits or deletion of the
- * `eca_games` row — what keeps a mid-flight game loadable and replayable.
- */
+/** From the definition stamped in the state: immune to later edits or deletion of the row. */
 export function ecaModuleFromState(
     state: EcaState,
     moduleId: string,
@@ -36,10 +26,7 @@ function buildFromRow(
     return registerGame(createEcaModule(validated.definition, moduleId));
 }
 
-/**
- * Status-agnostic: a room that already exists keeps working after its studio
- * game is unpublished. New-room gating is {@link resolveLaunchableModule}.
- */
+/** Status-agnostic: an existing room survives unpublishing. */
 export async function resolveGameModule(
     admin: Client,
     id: string,
@@ -54,11 +41,7 @@ export async function resolveGameModule(
     return buildFromRow(data.definition, id);
 }
 
-/**
- * A studio game may start a new room when published, or when the requester
- * owns it (playtesting a draft). Status and owner come from the row, never
- * from the request.
- */
+/** Published, or a draft its owner is playtesting — checked against the row, never the request. */
 export async function resolveLaunchableModule(
     admin: Client,
     id: string,
@@ -77,10 +60,7 @@ export async function resolveLaunchableModule(
     return buildFromRow(data.definition, id);
 }
 
-/**
- * Studio game names in one `IN` query. Ids that are not studio games, or
- * rows the client cannot read, are simply absent — callers fall back.
- */
+/** Unreadable or non-studio ids are absent from the map; callers fall back. */
 export async function ecaNamesByModuleIds(
     client: Client,
     moduleIds: Iterable<string>,

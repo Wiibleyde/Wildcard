@@ -46,7 +46,6 @@ export type ApplyResult<S extends GameState> =
       }
     | { readonly ok: false; readonly error: RuleViolation };
 
-/** A boolean rule the host flips in the lobby before the deal. */
 export interface GameRuleToggle {
     readonly key: string;
     readonly default: boolean;
@@ -54,11 +53,7 @@ export interface GameRuleToggle {
     readonly requires?: string;
 }
 
-/**
- * Unknown keys dropped, missing ones defaulted, and any toggle whose
- * dependency is OFF forced OFF. Shared by lobby, config route and deal so
- * every layer agrees.
- */
+/** Shared by lobby, config route and deal so every layer agrees on the rules. */
 export function resolveRuleToggles(
     toggles: readonly GameRuleToggle[] | undefined,
     input: Record<string, unknown> | null | undefined,
@@ -83,10 +78,7 @@ export function resolveRuleToggles(
     return out;
 }
 
-/**
- * A named preset over a game's toggles — pure data, stored as the toggle map
- * itself. A game's FIRST mode is its default and must match the toggle defaults.
- */
+/** A game's FIRST mode is its default and must match the toggle defaults. */
 export interface GameRuleMode {
     /** Unique across the catalog (i18n: `lobby.modes.<key>`). */
     readonly key: string;
@@ -100,7 +92,7 @@ export function ruleModeValues(
     return resolveRuleToggles(toggles, mode.rules);
 }
 
-/** The preset a rule set matches, or `null` for a custom set (derived, never stored). */
+/** Derived, never stored: `null` for a custom set. */
 export function matchRuleMode(
     modes: readonly GameRuleMode[] | undefined,
     toggles: readonly GameRuleToggle[] | undefined,
@@ -126,11 +118,7 @@ export interface GameOutcome {
     readonly winners: readonly string[];
 }
 
-/**
- * The single contract every game — native module or ECA studio game — is
- * driven through. `V` is the client-safe projection: `view()` is RLS in code,
- * defense in depth on top of the database policies.
- */
+/** Native and studio games alike. `view()` is RLS in code, on top of the database policies. */
 export interface GameModule<S extends GameState, A extends GameAction, V = S> {
     readonly id: string;
     readonly name: string;
@@ -155,25 +143,19 @@ export interface GameModule<S extends GameState, A extends GameAction, V = S> {
 
     legalActions(state: S, playerId: string): readonly A[];
 
-    /**
-     * Pure reducer, only ever called through `dispatch` (actor seated and
-     * verified, game not over). Owns turn/phase ownership and move legality.
-     */
+    /** Called only through `dispatch` (actor verified and seated, game not over). */
     apply(state: S, action: A, rng: Rng): ApplyResult<S>;
 
     isOver(state: S): boolean;
 
     outcome(state: S): GameOutcome | null;
 
-    /** `viewerId === null` is a spectator. */
     view(state: S, viewerId: string | null): V;
 }
 
 /**
- * Type-erased module. Hooks are declared with METHOD syntax on purpose:
- * methods are bivariant in their parameters, so a concrete module widens to
- * this type without a cast. Turning one into a function-typed property would
- * make the module invariant and break registration.
+ * Hooks use METHOD syntax on purpose: methods are bivariant, so a concrete
+ * module widens to this type without a cast.
  */
 export type AnyGameModule = GameModule<GameState, GameAction, unknown>;
 
