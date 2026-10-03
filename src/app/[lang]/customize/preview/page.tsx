@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { Locale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { PreviewPage } from "@/components/pages/PreviewPage";
+import { CustomizePreview } from "@/components/customize/CustomizePreview";
 import { requireAuthUser } from "@/lib/auth/session";
 import { BOARD_THEMES } from "@/lib/board/themes";
 import { THEMES } from "@/lib/card/themes";
@@ -41,6 +41,10 @@ export default async function Page({
     }
 
     return (
-        <PreviewPage deckId={deckId} boardId={boardId} backHref="/customize" />
+        <CustomizePreview
+            deckId={deckId}
+            boardId={boardId}
+            backHref="/customize"
+        />
     );
 }

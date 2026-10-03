@@ -1,35 +1,28 @@
 import type { Metadata } from "next";
-import { Hanken_Grotesk, Lilita_One, Silkscreen } from "next/font/google";
+import { Rubik, Titan_One } from "next/font/google";
 import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import "../globals.css";
 import { PublicEnvScript } from "@/components/analytics/PublicEnvScript";
 import { UmamiAnalytics } from "@/components/analytics/UmamiAnalytics";
-import { AppNav } from "@/components/nav/AppNav";
-import { AppShell } from "@/components/nav/AppShell";
-import { GuestNav } from "@/components/nav/GuestNav";
+import { AppNav } from "@/components/layout/AppNav";
+import { AppShell } from "@/components/layout/AppShell";
+import { GuestNav } from "@/components/layout/GuestNav";
 import { ConfirmProvider } from "@/components/ui/ConfirmProvider";
 import { routing } from "@/i18n/routing";
 import { getAuthUser } from "@/lib/auth/session";
 
-const body = Hanken_Grotesk({
+const body = Rubik({
     variable: "--font-body",
     subsets: ["latin"],
-    weight: ["400", "500", "600", "700", "800"],
+    weight: ["400", "500", "600", "700", "800", "900"],
 });
 
-const display = Lilita_One({
+const display = Titan_One({
     variable: "--font-display",
     subsets: ["latin"],
     weight: ["400"],
-});
-
-// Not `--font-pixel`: that name is the Tailwind theme token built on top of it.
-const pixel = Silkscreen({
-    variable: "--font-silkscreen",
-    subsets: ["latin"],
-    weight: ["400", "700"],
 });
 
 export async function generateMetadata({
@@ -68,7 +61,7 @@ export default async function RootLayout({
     return (
         <html
             lang={lang}
-            className={`${body.variable} ${display.variable} ${pixel.variable} h-full antialiased`}
+            className={`${body.variable} ${display.variable} h-full antialiased`}
         >
             <body className="min-h-screen bg-wc-bg text-wc-cream">
                 <PublicEnvScript />

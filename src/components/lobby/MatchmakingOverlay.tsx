@@ -61,7 +61,7 @@ export function MatchmakingOverlay({
             onClose={onCancel}
             labelledBy={titleId}
             dismissible={!matched || stuck}
-            className="flex max-w-md flex-col items-center gap-6 bg-wc-panel-d px-8 py-10 text-center text-wc-cream sm:max-w-md"
+            className="flex max-w-md flex-col items-center gap-6 px-8 py-10 text-center sm:max-w-md"
         >
             <div className="relative flex h-24 w-24 items-center justify-center">
                 {!matched && (
@@ -104,7 +104,7 @@ export function MatchmakingOverlay({
                 {seatIds.map((id, i) => (
                     <span
                         key={id}
-                        className="h-9 w-9 rounded-full border-nb border-wc-ink"
+                        className="h-9 w-9 rounded-[28%] shadow-[inset_0_-3px_0_rgba(0,0,0,0.25)]"
                         style={{
                             background: i === 0 ? accent : "var(--panel-d2)",
                         }}
@@ -119,7 +119,7 @@ export function MatchmakingOverlay({
                             value={t("elapsed_value", { s: elapsed })}
                             label={t("elapsed_label")}
                         />
-                        <span className="h-8 w-0.5 rounded-full bg-wc-ink" />
+                        <span className="h-8 w-0.5 rounded-full bg-wc-edge" />
                         <Stat
                             value={String(waiting)}
                             label={t("in_queue_label")}

@@ -6,20 +6,19 @@ export const greenFeltTheme: BoardTheme = {
     tier: "common",
     surface: {
         background: [
-            "radial-gradient(rgba(255,255,255,0.05) 1.4px, transparent 1.5px) 0 0 / 22px 22px",
-            "radial-gradient(rgba(0,0,0,0.16) 1.4px, transparent 1.5px) 11px 11px / 22px 22px",
-            "linear-gradient(#10684b, #10684b)",
+            "repeating-conic-gradient(rgba(0,0,0,0.06) 0 25%, transparent 0 50%) 0 0 / 4px 4px",
+            "radial-gradient(ellipse at 50% 40%, #2c6a55 0 55%, #18402f 100%)",
         ].join(", "),
     },
     zone: {
-        background: "rgba(8,64,46,0.60)",
-        borderColor: "#0b1220",
-        boxShadow: "inset 0 3px 0 rgba(0,0,0,0.22)",
-        textColor: "#f7edd4",
+        background: "rgba(0,0,0,0.16)",
+        borderColor: "rgba(255,255,255,0.14)",
+        boxShadow: "inset 0 3px 0 rgba(0,0,0,0.18)",
+        textColor: "#fbf8ff",
     },
     badge: {
-        background: "#f7edd4",
-        textColor: "#0b1220",
+        background: "#2a2236",
+        textColor: "#fbf8ff",
     },
-    accentColor: "#ffc23d",
+    accentColor: "#f5c64f",
 };

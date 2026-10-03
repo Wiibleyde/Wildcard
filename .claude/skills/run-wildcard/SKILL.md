@@ -49,7 +49,7 @@ node .claude/skills/run-wildcard/driver.mjs shoot
 node .claude/skills/run-wildcard/driver.mjs shoot --routes=lobby,game --widths=375,1920
 ```
 
-Routes: `home login lobby profile customize preview room game` (`login` = the dev-login page) — `room` and
+Routes: `home login lobby profile history leaderboard customize preview room game studio friends editor` (`login` = the dev-login page; `editor` creates an ECA game through the Studio form) — `room` and
 `game` are real: the driver creates rooms via `POST /api/rooms`
 (`{moduleId: "president"}`), adds bots, and starts a game. Screenshots land in
 `.uitest/shots/<route>-<width>.png` (gitignored). **Read the screenshots** —

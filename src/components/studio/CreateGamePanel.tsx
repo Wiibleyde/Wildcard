@@ -2,18 +2,18 @@
 
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { Input } from "@/components/nb/input";
+import { Input } from "@/components/ui/base/input";
+import { fieldClass, fieldLabelClass } from "@/components/ui/fields";
 import { GameButton } from "@/components/ui/GameButton";
 import { postJson } from "@/hooks/studio/postJson";
 import { useRouter } from "@/i18n/navigation";
+import type { StudioMessageKey } from "@/lib/eca/studioMessages";
 import {
     ECA_TEMPLATE_IDS,
     type EcaTemplateId,
     ecaTemplate,
 } from "@/lib/eca/templates";
 import { ECA_NAME_MAX } from "@/lib/eca/validate";
-import { fieldClass, labelClass, labelStyle, mutedTextStyle } from "./fields";
-import type { StudioMessageKey } from "./messages";
 import { PanelTitle } from "./PanelTitle";
 
 const TEMPLATE_LABELS: Record<
@@ -77,22 +77,17 @@ export function CreateGamePanel({
                             type="button"
                             onClick={() => setTemplate(id)}
                             aria-pressed={selected}
-                            className="lift flex flex-col items-start gap-1 rounded-2xl p-4 text-left"
-                            style={{
-                                background: selected
-                                    ? "var(--gold)"
-                                    : "var(--cream2)",
-                                border: "2.5px solid var(--ink)",
-                                boxShadow: "0 4px 0 var(--ink)",
-                                color: "var(--ink)",
-                            }}
+                            className={`wc-press flex flex-col items-start gap-1 rounded-2xl p-4 text-left ${
+                                selected
+                                    ? "bg-wc-gold text-wc-ink [--press:var(--gold-d)]"
+                                    : "bg-wc-panel-d2 text-wc-cream [--press:#110c17]"
+                            }`}
                         >
                             <span className="font-display text-lg">
                                 {t(TEMPLATE_LABELS[id].label)}
                             </span>
                             <span
-                                className="text-xs font-semibold"
-                                style={mutedTextStyle}
+                                className={`text-xs font-semibold ${selected ? "text-wc-ink/70" : "text-wc-muted"}`}
                             >
                                 {t(TEMPLATE_LABELS[id].description)}
                             </span>
@@ -104,8 +99,7 @@ export function CreateGamePanel({
                 <div className="min-w-0 flex-1">
                     <label
                         htmlFor="studio-create-name"
-                        className={`${labelClass} mb-2 block`}
-                        style={labelStyle}
+                        className={`${fieldLabelClass} mb-2 block`}
                     >
                         {t("create_name_label")}
                     </label>
@@ -119,7 +113,7 @@ export function CreateGamePanel({
                     />
                 </div>
                 <GameButton
-                    variant="red"
+                    variant="orange"
                     size="md"
                     onClick={handleCreate}
                     disabled={busy || atLimit || trimmed.length === 0}
@@ -129,7 +123,7 @@ export function CreateGamePanel({
                 </GameButton>
             </div>
             {atLimit && (
-                <p className="text-xs font-semibold" style={mutedTextStyle}>
+                <p className="text-xs font-semibold text-wc-muted">
                     {t("create_limit")}
                 </p>
             )}

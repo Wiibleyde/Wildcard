@@ -22,7 +22,7 @@ export function GameRow({ game: g, canEnd, now, endingId, onEnd }: Props) {
         <li className="panel flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center">
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                 <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-display text-base leading-none text-wc-ink">
+                    <span className="font-display text-base leading-none">
                         {g.moduleName}
                     </span>
                     <span
@@ -35,7 +35,7 @@ export function GameRow({ game: g, canEnd, now, endingId, onEnd }: Props) {
                         {g.roomCode}
                     </span>
                 </div>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-wc-ink-soft">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-wc-muted">
                     <span>{t("players_count", { count: g.playerCount })}</span>
                     {g.botCount > 0 && (
                         <span>{t("bots_count", { count: g.botCount })}</span>
@@ -47,7 +47,7 @@ export function GameRow({ game: g, canEnd, now, endingId, onEnd }: Props) {
                                     ? t("bot_turn")
                                     : (g.currentPlayerName ?? ""),
                                 b: (chunks) => (
-                                    <span className="text-wc-ink">
+                                    <span className="text-wc-cream">
                                         {chunks}
                                     </span>
                                 ),

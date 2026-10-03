@@ -24,6 +24,7 @@ export function RoomActions({
             {isHost ? (
                 <GameButton
                     variant="green"
+                    size="lg"
                     onClick={onStart}
                     disabled={busy || !canStart}
                     className="flex-1"
@@ -35,15 +36,7 @@ export function RoomActions({
                           : t("need_more_players", { min: minPlayers })}
                 </GameButton>
             ) : (
-                <div
-                    className="flex flex-1 items-center justify-center rounded-wc-btn border-nb py-3 text-center font-display text-sm"
-                    style={{
-                        background: "var(--panel-d)",
-                        color: "var(--muted)",
-                        borderColor: "var(--ink)",
-                        boxShadow: "0 4px 0 var(--ink)",
-                    }}
-                >
+                <div className="well flex flex-1 items-center justify-center py-3 text-center text-sm font-bold text-wc-muted">
                     {t("waiting_host")}
                 </div>
             )}

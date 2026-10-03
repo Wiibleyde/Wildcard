@@ -64,8 +64,8 @@ export function TileShell({
         <div
             className="panel lift relative overflow-hidden"
             style={{
-                borderColor: selected ? "var(--red)" : "var(--ink)",
-                borderWidth: selected ? "3.5px" : "2.5px",
+                borderColor: selected ? "var(--gold)" : "var(--edge)",
+                borderWidth: selected ? "3px" : "2px",
             }}
         >
             <button
@@ -75,7 +75,7 @@ export function TileShell({
                 className="flex w-full cursor-pointer flex-col items-center gap-2 p-3 pb-8"
             >
                 {children}
-                <span className="w-full truncate text-center font-display text-xs text-wc-ink">
+                <span className="w-full truncate text-center font-display text-sm">
                     {name}
                 </span>
                 <TierBadge tier={tier} />
@@ -86,8 +86,8 @@ export function TileShell({
                         title={t("selected")}
                         className="stamp absolute top-1.5 left-1.5"
                         style={{
-                            background: "var(--red)",
-                            color: "var(--accent-ink)",
+                            background: "var(--gold)",
+                            color: "var(--ink)",
                             padding: "5px",
                         }}
                     >
@@ -98,7 +98,7 @@ export function TileShell({
             <Link
                 href={previewHref}
                 className="stamp absolute bottom-1.5 left-1/2 -translate-x-1/2"
-                style={{ background: "var(--cream2)", color: "var(--ink)" }}
+                style={{ background: "var(--panel-d2)", color: "var(--muted)" }}
             >
                 <EyeIcon />
                 <span>{t("preview_action")}</span>

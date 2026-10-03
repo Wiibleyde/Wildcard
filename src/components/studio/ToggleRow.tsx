@@ -1,4 +1,4 @@
-import { Checkbox } from "@/components/nb/checkbox";
+import { Checkbox } from "@/components/ui/base/checkbox";
 
 export function ToggleRow({
     label,
@@ -15,14 +15,9 @@ export function ToggleRow({
             <Checkbox
                 checked={checked}
                 onCheckedChange={onChange}
-                className="size-5 cursor-pointer bg-wc-cream2"
+                className="size-5 cursor-pointer"
             />
-            <span
-                className="text-sm font-semibold"
-                style={{ color: "var(--ink)" }}
-            >
-                {label}
-            </span>
+            <span className="text-sm font-semibold">{label}</span>
         </label>
     );
 }

@@ -12,15 +12,7 @@ export function ValidationReport({
 }) {
     const t = useTranslations("studio");
     return (
-        <div
-            className="rounded-2xl p-4"
-            style={{
-                background: "var(--red)",
-                border: "2.5px solid var(--ink)",
-                boxShadow: "0 4px 0 var(--ink)",
-                color: "var(--accent-ink)",
-            }}
-        >
+        <div className="rounded-2xl bg-wc-red p-4 text-white shadow-[0_4px_0_var(--red-d)]">
             <p className="font-display">
                 {t("errors_title", { n: errors.length })}
             </p>

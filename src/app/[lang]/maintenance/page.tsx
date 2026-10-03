@@ -27,17 +27,10 @@ export default async function MaintenancePage({
 
     return (
         <div className="flex min-h-screen items-center justify-center px-4 xl:px-10">
-            <div
-                className="panel flex w-full max-w-md flex-col items-center gap-6 px-6 py-10 text-center lg:max-w-lg xl:max-w-xl xl:px-10 xl:py-12 2xl:max-w-2xl"
-                style={{ boxShadow: "0 8px 0 var(--ink)" }}
-            >
+            <div className="panel flex w-full max-w-md flex-col items-center gap-6 px-6 py-10 text-center lg:max-w-lg xl:max-w-xl xl:px-10 xl:py-12 2xl:max-w-2xl">
                 <div
                     aria-hidden="true"
-                    className="flex h-16 w-16 items-center justify-center rounded-xl border-nb border-wc-ink bg-wc-gold text-3xl text-wc-ink"
-                    style={{
-                        boxShadow: "0 4px 0 var(--ink)",
-                        transform: "rotate(-4deg)",
-                    }}
+                    className="flex h-16 w-16 -rotate-4 items-center justify-center rounded-xl bg-wc-gold text-3xl text-wc-ink shadow-[0_4px_0_var(--gold-d)]"
                 >
                     ♠
                 </div>
@@ -45,7 +38,7 @@ export default async function MaintenancePage({
                     <h1 className="font-display text-3xl leading-none xl:text-4xl">
                         {t("title")}
                     </h1>
-                    <p className="text-sm font-semibold text-wc-ink-soft xl:text-base">
+                    <p className="text-sm font-semibold text-wc-muted xl:text-base">
                         {maintenanceMessage ?? t("description")}
                     </p>
                 </div>

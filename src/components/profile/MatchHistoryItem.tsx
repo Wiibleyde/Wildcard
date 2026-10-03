@@ -1,14 +1,14 @@
 "use client";
 
 import { useFormatter, useTranslations } from "next-intl";
-import { Button } from "@/components/nb/button";
+import { Button } from "@/components/ui/base/button";
 import { GameButton, gameButtonClass } from "@/components/ui/GameButton";
 import type { MatchHistoryEntry, MatchResult } from "@/lib/models/history";
 
 const RESULT_STYLE: Record<MatchResult, { bg: string; fg: string }> = {
-    win: { bg: "var(--green)", fg: "var(--ink)" },
-    loss: { bg: "var(--red)", fg: "var(--accent-ink)" },
-    none: { bg: "var(--cream2)", fg: "var(--ink)" },
+    win: { bg: "var(--green)", fg: "#fff" },
+    loss: { bg: "var(--red)", fg: "#fff" },
+    none: { bg: "var(--panel-d2)", fg: "var(--muted)" },
 };
 
 type Props = {
@@ -51,10 +51,10 @@ export function MatchHistoryItem({
                     {t(`result_${entry.result}`)}
                 </span>
                 <div className="min-w-0">
-                    <div className="truncate font-display text-wc-ink">
+                    <div className="truncate font-display text-lg">
                         {entry.moduleName}
                     </div>
-                    <div className="mt-0.5 truncate text-xs font-semibold text-wc-ink-soft">
+                    <div className="mt-0.5 truncate text-xs font-semibold text-wc-muted">
                         {opponents
                             ? t("played_vs", {
                                   date: playedAtLabel,
@@ -88,7 +88,7 @@ export function MatchHistoryItem({
                     <span
                         aria-disabled="true"
                         title={t("replay_expired_hint")}
-                        className="cursor-not-allowed rounded-wc-btn border-nb border-wc-ink bg-wc-cream2 px-4 py-2 text-center font-display text-sm text-wc-ink-soft opacity-50"
+                        className="well cursor-not-allowed px-4 py-2 text-center text-sm font-bold text-wc-sub"
                     >
                         {t("replay_expired")}
                     </span>

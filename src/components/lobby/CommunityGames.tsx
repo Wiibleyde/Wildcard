@@ -12,86 +12,77 @@ interface Props {
     readonly onHost: (moduleId: string) => void;
 }
 
+/** Studio games published by players, listed like open tables. */
 export function CommunityGames({ games, busy, busyModuleId, onHost }: Props) {
     const t = useTranslations("lobby");
 
     return (
-        <section className="flex flex-col gap-4">
-            <header className="flex flex-col gap-1.5">
-                <h2 className="font-display text-2xl text-wc-cream xl:text-3xl">
-                    {t("community_title")}
-                </h2>
+        <section className="panel flex flex-col gap-4 p-5">
+            <header className="flex flex-col gap-1">
+                <h2 className="h-lg">{t("community_title")}</h2>
                 <p className="sub text-sm">{t("community_subtitle")}</p>
             </header>
 
             {games.length === 0 ? (
-                <div className="panel-d p-6">
-                    <p className="sub text-sm">{t("community_empty")}</p>
-                </div>
+                <p className="well px-4 py-6 text-center text-sm font-semibold text-wc-muted">
+                    {t("community_empty")}
+                </p>
             ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                <ul className="flex flex-col gap-2">
                     {games.map((g) => (
-                        <article
+                        <li
                             key={g.id}
-                            className="panel lift flex flex-col gap-3 p-4 sm:p-5"
+                            className="well grid grid-cols-[48px_minmax(0,1fr)_auto] items-center gap-3 p-2.5 pr-3"
                         >
-                            {g.imageUrl && (
-                                <div className="relative aspect-video w-full overflow-hidden rounded-xl border-nb border-wc-ink">
+                            <span className="relative grid aspect-square place-items-center overflow-hidden rounded-[10px] bg-wc-panel-d font-display text-2xl text-wc-gold">
+                                {g.imageUrl ? (
                                     <Image
                                         src={g.imageUrl}
-                                        alt={g.name}
+                                        alt=""
                                         fill
-                                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                                        sizes="48px"
                                         className="object-cover"
                                         unoptimized
                                     />
-                                </div>
-                            )}
-                            <div className="flex items-start justify-between gap-2">
-                                <h3 className="font-display text-lg leading-tight text-wc-ink">
+                                ) : (
+                                    <span aria-hidden="true">♦</span>
+                                )}
+                            </span>
+                            <div className="min-w-0">
+                                <p className="truncate font-extrabold">
                                     {g.name}
-                                </h3>
-                                <span
-                                    className="stamp shrink-0"
-                                    style={{
-                                        background: "var(--cream2)",
-                                        color: "var(--ink)",
-                                    }}
-                                >
-                                    <span aria-hidden="true">👥</span>
-                                    {t("community_players", {
-                                        min: g.minPlayers,
-                                        max: g.maxPlayers,
-                                    })}
-                                </span>
+                                </p>
+                                <p className="truncate text-xs font-semibold text-wc-muted">
+                                    {[
+                                        g.ownerName &&
+                                            t("community_by", {
+                                                name: g.ownerName,
+                                            }),
+                                        t("community_players", {
+                                            min: g.minPlayers,
+                                            max: g.maxPlayers,
+                                        }),
+                                        t("community_rules", {
+                                            n: g.ruleCount,
+                                        }),
+                                    ]
+                                        .filter(Boolean)
+                                        .join(" · ")}
+                                </p>
                             </div>
-                            {g.ownerName && (
-                                <p className="text-xs font-semibold text-wc-ink-soft">
-                                    {t("community_by", { name: g.ownerName })}
-                                </p>
-                            )}
-                            {g.description && (
-                                <p className="line-clamp-2 text-xs font-semibold text-wc-ink-soft">
-                                    {g.description}
-                                </p>
-                            )}
-                            <p className="text-xs font-semibold text-wc-ink-soft">
-                                {t("community_rules", { n: g.ruleCount })}
-                            </p>
                             <GameButton
                                 variant="green"
                                 size="sm"
                                 onClick={() => onHost(g.moduleId)}
                                 disabled={busy}
-                                className="mt-auto w-full"
                             >
                                 {busyModuleId === g.moduleId
                                     ? t("creating")
                                     : t("host")}
                             </GameButton>
-                        </article>
+                        </li>
                     ))}
-                </div>
+                </ul>
             )}
         </section>
     );

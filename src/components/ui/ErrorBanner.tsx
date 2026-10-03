@@ -1,6 +1,6 @@
 import { CircleAlert } from "lucide-react";
 import type { ReactNode } from "react";
-import { Alert, AlertDescription } from "@/components/nb/alert";
+import { Alert, AlertDescription } from "@/components/ui/base/alert";
 import { cn } from "@/lib/utils";
 
 export function ErrorBanner({

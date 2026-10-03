@@ -3,6 +3,10 @@
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GameTable } from "@/components/game/GameTable";
+import { TierBadge } from "@/components/ui/TierBadge";
+import { Link } from "@/i18n/navigation";
+import { getBoardTheme } from "@/lib/board/themes";
+import { getCardTheme } from "@/lib/card/themes";
 import {
     isPreviewPlay,
     PREVIEW_OPPONENT,
@@ -10,11 +14,7 @@ import {
     type PreviewCard,
     type PreviewView,
     previewTable,
-} from "@/components/game/previewTable";
-import { TierBadge } from "@/components/ui/TierBadge";
-import { Link } from "@/i18n/navigation";
-import { getBoardTheme } from "@/lib/board/themes";
-import { getCardTheme } from "@/lib/card/themes";
+} from "@/lib/customize/previewTable";
 import type { GameAction } from "@/lib/engine/types";
 import type { GameClientPayload } from "@/lib/models/game";
 
@@ -63,7 +63,7 @@ type Props = {
     backHref: string;
 };
 
-export function PreviewPage({ deckId, boardId, backHref }: Props) {
+export function CustomizePreview({ deckId, boardId, backHref }: Props) {
     const t = useTranslations("preview");
     const cardTheme = getCardTheme(deckId);
     const boardTheme = getBoardTheme(boardId);
@@ -170,7 +170,7 @@ export function PreviewPage({ deckId, boardId, backHref }: Props) {
             <div
                 className="flex shrink-0 items-center justify-between px-4 py-3"
                 style={{
-                    borderBottom: "3px solid var(--ink)",
+                    borderBottom: "2px solid var(--edge)",
                     background: "var(--panel-d)",
                 }}
             >

@@ -112,7 +112,7 @@ export function MaintenanceControl({ initialEnabled, initialMessage }: Props) {
                     rows={3}
                     maxLength={280}
                     placeholder={t("maintenance_message_placeholder")}
-                    className="w-full resize-none rounded-xl border-nb border-wc-ink bg-wc-panel-d2 px-3 py-2.5 text-sm font-semibold text-wc-cream outline-none"
+                    className="w-full resize-none rounded-xl border-nb border-wc-edge bg-wc-panel-d2 px-3 py-2.5 text-sm font-semibold text-wc-cream outline-none"
                 />
             </label>
 

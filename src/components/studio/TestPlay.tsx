@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { GameButton } from "@/components/ui/GameButton";
 import { useTestPlay } from "@/hooks/studio/useTestPlay";
 import { ecaCardLabel as cardLabel, isRedSuit } from "@/lib/eca/display";
@@ -48,28 +49,10 @@ export function TestPlay({
                 </GameButton>
             </div>
 
-            {!valid && (
-                <p
-                    className="rounded-xl px-4 py-3 text-sm font-bold"
-                    style={{
-                        background: "var(--red)",
-                        border: "2.5px solid var(--ink)",
-                        color: "var(--accent-ink)",
-                    }}
-                >
-                    {t("test_invalid")}
-                </p>
-            )}
+            {!valid && <ErrorBanner>{t("test_invalid")}</ErrorBanner>}
 
             {sandbox && stale && (
-                <p
-                    className="rounded-xl px-4 py-3 text-sm font-bold"
-                    style={{
-                        background: "var(--gold)",
-                        border: "2.5px solid var(--ink)",
-                        color: "var(--ink)",
-                    }}
-                >
+                <p className="rounded-xl bg-wc-gold px-4 py-3 text-sm font-bold text-wc-ink shadow-[0_4px_0_var(--gold-d)]">
                     {t("test_stale")}
                 </p>
             )}
@@ -81,8 +64,8 @@ export function TestPlay({
                             <span
                                 className="stamp"
                                 style={{
-                                    background: "var(--cream2)",
-                                    color: "var(--ink)",
+                                    background: "var(--panel-d2)",
+                                    color: "var(--muted)",
                                 }}
                             >
                                 {t("test_draw_pile")}{" "}
@@ -107,7 +90,7 @@ export function TestPlay({
                                 className="stamp"
                                 style={{
                                     background: "var(--purple)",
-                                    color: "var(--accent-ink)",
+                                    color: "#fff",
                                 }}
                             >
                                 {t("test_direction")}{" "}
@@ -127,15 +110,7 @@ export function TestPlay({
                         </div>
 
                         {over && (
-                            <p
-                                className="rounded-xl px-4 py-3 text-sm font-bold"
-                                style={{
-                                    background: "var(--green)",
-                                    border: "2.5px solid var(--ink)",
-                                    boxShadow: "0 4px 0 var(--ink)",
-                                    color: "var(--ink)",
-                                }}
-                            >
+                            <p className="rounded-xl bg-wc-green px-4 py-3 text-sm font-bold text-white text-shadow shadow-[0_4px_0_var(--green-d)]">
                                 {t("test_winner", { names: winnerNames })}
                             </p>
                         )}

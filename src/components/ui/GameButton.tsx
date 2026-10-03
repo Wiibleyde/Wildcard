@@ -1,4 +1,4 @@
-import { Button } from "@/components/nb/button";
+import { Button } from "@/components/ui/base/button";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
@@ -7,23 +7,26 @@ export type GameButtonVariant =
     | "green"
     | "red"
     | "teal"
+    | "orange"
     | "purple"
     | "cream"
     | "ghost";
 export type GameButtonSize = "sm" | "md" | "lg";
 
+// Each button rests on a darker shade of its own colour (`--press`) and sinks into it when pressed.
 const VARIANTS: Record<GameButtonVariant, string> = {
-    gold: "bg-wc-gold text-wc-ink",
-    green: "bg-wc-green text-wc-ink",
-    red: "bg-wc-red text-wc-accent-ink",
-    teal: "bg-wc-blue text-wc-accent-ink",
-    purple: "bg-wc-purple text-wc-accent-ink",
-    cream: "bg-wc-cream text-wc-ink",
-    ghost: "border-transparent bg-transparent text-wc-cream shadow-none hover:translate-x-0 hover:translate-y-0 hover:bg-white/5",
+    gold: "bg-wc-gold text-wc-ink [--press:var(--gold-d)]",
+    green: "bg-wc-green text-white text-shadow [--press:var(--green-d)]",
+    red: "bg-wc-red text-white text-shadow [--press:var(--red-d)]",
+    teal: "bg-wc-blue text-white text-shadow [--press:var(--blue-d)]",
+    orange: "bg-wc-orange text-white text-shadow [--press:var(--orange-d)]",
+    purple: "bg-wc-purple text-white text-shadow [--press:var(--purple-d)]",
+    cream: "bg-wc-panel-d2 text-wc-cream text-shadow [--press:#110c17]",
+    ghost: "bg-transparent text-wc-cream shadow-none hover:bg-white/5",
 };
 
 const SIZES: Record<GameButtonSize, string> = {
-    sm: "h-auto px-3.5 py-2 text-sm",
+    sm: "h-auto rounded-[10px] px-3.5 py-2 text-sm",
     md: "h-auto px-4.5 py-2.75 text-base",
     lg: "h-auto px-6 py-3.5 text-xl",
 };
@@ -59,7 +62,9 @@ export function gameButtonClass(
     className?: string,
 ): string {
     return cn(
-        "border-nb font-display font-normal tracking-wc-cap leading-none",
+        "border-0 font-body font-extrabold leading-none",
+        variant !== "ghost" && "wc-press",
+        "disabled:bg-wc-track disabled:text-wc-sub disabled:opacity-100 disabled:[--press:var(--panel-d)] disabled:[text-shadow:none] data-disabled:bg-wc-track data-disabled:text-wc-sub data-disabled:opacity-100",
         VARIANTS[variant],
         SIZES[size],
         className,

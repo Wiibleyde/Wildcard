@@ -7,7 +7,7 @@ import {
     AlertDialogDescription,
     AlertDialogFooter,
     AlertDialogTitle,
-} from "@/components/nb/alert-dialog";
+} from "@/components/ui/base/alert-dialog";
 import {
     GameButton,
     type GameButtonVariant,

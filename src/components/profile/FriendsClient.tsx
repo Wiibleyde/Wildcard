@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useState } from "react";
-import { Input } from "@/components/nb/input";
+import { Input } from "@/components/ui/base/input";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { fieldClass, fieldLabelClass } from "@/components/ui/fields";

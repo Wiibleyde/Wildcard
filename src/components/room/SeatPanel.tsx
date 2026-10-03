@@ -29,8 +29,7 @@ function StepButton({
             onClick={onClick}
             disabled={disabled}
             aria-label={label}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border-nb border-wc-ink bg-wc-cream font-display text-wc-ink disabled:opacity-30"
-            style={{ boxShadow: "0 3px 0 var(--ink)" }}
+            className="wc-iconbtn grid h-8 w-8 place-items-center rounded-lg bg-wc-panel-d2 font-display text-lg text-wc-cream [--press:#110c17] disabled:opacity-30"
         >
             <span aria-hidden="true">{glyph}</span>
         </button>
@@ -48,14 +47,14 @@ export function SeatPanel({
 }: Props) {
     const t = useTranslations("room");
     return (
-        <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-3">
-                <h3 className="font-display text-base text-wc-cream">
+        <section className="panel flex flex-col gap-4 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="h-lg">
                     {t("seats", { total, max: maxPlayers })}
-                </h3>
+                </h2>
                 {isHost && (
                     <div className="flex items-center gap-2">
-                        <span className="font-display text-xs text-wc-muted">
+                        <span className="label text-xs font-bold text-wc-muted uppercase">
                             {t("bots")}
                         </span>
                         <StepButton
@@ -64,7 +63,7 @@ export function SeatPanel({
                             disabled={botCount <= 0}
                             onClick={() => onSetBots(botCount - 1)}
                         />
-                        <span className="w-5 text-center font-display text-wc-cream">
+                        <span className="w-6 text-center font-display text-xl">
                             {botCount}
                         </span>
                         <StepButton
@@ -76,7 +75,7 @@ export function SeatPanel({
                     </div>
                 )}
             </div>
-            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-3">
                 {slots.map((slot, index) => {
                     // Bots and empty seats have no identity: their position is the key.
                     const key =
@@ -86,6 +85,6 @@ export function SeatPanel({
                     return <SeatSlot key={key} slot={slot} hostId={hostId} />;
                 })}
             </ul>
-        </div>
+        </section>
     );
 }

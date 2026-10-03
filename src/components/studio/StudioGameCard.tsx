@@ -10,7 +10,6 @@ import { useApiMutation } from "@/hooks/useApiMutation";
 import { useRouter } from "@/i18n/navigation";
 import { ecaModuleIdFor } from "@/lib/eca/id";
 import type { EcaGameStatus } from "@/lib/models/studio";
-import { mutedTextStyle } from "./fields";
 import { StatusStamp } from "./StatusStamp";
 
 export interface StudioGameSummary {
@@ -76,10 +75,7 @@ export function StudioGameCard({
     return (
         <article className="panel lift flex flex-col gap-3 p-4 sm:p-5">
             {game.imageUrl && (
-                <div
-                    className="relative aspect-video w-full overflow-hidden rounded-xl"
-                    style={{ border: "2.5px solid var(--ink)" }}
-                >
+                <div className="relative aspect-video w-full overflow-hidden rounded-xl">
                     <Image
                         src={game.imageUrl}
                         alt={game.name}
@@ -91,10 +87,7 @@ export function StudioGameCard({
                 </div>
             )}
             <div className="flex items-start justify-between gap-2">
-                <h3
-                    className="font-display text-lg leading-tight"
-                    style={{ color: "var(--ink)" }}
-                >
+                <h3 className="font-display text-lg leading-tight">
                     {game.name}
                 </h3>
                 <StatusStamp status={game.status} className="shrink-0" />
@@ -103,14 +96,11 @@ export function StudioGameCard({
                 <StatusStamp status="locked" className="self-start" />
             )}
             {game.description && (
-                <p
-                    className="line-clamp-2 text-xs font-semibold"
-                    style={mutedTextStyle}
-                >
+                <p className="line-clamp-2 text-xs font-semibold text-wc-muted">
                     {game.description}
                 </p>
             )}
-            <p className="text-xs font-semibold" style={mutedTextStyle}>
+            <p className="text-xs font-semibold text-wc-muted">
                 {t("rule_count", { n: game.ruleCount })} ·{" "}
                 {t("updated", {
                     // UTC so the SSR and client renders agree near midnight.

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { Locale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { RoomClient } from "@/components/lobby/RoomClient";
+import { RoomClient } from "@/components/room/RoomClient";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PageShell } from "@/components/ui/PageShell";
 import { redirect } from "@/i18n/navigation";
@@ -87,7 +87,7 @@ export default async function Page({
           : "player";
 
     return (
-        <PageShell width="narrow">
+        <PageShell>
             <PageHeader title={t("title")} />
             <RoomClient
                 roomId={room.id}

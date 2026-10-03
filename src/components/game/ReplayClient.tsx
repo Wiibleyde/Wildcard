@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
 import { GameTable } from "@/components/game/GameTable";
-import { Slider } from "@/components/nb/slider";
+import { Slider } from "@/components/ui/base/slider";
 import { GameButton } from "@/components/ui/GameButton";
 import { replayBoard } from "@/hooks/game/gamePayload";
 import { usePlayerNames } from "@/hooks/game/usePlayerNames";

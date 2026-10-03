@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { dangerIconButtonClass, fieldClass } from "@/components/ui/fields";
 import { SelectField } from "@/components/ui/SelectField";
 import { comparatorsFor, isOneOf, reconcileCondition } from "@/lib/eca/schema";
 import type {
@@ -10,7 +11,6 @@ import type {
     EcaEventType,
     EcaOperand,
 } from "@/lib/eca/types";
-import { dangerButtonStyle, fieldClass } from "./fields";
 import { OperandField } from "./OperandField";
 import { StudioRow } from "./StudioRow";
 
@@ -88,8 +88,7 @@ export function ConditionRow({
                 type="button"
                 onClick={onRemove}
                 aria-label={t("remove_condition")}
-                className="wc-iconbtn grid h-8 w-8 shrink-0 place-items-center self-end rounded-lg text-sm font-bold sm:self-auto"
-                style={dangerButtonStyle}
+                className={`${dangerIconButtonClass} self-end  sm:self-auto`}
             >
                 ✕
             </button>

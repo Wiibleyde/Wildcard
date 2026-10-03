@@ -13,8 +13,9 @@ export async function GuestNav() {
         <header
             className="sticky top-0 z-40"
             style={{
-                background: "var(--panel-d2)",
-                borderBottom: "3px solid var(--ink)",
+                background: "rgba(23, 17, 31, 0.88)",
+                backdropFilter: "blur(8px)",
+                borderBottom: "2px solid var(--edge)",
             }}
         >
             <div className="flex items-center justify-between px-4 xl:px-10 h-14">

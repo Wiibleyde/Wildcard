@@ -3,7 +3,7 @@ import type {
     EcaDefinition,
     EcaEffect,
     EcaEventType,
-} from "@/lib/eca/types";
+} from "./types";
 
 /**
  * Editor mirror of a definition with stable row keys. The validator rebuilds

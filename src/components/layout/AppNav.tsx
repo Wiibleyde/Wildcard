@@ -5,7 +5,7 @@ import { getUserRole, roleAtLeast } from "@/lib/auth/roles";
 import type { AuthUser } from "@/lib/auth/session";
 import { identityOf, nameTag, portalAvatarUrl } from "@/lib/models/identities";
 import { createClient } from "@/lib/supabase/server";
-import { levelForXp } from "@/lib/xp/xp";
+import { levelForXp, xpProgress } from "@/lib/xp/xp";
 import { Brand } from "./Brand";
 import { NavActions } from "./NavActions";
 import { NavLinks } from "./NavLinks";
@@ -22,7 +22,8 @@ export async function AppNav({ user }: { user: AuthUser }) {
         getTranslations("common"),
     ]);
     const canModerate = roleAtLeast(role, "moderator");
-    const level = levelForXp(xpRes.data?.xp ?? 0);
+    const xp = xpRes.data?.xp ?? 0;
+    const level = levelForXp(xp);
     const avatarUrl = portalAvatarUrl(identity.avatarPath);
     const username =
         identity.name ?? tCommon("player_fallback", { tag: nameTag(user.id) });
@@ -33,14 +34,16 @@ export async function AppNav({ user }: { user: AuthUser }) {
                 username={username}
                 avatarUrl={avatarUrl}
                 level={level}
+                levelProgress={xpProgress(xp)}
                 canModerate={canModerate}
             />
 
             <header
                 className="sticky top-0 z-40 md:hidden"
                 style={{
-                    background: "var(--panel-d2)",
-                    borderBottom: "3px solid var(--ink)",
+                    background: "rgba(23, 17, 31, 0.88)",
+                    backdropFilter: "blur(8px)",
+                    borderBottom: "2px solid var(--edge)",
                 }}
             >
                 <div className="flex h-14 items-center justify-between px-4">
@@ -57,7 +60,7 @@ export async function AppNav({ user }: { user: AuthUser }) {
                             />
                         </Link>
 
-                        <span className="rounded-md border-2 border-wc-ink bg-wc-cream px-2 py-1 font-pixel text-wc-micro text-wc-ink uppercase">
+                        <span className="stamp bg-wc-purple text-white">
                             {tProfile("level", { level })}
                         </span>
                     </div>
@@ -67,8 +70,9 @@ export async function AppNav({ user }: { user: AuthUser }) {
             <nav
                 className="fixed right-0 bottom-0 left-0 z-40 flex md:hidden"
                 style={{
-                    background: "var(--panel-d2)",
-                    borderTop: "3px solid var(--ink)",
+                    background: "rgba(23, 17, 31, 0.92)",
+                    backdropFilter: "blur(8px)",
+                    borderTop: "2px solid var(--edge)",
                     padding: "8px 8px calc(8px + env(safe-area-inset-bottom))",
                 }}
             >

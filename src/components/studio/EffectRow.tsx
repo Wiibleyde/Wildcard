@@ -1,7 +1,12 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Input } from "@/components/nb/input";
+import { Input } from "@/components/ui/base/input";
+import {
+    dangerIconButtonClass,
+    fieldClass,
+    fieldLabelClass,
+} from "@/components/ui/fields";
 import { SelectField } from "@/components/ui/SelectField";
 import {
     ECA_DRAW_TARGETS,
@@ -10,15 +15,9 @@ import {
     effectTypesFor,
     isOneOf,
 } from "@/lib/eca/schema";
+import type { StudioMessageKey } from "@/lib/eca/studioMessages";
 import type { EcaDrawTarget, EcaEffect, EcaEventType } from "@/lib/eca/types";
 import { ECA_DRAW_COUNT_MAX, ECA_DRAW_COUNT_MIN } from "@/lib/eca/validate";
-import {
-    dangerButtonStyle,
-    fieldClass,
-    labelClass,
-    labelStyle,
-} from "./fields";
-import type { StudioMessageKey } from "./messages";
 import { StudioRow } from "./StudioRow";
 
 const EFFECT_LABELS: Record<EcaEffectType, StudioMessageKey> = {
@@ -103,7 +102,7 @@ export function EffectRow({
                         aria-label={t("effect_count_aria")}
                         className={`${fieldClass} w-16 shrink-0`}
                     />
-                    <span className={labelClass} style={labelStyle}>
+                    <span className={fieldLabelClass}>
                         {t("effect_count_label")} →
                     </span>
                     <SelectField
@@ -124,8 +123,7 @@ export function EffectRow({
                 onClick={onRemove}
                 disabled={!removable}
                 aria-label={t("remove_effect")}
-                className="wc-iconbtn grid h-8 w-8 shrink-0 place-items-center self-end rounded-lg text-sm font-bold disabled:opacity-40 sm:self-auto"
-                style={dangerButtonStyle}
+                className={`${dangerIconButtonClass} self-end   sm:self-auto`}
             >
                 ✕
             </button>

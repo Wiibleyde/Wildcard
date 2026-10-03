@@ -13,7 +13,7 @@ export const TIER_LABEL_KEY = {
 
 /** `[background, text]` for the `.stamp` chip. */
 const TIER_STAMP: Record<ThemeTier, readonly [string, string]> = {
-    common: ["var(--cream2)", "var(--ink)"],
+    common: ["var(--panel-d2)", "var(--muted)"],
     uncommon: ["var(--green)", "var(--ink)"],
     rare: ["var(--blue)", "var(--accent-ink)"],
     epic: ["var(--purple)", "var(--accent-ink)"],

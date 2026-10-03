@@ -1,7 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Input } from "@/components/nb/input";
+import { Input } from "@/components/ui/base/input";
+import { fieldClass } from "@/components/ui/fields";
 import { SelectField } from "@/components/ui/SelectField";
 import { DECKS } from "@/lib/card/decks";
 import type { Suit } from "@/lib/card/types";
@@ -12,6 +13,7 @@ import {
     ECA_STAT_SOURCES,
     literalDomainFor,
 } from "@/lib/eca/schema";
+import type { StudioMessageKey } from "@/lib/eca/studioMessages";
 import type {
     EcaCardProp,
     EcaCardSource,
@@ -20,8 +22,6 @@ import type {
     EcaOperand,
     EcaStatSource,
 } from "@/lib/eca/types";
-import { fieldClass } from "./fields";
-import type { StudioMessageKey } from "./messages";
 
 /**
  * One side of a condition. The literal editor's shape follows the other side,

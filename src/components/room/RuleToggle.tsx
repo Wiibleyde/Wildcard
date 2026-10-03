@@ -24,16 +24,10 @@ export function RuleToggle({
     const t = useTranslations("room");
     return (
         <li
-            className="flex items-center justify-between gap-3 rounded-xl border-nb border-wc-ink bg-wc-panel-d px-4 py-3"
-            style={{
-                boxShadow: "0 4px 0 var(--ink)",
-                opacity: locked ? 0.5 : 1,
-            }}
+            className={`well flex items-center justify-between gap-3 px-4 py-3 ${locked ? "opacity-50" : ""}`}
         >
             <div className="min-w-0 flex-1">
-                <div className="font-display text-sm text-wc-cream">
-                    {label}
-                </div>
+                <div className="text-sm font-extrabold">{label}</div>
                 <div className="text-xs text-wc-muted">{description}</div>
             </div>
             {isHost ? (
@@ -45,8 +39,11 @@ export function RuleToggle({
                 />
             ) : (
                 <span
-                    className="shrink-0 font-pixel text-wc-micro uppercase"
-                    style={{ color: on ? "var(--green)" : "var(--muted)" }}
+                    className="stamp shrink-0"
+                    style={{
+                        background: on ? "var(--green)" : "var(--panel-d)",
+                        color: on ? "#fff" : "var(--muted)",
+                    }}
                 >
                     {on ? t("rule_on") : t("rule_off")}
                 </span>

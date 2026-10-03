@@ -2,9 +2,9 @@
 
 import { useTranslations } from "next-intl";
 import { GameButton } from "@/components/ui/GameButton";
+import { type DraftRule, newDraftRule } from "@/lib/eca/draft";
 import type { EcaDeckId } from "@/lib/eca/types";
 import { ECA_RULES_MAX } from "@/lib/eca/validate";
-import { type DraftRule, newDraftRule } from "./draft";
 import { RuleCard } from "./RuleCard";
 
 interface Props {

@@ -18,22 +18,11 @@ export function TurnBanner({
 }) {
     return (
         <div
-            className="self-center rounded-wc-btn border-nb px-5 py-2 text-center font-display text-lg leading-none"
-            style={
+            className={`self-center rounded-wc-btn px-5 py-2.5 text-center font-display text-lg leading-none ${
                 highlight
-                    ? {
-                          background: "var(--gold)",
-                          color: "var(--ink)",
-                          borderColor: "var(--ink)",
-                          boxShadow: "0 4px 0 var(--ink)",
-                      }
-                    : {
-                          background: "var(--panel-d)",
-                          color: "var(--muted)",
-                          borderColor: "var(--ink)",
-                          boxShadow: "0 4px 0 var(--ink)",
-                      }
-            }
+                    ? "bg-wc-orange text-white text-shadow shadow-[0_4px_0_var(--orange-d)]"
+                    : "border-nb border-wc-edge bg-wc-panel-d text-wc-muted shadow-[0_4px_0_var(--drop)]"
+            }`}
         >
             {label}
         </div>
@@ -86,18 +75,15 @@ export function GameOverOverlay({
         <div
             className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-5 px-6 text-center backdrop-blur-sm"
             style={{
-                background: "rgba(10,26,46,0.86)",
+                background: "rgba(23,17,31,0.88)",
                 borderRadius: BOARD_RADIUS,
             }}
         >
-            <span
-                className="stamp"
-                style={{ background: "var(--cream)", color: "var(--red)" }}
-            >
+            <span className="stamp bg-wc-red text-white">
                 ★ {t("game_over")}
             </span>
             <h2
-                className="font-display text-4xl xl:text-5xl"
+                className="font-display text-4xl text-shadow xl:text-5xl"
                 style={{ color: won ? "var(--green)" : "var(--gold)" }}
             >
                 {gameOverTitle(t, outcome, end, nameOf, currentUserId, won)}
@@ -111,47 +97,35 @@ export function GameOverOverlay({
                         return (
                             <li
                                 key={r.playerId}
-                                className="flex items-center justify-between gap-3 rounded-lg border-nb px-3 py-2"
-                                style={{
-                                    background: isMe
-                                        ? "var(--cream)"
-                                        : "var(--cream2)",
-                                    borderColor: "var(--ink)",
-                                    boxShadow: "0 3px 0 var(--ink)",
-                                }}
+                                className={`flex items-center justify-between gap-3 rounded-[10px] px-3 py-2 ${
+                                    isMe
+                                        ? "bg-wc-panel-d shadow-[inset_0_0_0_2px_var(--gold)]"
+                                        : "bg-wc-panel-d2"
+                                }`}
                             >
                                 <span className="flex min-w-0 items-center gap-2">
                                     <span
                                         className="font-display tabular-nums"
                                         style={{
                                             color: isMe
-                                                ? "var(--red)"
-                                                : "#8a7d55",
+                                                ? "var(--gold)"
+                                                : "var(--muted)",
                                         }}
                                     >
                                         {r.rank}
                                     </span>
-                                    <span
-                                        className="truncate font-display text-base"
-                                        style={{ color: "var(--ink)" }}
-                                    >
+                                    <span className="truncate text-base font-extrabold">
                                         {nameOf(r.playerId)}
                                     </span>
                                 </span>
                                 {title ? (
-                                    <span
-                                        className="stamp shrink-0"
-                                        style={{
-                                            background: "var(--gold)",
-                                            color: "var(--ink)",
-                                        }}
-                                    >
+                                    <span className="stamp shrink-0 bg-wc-gold text-wc-ink">
                                         {title}
                                     </span>
                                 ) : typeof r.score === "number" ? (
                                     <span
                                         className="shrink-0 font-display text-base"
-                                        style={{ color: "var(--ink-soft)" }}
+                                        style={{ color: "var(--muted)" }}
                                     >
                                         {r.score}
                                     </span>
@@ -166,7 +140,7 @@ export function GameOverOverlay({
                 <GameOverXp userId={currentUserId} gained={end.xpGained} />
             ) : null}
 
-            <GameButton href="/lobby" className="mt-2">
+            <GameButton href="/lobby" variant="orange" className="mt-2">
                 {t("back_to_lobby")}
             </GameButton>
         </div>

@@ -5,11 +5,11 @@ import { useCardLabel } from "@/components/card/Card";
 import { BoardPill } from "@/components/ui/BoardPill";
 import { buildZoneStyle } from "@/lib/board/styles";
 import { CARD_WIDTH_CLASS } from "@/lib/card/sizes";
-import { CardRow } from "./zones/CardRow";
-import { CascadeColumn } from "./zones/CascadeColumn";
-import { HandFan } from "./zones/HandFan";
-import { type TableZoneProps, ZoneCard } from "./zones/ZoneCard";
-import { ZoneOverlayButton } from "./zones/ZoneOverlayButton";
+import { CardRow } from "./CardRow";
+import { CascadeColumn } from "./CascadeColumn";
+import { HandFan } from "./HandFan";
+import { type TableZoneProps, ZoneCard } from "./ZoneCard";
+import { ZoneOverlayButton } from "./ZoneOverlayButton";
 
 /** Top cards a `stack` zone renders; the badge carries the count. */
 const STACK_VISIBLE = 3;

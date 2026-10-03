@@ -27,13 +27,20 @@ technique fullstack et une architecture solide, présentable devant un jury.
 - **TypeScript strict** — aucun `any` toléré
 - **Tailwind CSS**
 - **GSAP** — animations des cartes
-- **neobrutalism.dev** (registry shadcn, primitives **Base UI**) — composants
-  vendorisés dans `src/components/nb/` (fichiers registry, ajout via
-  `https://www.neobrutalism.dev/r/<nom>.json`). Tokens (`--main`, `--border`,
-  `--shadow`…) mappés sur la palette Wildcard dans `globals.css`. Les wrappers
-  applicatifs (`GameButton`, `Modal`, `ConfirmDialog`, `Switch`, `SelectField`,
-  `Avatar`, `ErrorBanner`) vivent dans `src/components/ui/` — les utiliser en
-  priorité ; `cn()` dans `src/lib/utils.ts`
+- **Design system « salle de nuit »** (jeu vidéo premium) — fond prune avec
+  enseignes qui dérivent, panneaux prune sombres, surfaces « carte » blanches,
+  boutons épais posés sur une teinte plus sombre de leur propre couleur
+  (`--press`, classe `.wc-press`) qui s'enfoncent au clic. Polices : **Titan One**
+  (titres, chiffres) + **Rubik** (tout le reste). Tokens dans `globals.css`
+  (`--panel-d`, `--edge`, `--red`/`--red-d`…, classes `.panel`, `.well`,
+  `.card-surface`, `.stamp`, `.wc-sway`, `.wc-tilt`, `.wc-holo`).
+- **Primitives Base UI** (registry shadcn neobrutalism.dev) vendorisées dans
+  `src/components/ui/base/` (fichiers registry kebab-case, ajout via
+  `https://www.neobrutalism.dev/r/<nom>.json`), tokens (`--main`, `--border`,
+  `--shadow`…) mappés sur la palette. Les wrappers applicatifs (`GameButton`,
+  `Modal`, `ConfirmDialog`, `Switch`, `SelectField`, `Avatar`, `ErrorBanner`,
+  `Tilt`, styles de champs dans `fields.ts`) vivent dans `src/components/ui/` —
+  les utiliser en priorité ; `cn()` dans `src/lib/utils.ts`
 
 ### Backend / API
 - **Next.js API Routes** — logique de jeu principale
@@ -305,10 +312,15 @@ wildcard/
 │   │   ├── types.ts
 │   │   └── interpreter.ts
 │   └── supabase/            # Client Supabase + helpers
-├── components/
-│   ├── card/                # Composants carte (GSAP)
-│   ├── lobby/
-│   └── studio/              # UI du Game Studio
+├── components/              # Un dossier par feature, un composant par fichier, pas de helper .ts
+│   ├── ui/                  # Design system (GameButton, Avatar, Tilt, Modal…) ; ui/base/ = registry Base UI
+│   ├── layout/              # Shell, sidebar HUD, nav mobile, logo
+│   ├── card/                # Rendu des cartes (thèmes, pips, GSAP)
+│   ├── lobby/               # Éventail de jeux, rejoindre, jeux communauté
+│   ├── room/                # Salon d'attente
+│   ├── game/                # Table, sièges, zones, rail (journal, chat)
+│   ├── studio/              # UI du Game Studio (cartes-règles ECA)
+│   ├── profile/ leaderboard/ customize/ admin/ analytics/
 ├── proxy.ts                 # Middleware next-intl + session Supabase (Next.js 16)
 └── supabase/
     ├── migrations/          # Schémas SQL versionnés

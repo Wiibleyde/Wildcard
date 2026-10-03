@@ -39,23 +39,18 @@ export function RuleModePicker({
                             aria-pressed={selected}
                             disabled={!isHost || busy}
                             onClick={() => onPick(mode)}
-                            className="rounded-xl border-nb px-3 py-2 text-left font-display text-sm transition-colors duration-200 enabled:cursor-pointer disabled:cursor-default"
-                            style={{
-                                background: selected
-                                    ? "var(--gold)"
-                                    : "var(--panel-d)",
-                                color: selected ? "var(--ink)" : "var(--cream)",
-                                borderColor: "var(--ink)",
-                                boxShadow: "0 4px 0 var(--ink)",
-                                opacity: !isHost && !selected ? 0.6 : 1,
-                            }}
+                            className={`wc-chip rounded-[10px] px-3 py-2 text-left text-sm font-extrabold enabled:cursor-pointer disabled:cursor-default ${
+                                selected
+                                    ? "bg-wc-gold text-wc-ink [--press:var(--gold-d)]"
+                                    : "bg-wc-panel-d2 text-wc-cream [--press:#110c17]"
+                            } ${!isHost && !selected ? "opacity-60" : ""}`}
                         >
                             {modeText(mode.key, "label")}
                         </button>
                     );
                 })}
             </fieldset>
-            <p className="text-xs" style={{ color: "var(--muted)" }}>
+            <p className="text-sm text-wc-muted">
                 {active
                     ? modeText(active.key, "description")
                     : t("mode_custom")}

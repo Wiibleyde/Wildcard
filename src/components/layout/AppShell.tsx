@@ -9,7 +9,10 @@ export function AppShell({ appNav, authed, children }: Props) {
     return (
         <>
             {appNav}
-            <div className={authed ? "pb-20 md:pb-0 md:pl-55 xl:pl-64" : ""}>
+            {/* Clip x: fanned and tilted cards may lean past the edge; never a horizontal scroll. */}
+            <div
+                className={`overflow-x-clip ${authed ? "pb-20 md:pb-0 md:pl-55 xl:pl-64" : ""}`}
+            >
                 {children}
             </div>
         </>

@@ -4,10 +4,8 @@ import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog
 import type { VariantProps } from "class-variance-authority";
 
 import type * as React from "react";
-
-import { buttonVariants } from "@/components/nb/button";
-
 import { cn } from "@/lib/utils";
+import { buttonVariants } from "./button";
 
 function AlertDialog({
     ...props

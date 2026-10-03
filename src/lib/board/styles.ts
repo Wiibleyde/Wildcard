@@ -1,7 +1,12 @@
 import type { CSSProperties } from "react";
 import type { BoardTheme } from "@/lib/board/types";
 
-export const BOARD_RADIUS = "clamp(1.125rem, 3vw, 2rem)";
+/** Stadium-shaped table: wide rounded ends, flatter long sides. */
+export const BOARD_RADIUS = "clamp(2rem, 7vw, 9rem) / clamp(2rem, 6vw, 7rem)";
+
+/** Wooden rim drawn inside the board's edge, plus the drop under the table. */
+export const BOARD_RIM =
+    "inset 0 0 0 9px #2a1c14, inset 0 0 0 12px #6a4529, inset 0 0 0 14px #2a1c14, inset 0 18px 40px rgba(0,0,0,0.45), 0 8px 0 rgba(0,0,0,0.4)";
 
 export function buildSurfaceStyle(theme: BoardTheme): CSSProperties {
     return { background: theme.surface.background };

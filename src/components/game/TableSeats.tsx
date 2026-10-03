@@ -1,6 +1,7 @@
 "use client";
 
 import { Card } from "@/components/card/Card";
+import { Avatar } from "@/components/ui/Avatar";
 import { getCardTheme } from "@/lib/card/themes";
 import { FACE_DOWN_CARD } from "@/lib/card/utils";
 import type { TableSeat } from "@/lib/games/table/types";
@@ -17,9 +18,9 @@ export function TableSeats({ seats, deckStyleOf }: TableSeatsProps) {
     if (seats.length === 0) return null;
 
     return (
-        <div className="flex flex-wrap items-start justify-around gap-x-4 gap-y-2 sm:gap-4">
+        <div className="flex flex-wrap items-start justify-around gap-x-4 gap-y-3 sm:gap-4">
             {seats.map((seat) => (
-                <SeatChip
+                <SeatPlate
                     key={seat.playerId}
                     seat={seat}
                     deckStyleId={deckStyleOf(seat.playerId)}
@@ -29,7 +30,8 @@ export function TableSeats({ seats, deckStyleOf }: TableSeatsProps) {
     );
 }
 
-function SeatChip({
+/** An opponent's name plate: avatar, name, status, and their hand face down. */
+function SeatPlate({
     seat,
     deckStyleId,
 }: {
@@ -42,26 +44,33 @@ function SeatChip({
     return (
         <div className="flex flex-col items-center gap-1.5">
             <div
-                className="flex items-center gap-2 rounded-full border-nb px-3.5 py-1.5"
-                style={{
-                    background: active ? "var(--gold)" : "var(--panel-d)",
-                    borderColor: "var(--ink)",
-                    boxShadow: "0 4px 0 var(--ink)",
-                }}
+                className={`flex items-center gap-2 rounded-[14px] border-2 bg-wc-panel-d py-1.5 pr-3 pl-1.5 transition-transform ${
+                    active
+                        ? "-translate-y-0.5 border-wc-orange"
+                        : "border-wc-edge"
+                }`}
+                style={{ boxShadow: "0 4px 0 var(--drop)" }}
             >
-                <span
-                    className="font-display text-sm leading-none"
-                    style={{ color: active ? "var(--ink)" : "var(--cream)" }}
-                >
-                    {seat.name}
-                </span>
+                <Avatar name={seat.name} size={30} />
+                <div className="min-w-0 leading-tight">
+                    <p className="max-w-32 truncate text-sm font-extrabold">
+                        {seat.name}
+                    </p>
+                    {seat.status && (
+                        <p
+                            className="max-w-32 truncate text-wc-label font-bold"
+                            style={{
+                                color: active
+                                    ? "var(--orange)"
+                                    : "var(--muted)",
+                            }}
+                        >
+                            {seat.status}
+                        </p>
+                    )}
+                </div>
                 {seat.handCount !== null && (
-                    <span
-                        className="font-pixel text-wc-micro leading-none"
-                        style={{
-                            color: active ? "#6a4f14" : "var(--muted)",
-                        }}
-                    >
+                    <span className="stamp bg-wc-panel-d2 text-wc-muted">
                         {seat.handCount}
                     </span>
                 )}
@@ -71,10 +80,7 @@ function SeatChip({
                     {SEAT_BACK_IDS.slice(0, seat.handCount).map((id) => (
                         <div
                             key={id}
-                            className="-ml-3 w-6 first:ml-0 xl:-ml-4 xl:w-8"
-                            style={{
-                                filter: "drop-shadow(0 3px 0 rgba(11,18,32,0.35))",
-                            }}
+                            className="-ml-3.5 w-6 first:ml-0 xl:-ml-4.5 xl:w-8"
                         >
                             <Card
                                 card={FACE_DOWN_CARD}
@@ -84,14 +90,6 @@ function SeatChip({
                         </div>
                     ))}
                 </div>
-            )}
-            {seat.status && (
-                <span
-                    className="font-display text-wc-tag xl:text-xs"
-                    style={{ color: active ? "var(--gold)" : "var(--muted)" }}
-                >
-                    {seat.status}
-                </span>
             )}
         </div>
     );

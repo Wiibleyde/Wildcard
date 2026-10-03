@@ -2,7 +2,7 @@
 
 import { useFormatter, useTranslations } from "next-intl";
 import type { ReactNode } from "react";
-import { Input } from "@/components/nb/input";
+import { Input } from "@/components/ui/base/input";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { fieldClass, fieldLabelClass } from "@/components/ui/fields";
 import { GameButton } from "@/components/ui/GameButton";
@@ -116,7 +116,7 @@ export function MatchHistoryClient({
             {pinning.error && <ErrorBanner>{pinning.error}</ErrorBanner>}
 
             {filter.filtered.length === 0 ? (
-                <p className="panel flat px-4 py-10 text-center text-sm font-semibold text-wc-ink-soft">
+                <p className="panel flat px-4 py-10 text-center text-sm font-semibold text-wc-muted">
                     {filter.hasFilters ? t("empty_filtered") : t("empty")}
                 </p>
             ) : (

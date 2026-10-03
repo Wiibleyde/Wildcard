@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { Switch as NbSwitch } from "@/components/nb/switch";
+import { Switch as NbSwitch } from "@/components/ui/base/switch";
 
 export function Switch({
     checked,

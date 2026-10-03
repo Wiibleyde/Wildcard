@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Dialog, DialogContent } from "@/components/nb/dialog";
+import { Dialog, DialogContent } from "@/components/ui/base/dialog";
 
 export function Modal({
     open,

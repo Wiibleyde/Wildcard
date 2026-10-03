@@ -109,13 +109,7 @@ export function GameOverXp({
         <div ref={containerRef} className="panel w-full max-w-xs p-3">
             <div className="flex items-center gap-3">
                 <div
-                    className="xp-gained-badge grid size-12 shrink-0 place-items-center rounded-xl border-nb font-display text-xl leading-none"
-                    style={{
-                        background: "var(--purple)",
-                        color: "var(--accent-ink)",
-                        borderColor: "var(--ink)",
-                        boxShadow: "0 3px 0 var(--ink)",
-                    }}
+                    className="xp-gained-badge grid size-12 shrink-0 place-items-center rounded-xl bg-wc-purple font-display text-xl leading-none text-white text-shadow shadow-[0_3px_0_var(--purple-d)]"
                     aria-hidden="true"
                 >
                     {t("xp_unit")}
@@ -123,13 +117,7 @@ export function GameOverXp({
 
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                        <span
-                            className="stamp"
-                            style={{
-                                background: "var(--cream2)",
-                                color: "var(--ink)",
-                            }}
-                        >
+                        <span className="stamp bg-wc-panel-d2 text-wc-muted">
                             {t("xp_title")}
                         </span>
                         <span
@@ -160,7 +148,7 @@ export function GameOverXp({
                         +{xp.gained}{" "}
                         <span
                             className="text-sm"
-                            style={{ color: "var(--ink-soft)" }}
+                            style={{ color: "var(--muted)" }}
                         >
                             {t("xp_unit")}
                         </span>
@@ -168,13 +156,7 @@ export function GameOverXp({
                 </div>
             </div>
 
-            <div
-                className="relative mt-3 h-3 overflow-hidden rounded-full border-2"
-                style={{
-                    background: "var(--cream2)",
-                    borderColor: "var(--ink)",
-                }}
-            >
+            <div className="relative mt-3 h-3 overflow-hidden rounded-full bg-wc-panel-d2">
                 <div
                     ref={barRef}
                     className="relative h-full overflow-hidden rounded-full"
@@ -207,7 +189,7 @@ export function GameOverXp({
                 )}
                 <span
                     className="text-xs font-bold tabular-nums"
-                    style={{ color: "var(--ink-soft)" }}
+                    style={{ color: "var(--muted)" }}
                 >
                     <span ref={numRef}>{xp.before}</span> {t("xp_unit")}
                 </span>

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { Locale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
-import { Input } from "@/components/nb/input";
+import { Input } from "@/components/ui/base/input";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { fieldClass } from "@/components/ui/fields";
 import { GameButton } from "@/components/ui/GameButton";

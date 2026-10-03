@@ -7,7 +7,7 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/nb/select";
+} from "@/components/ui/base/select";
 import { cn } from "@/lib/utils";
 
 export interface SelectOption {
@@ -46,7 +46,7 @@ export function SelectField({
             >
                 <SelectValue />
             </SelectTrigger>
-            <SelectContent className="border-nb bg-wc-cream text-wc-ink shadow-shadow">
+            <SelectContent className="border-nb border-wc-edge bg-wc-panel-d text-wc-cream shadow-shadow">
                 {options.map((option) => (
                     <SelectItem
                         key={option.value}
