@@ -43,13 +43,7 @@ export function EcaEditorHeader({
                 <StatusStamp status={status} />
                 {locked && <StatusStamp status="locked" />}
                 {validation.ok ? (
-                    <span
-                        className="stamp"
-                        style={{
-                            background: "var(--green)",
-                            color: "var(--ink)",
-                        }}
-                    >
+                    <span className="stamp bg-wc-green text-white">
                         {t("valid_badge")}
                     </span>
                 ) : (

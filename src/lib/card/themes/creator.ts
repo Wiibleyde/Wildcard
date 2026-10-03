@@ -32,7 +32,7 @@ export const creatorTheme: CardTheme = {
     effects: [{ type: "shimmer", color: "#ffc23d", speed: 0.8 }],
     playAnimation: { template: "arc" },
     font: {
-        family: 'var(--disp, "Lilita One", system-ui, sans-serif)',
+        family: 'var(--disp, "Titan One", system-ui, sans-serif)',
         rankWeight: 400,
     },
     trumpColor: "#ffc23d",

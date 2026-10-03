@@ -17,7 +17,7 @@ export function ProfileXPCard({ xp }: { xp: number }) {
                         className="stamp"
                         style={{
                             background: "var(--purple)",
-                            color: "var(--accent-ink)",
+                            color: "#fff",
                         }}
                     >
                         {t("xp_title")}
@@ -29,7 +29,7 @@ export function ProfileXPCard({ xp }: { xp: number }) {
                 <div className="text-right">
                     <span
                         ref={xpNumRef}
-                        className="font-display text-xl text-wc-cream tabular-nums"
+                        className="font-display text-2xl tabular-nums text-shadow"
                     >
                         {xp}
                     </span>
@@ -39,10 +39,10 @@ export function ProfileXPCard({ xp }: { xp: number }) {
                 </div>
             </div>
 
-            <div className="relative h-4 overflow-hidden rounded-full border-nb border-wc-ink bg-wc-track">
+            <div className="relative h-3.5 overflow-hidden rounded-full bg-wc-panel-d2">
                 <div
                     ref={barRef}
-                    className="relative h-full bg-wc-purple"
+                    className="relative h-full rounded-full bg-wc-purple shadow-[inset_0_-3px_0_rgba(0,0,0,0.25)]"
                     style={{ width: "0%" }}
                 />
             </div>

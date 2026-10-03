@@ -1,8 +1,8 @@
-import { GAME_CATEGORIES, type GameCategoryId, type PlayGame } from "./catalog";
+import type { PlayGame } from "./catalog";
 import type { Translate } from "./table/types";
 
 /*
- * Translated labels and sections for the play catalog — shared by the home
+ * Translated labels for the play catalog — shared by the home
  * showcase and the play hub so wording never drifts between them.
  */
 
@@ -46,24 +46,4 @@ export function gameLabels(g: PlayGame, tg: Translate): GameLabels {
             comingSoon: tg("coming_soon"),
         },
     };
-}
-
-interface PlaySection {
-    readonly id: GameCategoryId;
-    readonly accent: string;
-    readonly label: string;
-    readonly games: PlayGame[];
-}
-
-/** Empty categories are dropped. */
-export function buildPlaySections(
-    games: PlayGame[],
-    tg: Translate,
-): PlaySection[] {
-    return GAME_CATEGORIES.map((cat) => ({
-        id: cat.id,
-        accent: cat.accent,
-        label: tg(`cat_${cat.id}`),
-        games: games.filter((g) => g.category === cat.id),
-    })).filter((s) => s.games.length > 0);
 }

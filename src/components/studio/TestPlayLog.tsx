@@ -10,13 +10,7 @@ export function TestPlayLog({ log }: { readonly log: readonly LogEntry[] }) {
             <h3 className="font-display text-sm text-wc-cream">
                 {t("test_log_title")}
             </h3>
-            <div
-                className="flex h-64 flex-col gap-1 overflow-y-auto rounded-xl p-3 lg:h-80"
-                style={{
-                    background: "var(--panel-d2)",
-                    border: "2.5px solid var(--ink)",
-                }}
-            >
+            <div className="well flex h-64 flex-col gap-1 overflow-y-auto p-3 lg:h-80">
                 {log.length === 0 && (
                     <p className="sub text-xs">{t("test_log_empty")}</p>
                 )}

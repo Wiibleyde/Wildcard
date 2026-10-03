@@ -21,11 +21,11 @@ export function GameLog({ lines }: { lines: readonly GameLogLine[] }) {
                     lines.map((line, index) => (
                         <li
                             key={line.id}
-                            className={
+                            className={`well px-2.5 py-1.5 ${
                                 index === 0
                                     ? "font-bold text-wc-cream"
-                                    : "text-wc-cream/70"
-                            }
+                                    : "text-wc-muted"
+                            }`}
                         >
                             {line.text}
                         </li>

@@ -6,7 +6,7 @@ import {
     findPlayerName,
     localizePlayers,
     type NameLabels,
-} from "@/components/game/playerName";
+} from "@/lib/games/table/playerName";
 import type { GamePlayer } from "@/lib/models/game";
 import { nameTag } from "@/lib/models/identities";
 

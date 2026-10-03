@@ -25,7 +25,7 @@ export function FriendRow({ pseudo, avatarUrl, actions, disabled }: Props) {
     const name = pseudo ?? t("no_pseudo");
 
     return (
-        <li className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border-nb border-wc-ink bg-wc-panel-d2 px-3 py-2.5">
+        <li className="well flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5">
             <Avatar name={name} avatarUrl={avatarUrl} size={36} />
             <span
                 className="min-w-24 flex-1 truncate font-display text-lg"

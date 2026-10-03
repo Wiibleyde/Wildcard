@@ -1,19 +1,26 @@
+import { CircleAlert } from "lucide-react";
 import type { ReactNode } from "react";
+import { Alert, AlertDescription } from "@/components/ui/base/alert";
+import { cn } from "@/lib/utils";
 
 export function ErrorBanner({
     children,
-    className = "",
+    className,
 }: {
     children: ReactNode;
     className?: string;
 }) {
     return (
-        <p
-            role="alert"
-            className={`rounded-xl border-nb border-wc-ink bg-wc-red px-4 py-3 text-sm font-bold text-wc-accent-ink ${className}`}
-            style={{ boxShadow: "0 4px 0 var(--ink)" }}
+        <Alert
+            className={cn(
+                "border-nb bg-wc-red font-bold text-wc-accent-ink",
+                className,
+            )}
         >
-            {children}
-        </p>
+            <CircleAlert aria-hidden="true" />
+            <AlertDescription className="font-bold">
+                {children}
+            </AlertDescription>
+        </Alert>
     );
 }

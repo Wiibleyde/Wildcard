@@ -19,26 +19,18 @@ export function TestPlaySeat({
     const t = useTranslations("studio");
     return (
         <div
-            className="flex flex-col gap-2 rounded-xl p-3"
+            className="well flex flex-col gap-2 border-2 p-3"
             style={{
-                background: "var(--panel-d2)",
-                border: `2.5px solid ${seat.isCurrent && !over ? "var(--gold)" : "var(--ink)"}`,
+                borderColor:
+                    seat.isCurrent && !over ? "var(--orange)" : "var(--edge)",
             }}
         >
             <div className="flex flex-wrap items-center gap-2">
-                <span className="font-display text-sm text-wc-cream">
+                <span className="text-sm font-extrabold">
                     {seat.player.name}
                 </span>
                 {seat.isCurrent && !over && (
-                    <span
-                        className="stamp"
-                        style={{
-                            background: "var(--gold)",
-                            color: "var(--ink)",
-                        }}
-                    >
-                        ▶
-                    </span>
+                    <span className="stamp bg-wc-orange text-white">▶</span>
                 )}
                 <div className="ml-auto flex gap-2">
                     <GameButton
@@ -81,11 +73,8 @@ export function TestPlaySeat({
                                 })
                             }
                             disabled={over || !seat.playable.has(key)}
-                            className="wc-chip rounded-lg px-2 py-1.5 text-sm font-bold disabled:opacity-40"
+                            className="wc-chip rounded-lg bg-wc-cream px-2 py-1.5 text-sm font-bold [--press:#9b90ad] disabled:opacity-40"
                             style={{
-                                background: "var(--cream)",
-                                border: "2px solid var(--ink)",
-                                boxShadow: "0 2px 0 var(--ink)",
                                 color: isRedSuit(card)
                                     ? "var(--red)"
                                     : "var(--ink)",

@@ -28,8 +28,8 @@ export function BoardPill({
                 ...style,
                 borderColor: "var(--ink)",
                 boxShadow: outlined
-                    ? `0 0 0 3px ${theme.accentColor}, 0 4px 0 var(--ink)`
-                    : "0 4px 0 var(--ink)",
+                    ? `0 0 0 3px ${theme.accentColor}, 0 4px 0 var(--drop)`
+                    : "0 4px 0 var(--drop)",
             }}
         >
             {children}

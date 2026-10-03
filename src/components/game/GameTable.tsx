@@ -9,7 +9,7 @@ import { useClickToMove } from "@/hooks/game/useClickToMove";
 import { usePlayerNames } from "@/hooks/game/usePlayerNames";
 import { useTableCardAnimations } from "@/hooks/game/useTableCardAnimations";
 import { useTableDrag } from "@/hooks/game/useTableDrag";
-import { BOARD_RADIUS, buildSurfaceStyle } from "@/lib/board/styles";
+import { BOARD_RADIUS, BOARD_RIM, buildSurfaceStyle } from "@/lib/board/styles";
 import type { BoardTheme } from "@/lib/board/types";
 import { getCardTheme } from "@/lib/card/themes";
 import type { CardTheme } from "@/lib/card/types";
@@ -30,7 +30,7 @@ import { GameRail } from "./GameRail";
 import { TableControls } from "./TableControls";
 import { TableSeats } from "./TableSeats";
 import { TableZone } from "./TableZone";
-import type { ZoneContext } from "./zones/ZoneCard";
+import type { ZoneContext } from "./ZoneCard";
 
 const NO_CONTROLS: readonly TableControl[] = [];
 
@@ -218,13 +218,11 @@ export function GameTable({
             <div className="flex flex-col gap-3 lg:flex-row">
                 <div
                     ref={rootRef}
-                    className="relative flex min-h-[60vh] flex-1 flex-col gap-3 overflow-hidden p-3 sm:gap-4 sm:p-4 lg:h-[70vh] lg:min-h-0 xl:p-6"
+                    className="relative flex min-h-[60vh] flex-1 flex-col gap-3 overflow-hidden px-5 py-6 sm:gap-4 sm:px-8 sm:py-7 lg:h-[70vh] lg:min-h-0 xl:px-12 xl:py-8"
                     style={{
                         ...buildSurfaceStyle(boardTheme),
                         borderRadius: BOARD_RADIUS,
-                        border: "3px solid var(--ink)",
-                        boxShadow:
-                            "inset 0 0 0 3px rgba(0,0,0,0.35), inset 0 0 90px rgba(0,0,0,0.4), 0 10px 0 var(--ink)",
+                        boxShadow: BOARD_RIM,
                     }}
                 >
                     <output aria-live="polite" className="sr-only">
@@ -242,12 +240,12 @@ export function GameTable({
                         aria-hidden
                         className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center font-display"
                         style={{
-                            fontSize: "clamp(80px,17vw,200px)",
-                            color: "rgba(255,255,255,0.045)",
+                            fontSize: "clamp(48px,8vw,120px)",
+                            color: "rgba(0,0,0,0.14)",
                             lineHeight: 1,
                         }}
                     >
-                        W
+                        WILDCARD
                     </span>
 
                     {data.seats && (
@@ -272,7 +270,7 @@ export function GameTable({
                         <div className={centerClass}>{center}</div>
                         {data.status && (
                             <span
-                                className="text-sm font-black xl:text-base"
+                                className="text-sm font-black text-shadow xl:text-base"
                                 style={{ color: boardTheme.accentColor }}
                             >
                                 {data.status}

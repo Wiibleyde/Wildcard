@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import { type SyntheticEvent, useId, useState } from "react";
+import { Input } from "@/components/ui/base/input";
+import { fieldClass } from "@/components/ui/fields";
 import { GameButton } from "@/components/ui/GameButton";
 import { useAutoScroll } from "@/hooks/game/useAutoScroll";
 import { usePlayerNames } from "@/hooks/game/usePlayerNames";
@@ -81,7 +83,7 @@ export function GameChat({
                                 }
                             >
                                 <span
-                                    className="font-display text-xs"
+                                    className="text-xs font-extrabold"
                                     style={{
                                         color: mine
                                             ? "var(--gold)"
@@ -103,7 +105,7 @@ export function GameChat({
             </ol>
 
             <form onSubmit={onSubmit} className="mt-2 flex gap-2">
-                <input
+                <Input
                     type="text"
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
@@ -112,14 +114,11 @@ export function GameChat({
                     aria-label={t("placeholder")}
                     aria-invalid={notice !== null}
                     aria-describedby={noticeId}
-                    className="min-w-0 flex-1 rounded-wc-icon border-nb bg-wc-cream px-3 py-2 text-xs text-wc-ink outline-none placeholder:text-wc-ink/50 xl:text-sm"
-                    style={{
-                        borderColor: notice ? "var(--red)" : "var(--ink)",
-                    }}
+                    className={`${fieldClass} min-w-0 flex-1 px-3 py-2 text-xs aria-invalid:border-wc-red xl:text-sm`}
                 />
                 <GameButton
                     type="submit"
-                    variant="gold"
+                    variant="teal"
                     size="sm"
                     disabled={draft.trim().length === 0}
                     className="shrink-0"

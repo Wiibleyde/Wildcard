@@ -2,9 +2,9 @@
 
 import Image from "next/image";
 import { useTranslations } from "next-intl";
+import { fieldLabelClass } from "@/components/ui/fields";
 import { useGameImageUpload } from "@/hooks/studio/useGameImageUpload";
 import { ECA_IMAGE_EXTENSIONS } from "@/lib/eca/id";
-import { labelClass, labelStyle, mutedTextStyle } from "./fields";
 import { CheckIcon, UploadIcon } from "./UploadIcons";
 
 interface Props {
@@ -21,19 +21,10 @@ export function GameImageField({ ownerId, gameId, initialImagePath }: Props) {
 
     return (
         <div className="flex flex-col gap-2">
-            <span className={labelClass} style={labelStyle}>
-                {t("image_label")}
-            </span>
+            <span className={fieldLabelClass}>{t("image_label")}</span>
 
             <div className="group relative">
-                <div
-                    className="relative aspect-video w-full overflow-hidden rounded-2xl"
-                    style={{
-                        border: "2.5px solid var(--ink)",
-                        boxShadow: "0 4px 0 var(--ink)",
-                        background: "var(--cream2)",
-                    }}
-                >
+                <div className="well relative aspect-video w-full overflow-hidden rounded-2xl border-2 border-dashed border-wc-edge">
                     {img.displayUrl ? (
                         <Image
                             src={img.displayUrl}
@@ -45,10 +36,7 @@ export function GameImageField({ ownerId, gameId, initialImagePath }: Props) {
                             unoptimized
                         />
                     ) : (
-                        <div
-                            className="flex h-full w-full items-center justify-center text-sm font-semibold"
-                            style={mutedTextStyle}
-                        >
+                        <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-wc-muted">
                             {t("image_hint")}
                         </div>
                     )}
@@ -78,8 +66,7 @@ export function GameImageField({ ownerId, gameId, initialImagePath }: Props) {
                     type="button"
                     onClick={img.openFilePicker}
                     disabled={img.busy}
-                    className="text-xs font-bold underline disabled:opacity-50"
-                    style={{ color: "var(--ink)" }}
+                    className="text-xs font-bold text-wc-cream underline disabled:opacity-50"
                 >
                     {t("image_upload")}
                 </button>

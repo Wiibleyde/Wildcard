@@ -5,27 +5,32 @@ export const freeTheme: CardTheme = {
     name: "Classic",
     tier: "common",
     suits: {
-        spades: { symbol: "♠", color: "#0b1220" },
-        hearts: { symbol: "♥", color: "#ff4b3b" },
-        diamonds: { symbol: "♦", color: "#ff4b3b" },
-        clubs: { symbol: "♣", color: "#0b1220" },
+        spades: { symbol: "♠", color: "#241c33" },
+        hearts: { symbol: "♥", color: "#f4504a" },
+        diamonds: { symbol: "♦", color: "#f4504a" },
+        clubs: { symbol: "♣", color: "#241c33" },
     },
-    backgroundColor: "#f7edd4",
-    textColor: "#0b1220",
+    backgroundColor: "#fbf8ff",
+    textColor: "#241c33",
     border: {
-        color: "#0b1220",
+        color: "#d6cde6",
+        width: 2,
         effect: "solid",
-        boxShadow: "0 3px 0 #0b1220",
+        boxShadow: "0 3px 0 rgba(0, 0, 0, 0.35)",
     },
     back: {
-        color: "#12294a",
-        pattern:
-            "repeating-linear-gradient(45deg,#3b8cff 0px,#3b8cff 7px,#12294a 7px,#12294a 16px)",
+        // Red back with diagonal stripes and a centre medallion.
+        color: "#f4504a",
+        pattern: [
+            "radial-gradient(circle at 50% 50%, rgba(255,255,255,0.24) 0 13%, transparent 14%)",
+            "repeating-linear-gradient(45deg, rgba(0,0,0,0.13) 0 3px, transparent 3px 9px)",
+            "#f4504a",
+        ].join(", "),
     },
-    // Lilita One is single-weight: a heavier rankWeight would faux-bold it.
+    // Titan One is single-weight: a heavier rankWeight would faux-bold it.
     font: {
-        family: 'var(--disp, "Lilita One", system-ui, sans-serif)',
+        family: 'var(--disp, "Titan One", system-ui, sans-serif)',
         rankWeight: 400,
     },
-    trumpColor: "#a16207",
+    trumpColor: "#a8811f",
 };

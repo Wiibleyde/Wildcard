@@ -1,3 +1,4 @@
+import type { CardDescriptor } from "@/lib/card/types";
 import { gameCatalog } from "./index";
 
 /*
@@ -6,21 +7,22 @@ import { gameCatalog } from "./index";
  * module yet. Modules stay UI-agnostic on purpose.
  */
 
-/** Display order of the picker's sections. */
-export const GAME_CATEGORIES = [
-    { id: "duel", accent: "#ff4b3b" },
-    { id: "shedding", accent: "#ffc23d" },
-    { id: "trick", accent: "#9b6cf2" },
-    { id: "solo", accent: "#38cf78" },
-    { id: "party", accent: "#3b8cff" },
+export const GAME_CATEGORY_IDS = [
+    "duel",
+    "shedding",
+    "trick",
+    "solo",
+    "party",
 ] as const;
 
-export type GameCategoryId = (typeof GAME_CATEGORIES)[number]["id"];
+export type GameCategoryId = (typeof GAME_CATEGORY_IDS)[number];
 
 interface GameDisplayMeta {
     readonly category: GameCategoryId;
     readonly accent: string;
     readonly suits: string;
+    /** The card that stands for the game in the lobby fan. */
+    readonly signature: CardDescriptor;
     readonly difficulty: 1 | 2 | 3;
     readonly durationMin: number;
     /** Name and player range of a game that ships no module yet. */
@@ -35,44 +37,50 @@ interface GameDisplayMeta {
 const DISPLAY: Record<string, GameDisplayMeta> = {
     bataille: {
         category: "duel",
-        accent: "#ff4b3b",
+        accent: "#f4504a",
         suits: "♠ ♥",
+        signature: { type: "suited", suit: "spades", rank: "A" },
         difficulty: 1,
         durationMin: 3,
     },
     president: {
         category: "shedding",
-        accent: "#ffc23d",
+        accent: "#f5c64f",
         suits: "♦ ♣",
+        signature: { type: "suited", suit: "hearts", rank: "2" },
         difficulty: 2,
         durationMin: 12,
     },
     tarot: {
         category: "trick",
-        accent: "#9b6cf2",
+        accent: "#9a6bff",
         suits: "♠ ♥ ♦ ♣",
+        signature: { type: "trump", index: 21 },
         difficulty: 3,
         durationMin: 20,
     },
     solitaire: {
         category: "solo",
-        accent: "#38cf78",
+        accent: "#36b981",
         suits: "♦ ♣",
+        signature: { type: "suited", suit: "diamonds", rank: "K" },
         difficulty: 2,
         durationMin: 6,
     },
     belote: {
         category: "trick",
-        accent: "#ff8a3d",
+        accent: "#ff9c1f",
         suits: "♠ ♦",
+        signature: { type: "suited", suit: "clubs", rank: "J" },
         difficulty: 3,
         durationMin: 15,
         comingSoon: { name: "Belote", minPlayers: 4, maxPlayers: 4 },
     },
     kems: {
         category: "party",
-        accent: "#3b8cff",
+        accent: "#2b8fff",
         suits: "♥ ♣",
+        signature: { type: "suited", suit: "hearts", rank: "K" },
         difficulty: 1,
         durationMin: 8,
         comingSoon: { name: "Kems", minPlayers: 4, maxPlayers: 4 },
@@ -85,6 +93,7 @@ export interface PlayGame {
     readonly category: GameCategoryId;
     readonly accent: string;
     readonly suits: string;
+    readonly signature: CardDescriptor;
     readonly difficulty: 1 | 2 | 3;
     readonly durationMin: number;
     readonly minPlayers: number;
@@ -116,6 +125,7 @@ export function buildPlayCatalog(): PlayGame[] {
             category: meta.category,
             accent: meta.accent,
             suits: meta.suits,
+            signature: meta.signature,
             difficulty: meta.difficulty,
             durationMin: meta.durationMin,
             minPlayers: facts.minPlayers,

@@ -1,4 +1,5 @@
-import { fieldClass, fieldStyle, labelClass, labelStyle } from "./fields";
+import { Input } from "@/components/ui/base/input";
+import { fieldClass, fieldLabelClass } from "@/components/ui/fields";
 
 /** Non-numeric input reads as 0; the validator reports the out-of-range value. */
 function parseCount(raw: string): number {
@@ -23,14 +24,10 @@ export function NumberField({
 }) {
     return (
         <div>
-            <label
-                htmlFor={id}
-                className={`${labelClass} mb-2 block`}
-                style={labelStyle}
-            >
+            <label htmlFor={id} className={`${fieldLabelClass} mb-2 block`}>
                 {label}
             </label>
-            <input
+            <Input
                 id={id}
                 type="number"
                 min={min}
@@ -38,7 +35,6 @@ export function NumberField({
                 value={value}
                 onChange={(e) => onChange(parseCount(e.target.value))}
                 className={`${fieldClass} w-full`}
-                style={fieldStyle}
             />
         </div>
     );

@@ -1,26 +1,34 @@
+import { Button } from "@/components/ui/base/button";
 import { Link } from "@/i18n/navigation";
+import { cn } from "@/lib/utils";
 
-export type GameButtonVariant = "gold" | "green" | "red" | "teal" | "ghost";
+export type GameButtonVariant =
+    | "gold"
+    | "green"
+    | "red"
+    | "teal"
+    | "orange"
+    | "purple"
+    | "cream"
+    | "ghost";
 export type GameButtonSize = "sm" | "md" | "lg";
 
-type VariantConfig = {
-    bg: string;
-    text: string;
-    ghost?: boolean;
-};
-
-const VARIANTS: Record<GameButtonVariant, VariantConfig> = {
-    gold: { bg: "var(--gold)", text: "var(--ink)" },
-    green: { bg: "var(--green)", text: "var(--ink)" },
-    red: { bg: "var(--red)", text: "var(--accent-ink)" },
-    teal: { bg: "var(--blue)", text: "var(--accent-ink)" },
-    ghost: { bg: "transparent", text: "var(--cream)", ghost: true },
+// Each button rests on a darker shade of its own colour (`--press`) and sinks into it when pressed.
+const VARIANTS: Record<GameButtonVariant, string> = {
+    gold: "bg-wc-gold text-wc-ink [--press:var(--gold-d)]",
+    green: "bg-wc-green text-white text-shadow [--press:var(--green-d)]",
+    red: "bg-wc-red text-white text-shadow [--press:var(--red-d)]",
+    teal: "bg-wc-blue text-white text-shadow [--press:var(--blue-d)]",
+    orange: "bg-wc-orange text-white text-shadow [--press:var(--orange-d)]",
+    purple: "bg-wc-purple text-white text-shadow [--press:var(--purple-d)]",
+    cream: "bg-wc-panel-d2 text-wc-cream text-shadow [--press:#110c17]",
+    ghost: "bg-transparent text-wc-cream shadow-none hover:bg-white/5",
 };
 
 const SIZES: Record<GameButtonSize, string> = {
-    sm: "px-3.5 py-2 text-sm",
-    md: "px-4.5 py-2.75 text-base",
-    lg: "px-6 py-3.5 text-xl",
+    sm: "h-auto rounded-[10px] px-3.5 py-2 text-sm",
+    md: "h-auto px-4.5 py-2.75 text-base",
+    lg: "h-auto px-6 py-3.5 text-xl",
 };
 
 type BaseProps = {
@@ -48,65 +56,68 @@ type AsLink = BaseProps & {
 
 type GameButtonProps = AsButton | AsLink;
 
+export function gameButtonClass(
+    variant: GameButtonVariant = "gold",
+    size: GameButtonSize = "md",
+    className?: string,
+): string {
+    return cn(
+        "border-0 font-body font-extrabold leading-none",
+        variant !== "ghost" && "wc-press",
+        "disabled:bg-wc-track disabled:text-wc-sub disabled:opacity-100 disabled:[--press:var(--panel-d)] disabled:[text-shadow:none] data-disabled:bg-wc-track data-disabled:text-wc-sub data-disabled:opacity-100",
+        VARIANTS[variant],
+        SIZES[size],
+        className,
+    );
+}
+
 export function GameButton({
     variant = "gold",
     size = "md",
     children,
-    className = "",
+    className,
     disabled = false,
     ariaLabel,
     ...rest
 }: GameButtonProps) {
-    const v = VARIANTS[variant];
-
-    const style = {
-        background: v.bg,
-        color: v.text,
-        ...(v.ghost ? { boxShadow: "none", borderColor: "transparent" } : null),
-    } as React.CSSProperties;
-
-    const baseClass = `wc-btn ${SIZES[size]} ${className}`;
+    const classes = gameButtonClass(variant, size, className);
+    const buttonVariant = variant === "ghost" ? "noShadow" : "default";
 
     // A disabled link renders as a disabled <button>: not navigable, not focusable.
     if ("href" in rest && rest.href !== undefined && !disabled) {
         // Off-site targets (the portal) bypass the locale-prefixing i18n Link.
-        if (/^https?:\/\//.test(rest.href)) {
-            return (
-                <a
-                    href={rest.href}
-                    className={baseClass}
-                    style={style}
-                    aria-label={ariaLabel}
-                >
-                    {children}
-                </a>
-            );
-        }
+        const link = /^https?:\/\//.test(rest.href) ? (
+            // biome-ignore lint/a11y/useAnchorContent: content is injected by Button's render prop
+            <a href={rest.href} />
+        ) : (
+            <Link href={rest.href} />
+        );
         return (
-            <Link
-                href={rest.href}
-                className={baseClass}
-                style={style}
+            <Button
+                variant={buttonVariant}
+                className={classes}
                 aria-label={ariaLabel}
+                nativeButton={false}
+                render={link}
             >
                 {children}
-            </Link>
+            </Button>
         );
     }
 
     const { type = "button", onClick, form } = rest as AsButton;
 
     return (
-        <button
+        <Button
+            variant={buttonVariant}
             type={type}
-            className={baseClass}
-            style={style}
+            className={classes}
             disabled={disabled}
             aria-label={ariaLabel}
             onClick={onClick}
             form={form}
         >
             {children}
-        </button>
+        </Button>
     );
 }

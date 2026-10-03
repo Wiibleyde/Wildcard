@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Card } from "@/components/card/Card";
 import type { PlayGame } from "@/lib/games/catalog";
 
 interface MetaLabels {
@@ -17,7 +18,7 @@ interface Props {
     readonly footer?: ReactNode;
 }
 
-/** Hook-free so it renders in both the server home page and the client play hub. */
+/** Catalog tile: the game's signature card beside its pitch. */
 export function GameCard({
     game,
     categoryLabel,
@@ -25,135 +26,39 @@ export function GameCard({
     meta,
     footer,
 }: Props) {
-    const { accent, available, suits, difficulty } = game;
-    const primarySuit = suits.trim()[0] ?? "♠";
+    const { accent, available } = game;
 
     return (
-        <div
-            className={`group panel relative flex flex-col overflow-hidden p-5 ${available ? "lift" : ""}`}
-            style={{ opacity: available ? 1 : 0.85 }}
+        <article
+            className={`panel flex gap-4 p-4 ${available ? "lift" : "opacity-70"}`}
         >
-            <span
-                aria-hidden="true"
-                className="font-display pointer-events-none absolute -top-8 -right-3 select-none leading-none"
-                style={{
-                    fontSize: "10rem",
-                    color: "var(--ink)",
-                    opacity: available ? 0.06 : 0.04,
-                    transform: "rotate(8deg)",
-                }}
-            >
-                {primarySuit}
-            </span>
-
-            <div className="relative z-10 flex flex-1 flex-col gap-4">
-                <div className="flex items-start justify-between gap-3">
+            <div className="w-16 shrink-0 -rotate-3 xl:w-20">
+                <Card card={game.signature} faceDown={!available} />
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-display text-xl leading-tight text-shadow">
+                        {game.name}
+                    </h3>
                     <span
-                        aria-hidden="true"
-                        className="flex h-12 items-center justify-center rounded-xl px-3 font-display text-xl leading-none"
+                        className="stamp text-white"
                         style={{
-                            background: available ? accent : "var(--cream2)",
-                            color: available ? "var(--ink)" : "var(--ink-soft)",
-                            border: "2.5px solid var(--ink)",
-                            boxShadow: "0 4px 0 var(--ink)",
-                            transform: "rotate(-4deg)",
+                            background: available ? accent : "var(--edge)",
                         }}
                     >
-                        {suits}
-                    </span>
-                    {available ? (
-                        <span
-                            role="img"
-                            className="mt-1 flex items-center gap-1.5"
-                            title={meta.difficulty}
-                            aria-label={meta.difficulty}
-                        >
-                            {[1, 2, 3].map((pip) => (
-                                <span
-                                    key={pip}
-                                    className="h-2.5 w-2.5 rounded-xs"
-                                    style={{
-                                        background:
-                                            pip <= difficulty
-                                                ? accent
-                                                : "var(--cream2)",
-                                        border: "2px solid var(--ink)",
-                                    }}
-                                />
-                            ))}
-                        </span>
-                    ) : (
-                        <span
-                            className="stamp mt-1"
-                            style={{
-                                background: "var(--cream2)",
-                                color: "var(--ink-soft)",
-                            }}
-                        >
-                            {meta.comingSoon}
-                        </span>
-                    )}
-                </div>
-
-                <div className="flex flex-col gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <h3
-                            className="font-display text-2xl leading-tight"
-                            style={{
-                                color: available
-                                    ? "var(--ink)"
-                                    : "var(--ink-soft)",
-                            }}
-                        >
-                            {game.name}
-                        </h3>
-                        <span
-                            className="stamp"
-                            style={{
-                                background: available
-                                    ? accent
-                                    : "var(--cream2)",
-                                color: available
-                                    ? "var(--ink)"
-                                    : "var(--ink-soft)",
-                            }}
-                        >
-                            {categoryLabel}
-                        </span>
-                    </div>
-                    <p
-                        className="text-sm font-semibold leading-snug"
-                        style={{ color: "var(--ink-soft)" }}
-                    >
-                        {description}
-                    </p>
-                </div>
-
-                <div className="mt-auto flex flex-wrap items-center gap-2">
-                    <span
-                        className="stamp"
-                        style={{
-                            background: "var(--cream)",
-                            color: "var(--ink)",
-                        }}
-                    >
-                        {meta.players}
-                    </span>
-                    <span
-                        className="stamp"
-                        style={{
-                            background: "var(--cream)",
-                            color: "var(--ink)",
-                        }}
-                    >
-                        {meta.duration}
+                        {available ? categoryLabel : meta.comingSoon}
                     </span>
                 </div>
-
+                <p className="text-sm leading-snug text-wc-muted">
+                    {description}
+                </p>
+                <p className="text-xs font-bold text-wc-sub">
+                    {meta.players} · {meta.duration}
+                </p>
                 {available && footer ? (
-                    <div className="flex flex-col gap-2">{footer}</div>
+                    <div className="mt-auto pt-1">{footer}</div>
                 ) : null}
             </div>
-        </div>
+        </article>
     );
 }

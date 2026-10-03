@@ -209,7 +209,12 @@
         "elapsed_value": "{s} s",
         "elapsed_label": "écoulé",
         "in_queue_label": "en file",
-        "play_bots": "Jouer contre des bots"
+        "play_bots": "Jouer contre des bots",
+        "pick_title": "Choisis ta carte",
+        "studio_card": "Ton jeu",
+        "studio_card_desc": "Invente tes propres règles avec des cartes quand, si, alors.",
+        "play_bots_short": "Contre des bots",
+        "solo_hint": "Partie solo, une nouvelle donne à chaque fois."
     },
     "room": {
         "title": "Salon d'attente",

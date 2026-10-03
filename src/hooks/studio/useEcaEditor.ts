@@ -2,15 +2,12 @@
 
 import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
-import {
-    type DraftDefinition,
-    toDraftDefinition,
-} from "@/components/studio/draft";
-import { studioApiErrorKey } from "@/components/studio/messages";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useApiMutation } from "@/hooks/useApiMutation";
 import { useRouter } from "@/i18n/navigation";
+import { type DraftDefinition, toDraftDefinition } from "@/lib/eca/draft";
 import { reconcileCondition } from "@/lib/eca/schema";
+import { studioApiErrorKey } from "@/lib/eca/studioMessages";
 import type { EcaDefinition } from "@/lib/eca/types";
 import {
     type EcaValidationError,

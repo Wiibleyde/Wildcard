@@ -1,8 +1,13 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { Input } from "@/components/ui/base/input";
+import { Textarea } from "@/components/ui/base/textarea";
+import { fieldClass, fieldLabelClass } from "@/components/ui/fields";
+import { SelectField } from "@/components/ui/SelectField";
 import type { EcaEditorController } from "@/hooks/studio/useEcaEditor";
 import { ECA_DECK_IDS, isOneOf } from "@/lib/eca/schema";
+import type { StudioMessageKey } from "@/lib/eca/studioMessages";
 import type { EcaDeckId, EcaDefinition } from "@/lib/eca/types";
 import {
     ECA_DESCRIPTION_MAX,
@@ -12,15 +17,7 @@ import {
     ECA_PLAYERS_MAX,
     ECA_PLAYERS_MIN,
 } from "@/lib/eca/validate";
-import {
-    fieldClass,
-    fieldStyle,
-    labelClass,
-    labelStyle,
-    mutedTextStyle,
-} from "./fields";
 import { GameImageField } from "./GameImageField";
-import type { StudioMessageKey } from "./messages";
 import { NumberField } from "./NumberField";
 import { PanelTitle } from "./PanelTitle";
 import { ToggleRow } from "./ToggleRow";
@@ -61,30 +58,27 @@ export function EcaSettingsRail({
                 <div>
                     <label
                         htmlFor="studio-name"
-                        className={`${labelClass} mb-2 block`}
-                        style={labelStyle}
+                        className={`${fieldLabelClass} mb-2 block`}
                     >
                         {t("create_name_label")}
                     </label>
-                    <input
+                    <Input
                         id="studio-name"
                         value={draft.meta.name}
                         onChange={(e) => patchMeta({ name: e.target.value })}
                         maxLength={ECA_NAME_MAX}
                         placeholder={t("create_name_placeholder")}
                         className={`${fieldClass} w-full`}
-                        style={fieldStyle}
                     />
                 </div>
                 <div>
                     <label
                         htmlFor="studio-description"
-                        className={`${labelClass} mb-2 block`}
-                        style={labelStyle}
+                        className={`${fieldLabelClass} mb-2 block`}
                     >
                         {t("description_label")}
                     </label>
-                    <textarea
+                    <Textarea
                         id="studio-description"
                         value={draft.meta.description ?? ""}
                         onChange={(e) =>
@@ -99,7 +93,6 @@ export function EcaSettingsRail({
                         rows={3}
                         placeholder={t("description_placeholder")}
                         className={`${fieldClass} w-full resize-none`}
-                        style={fieldStyle}
                     />
                 </div>
                 <GameImageField
@@ -133,29 +126,24 @@ export function EcaSettingsRail({
                     <div>
                         <label
                             htmlFor="studio-deck"
-                            className={`${labelClass} mb-2 block`}
-                            style={labelStyle}
+                            className={`${fieldLabelClass} mb-2 block`}
                         >
                             {t("deck_label")}
                         </label>
-                        <select
+                        <SelectField
                             id="studio-deck"
                             value={draft.setup.deckId}
-                            onChange={(e) => {
-                                const deckId = e.target.value;
+                            onChange={(deckId) => {
                                 if (isOneOf(deckId, ECA_DECK_IDS)) {
                                     patchSetup({ deckId });
                                 }
                             }}
                             className={`${fieldClass} w-full`}
-                            style={fieldStyle}
-                        >
-                            {ECA_DECK_IDS.map((deckId) => (
-                                <option key={deckId} value={deckId}>
-                                    {t(DECK_LABELS[deckId])}
-                                </option>
-                            ))}
-                        </select>
+                            options={ECA_DECK_IDS.map((deckId) => ({
+                                value: deckId,
+                                label: t(DECK_LABELS[deckId]),
+                            }))}
+                        />
                     </div>
                     <NumberField
                         id="studio-hand-size"
@@ -187,7 +175,7 @@ export function EcaSettingsRail({
 
             <section className="panel flex flex-col gap-2 p-5">
                 <PanelTitle>{t("editor_win")}</PanelTitle>
-                <p className="text-sm font-semibold" style={mutedTextStyle}>
+                <p className="text-sm font-semibold text-wc-muted">
                     {t("win_empty_hand")}
                 </p>
             </section>

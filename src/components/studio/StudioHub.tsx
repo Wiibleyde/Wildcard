@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { ErrorBanner } from "@/components/ui/ErrorBanner";
 // Client-safe: models/studio only has type imports from supabase.
 import { MAX_ECA_GAMES_PER_OWNER } from "@/lib/models/studio";
 import { CreateGamePanel } from "./CreateGamePanel";
@@ -22,24 +23,10 @@ export function StudioHub({
                 onError={setError}
             />
 
-            {error && (
-                <p
-                    className="rounded-xl px-4 py-3 text-sm font-bold"
-                    style={{
-                        background: "var(--red)",
-                        border: "2.5px solid var(--ink)",
-                        boxShadow: "0 4px 0 var(--ink)",
-                        color: "var(--accent-ink)",
-                    }}
-                >
-                    {error}
-                </p>
-            )}
+            {error && <ErrorBanner>{error}</ErrorBanner>}
 
             <section className="flex flex-col gap-4">
-                <h2 className="font-display text-xl text-wc-cream">
-                    {t("my_games")}
-                </h2>
+                <h2 className="h-lg">{t("my_games")}</h2>
                 {games.length === 0 ? (
                     <div className="panel-d p-6">
                         <p className="sub text-sm">{t("empty")}</p>

@@ -1,7 +1,18 @@
 "use client";
 
-import { GameButton, type GameButtonVariant } from "./GameButton";
-import { Modal } from "./Modal";
+import {
+    AlertDialog,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogTitle,
+} from "@/components/ui/base/alert-dialog";
+import {
+    GameButton,
+    type GameButtonVariant,
+    gameButtonClass,
+} from "./GameButton";
 
 export interface ConfirmDialogProps {
     open: boolean;
@@ -25,26 +36,37 @@ export function ConfirmDialog({
     onCancel,
 }: ConfirmDialogProps) {
     return (
-        <Modal
+        <AlertDialog
             open={open}
-            onClose={onCancel}
-            closeLabel={cancelLabel}
-            role="alertdialog"
-            label={title ?? message}
-            className="flex max-w-sm flex-col gap-4 rounded-2xl border-nb border-wc-ink bg-wc-panel-d p-6 text-center shadow-[0_8px_0_var(--ink)]"
+            onOpenChange={(next) => {
+                if (!next) onCancel();
+            }}
         >
-            {title && (
-                <h2 className="font-display text-xl text-wc-cream">{title}</h2>
-            )}
-            <p className="text-sm font-semibold text-wc-muted">{message}</p>
-            <div className="mt-2 flex flex-col-reverse gap-3 sm:flex-row sm:justify-center">
-                <GameButton variant="ghost" size="sm" onClick={onCancel}>
-                    {cancelLabel}
-                </GameButton>
-                <GameButton variant={variant} size="sm" onClick={onConfirm}>
-                    {confirmLabel}
-                </GameButton>
-            </div>
-        </Modal>
+            <AlertDialogContent
+                size="sm"
+                aria-label={title ? undefined : message}
+                className="flex flex-col gap-4 bg-wc-panel-d text-center text-wc-cream"
+            >
+                {title && (
+                    <AlertDialogTitle className="font-display text-xl text-wc-cream">
+                        {title}
+                    </AlertDialogTitle>
+                )}
+                <AlertDialogDescription className="text-sm font-semibold text-wc-muted">
+                    {message}
+                </AlertDialogDescription>
+                <AlertDialogFooter className="mt-2 sm:justify-center">
+                    <AlertDialogCancel
+                        className={gameButtonClass("ghost", "sm")}
+                    >
+                        {cancelLabel}
+                    </AlertDialogCancel>
+                    {/* Not an AlertDialog.Close: confirming must not also fire onCancel. */}
+                    <GameButton variant={variant} size="sm" onClick={onConfirm}>
+                        {confirmLabel}
+                    </GameButton>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     );
 }

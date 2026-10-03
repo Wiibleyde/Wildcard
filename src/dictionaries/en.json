@@ -209,7 +209,12 @@
         "elapsed_value": "{s}s",
         "elapsed_label": "elapsed",
         "in_queue_label": "in queue",
-        "play_bots": "Play against bots"
+        "play_bots": "Play against bots",
+        "pick_title": "Pick your card",
+        "studio_card": "Your game",
+        "studio_card_desc": "Invent your own rules with when, if, then cards.",
+        "play_bots_short": "Against bots",
+        "solo_hint": "Solo game, a fresh deal every time."
     },
     "room": {
         "title": "Waiting room",

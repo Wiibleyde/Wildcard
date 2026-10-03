@@ -1,49 +1,59 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-/* Neobrutalism design system: 2.5px ink outlines, hard offset shadows, cream on cobalt. */
+/* Wildcard design system: a night card room. Plum ground with drifting suits, dark
+   plum panels, white playing-card surfaces, chunky buttons that press down onto a
+   darker shade of their own colour. Titan One for display, Rubik for everything else. */
 
 @theme {
-    --color-wc-ink: #0b1220; /* outlines, hard shadows, text on cream */
-    --color-wc-bg: #12294a; /* app background — deep cobalt */
-    --color-wc-bg-line: #1c3a63; /* texture hairline on dark */
-    --color-wc-cream: #f7edd4; /* cards, light panels */
-    --color-wc-cream2: #ecdcb4; /* deeper cream */
-    --color-wc-panel-d: #0e2138; /* dark-blue panel (HUD / chrome) */
-    --color-wc-panel-d2: #0a1a2e; /* darkest blue (sidebar) */
-    --color-wc-muted: #93a8c8; /* blue-gray secondary text on dark */
-    --color-wc-blue: #3b8cff;
-    --color-wc-red: #ff4b3b; /* primary accent / hearts */
-    --color-wc-gold: #ffc23d;
-    --color-wc-green: #38cf78;
-    --color-wc-purple: #9b6cf2;
-    --color-wc-felt: #10684b;
-    --color-wc-felt-d: #08402e;
-    --color-wc-accent-ink: #fff7ee;
-    --color-wc-ink-soft: #5a5340; /* secondary text on cream */
+    --color-wc-ink: #120d18; /* outlines, drop shadows, text on white cards */
+    --color-wc-bg: #17111f; /* app background — night plum */
+    --color-wc-bg-line: #2a2236; /* hairlines on dark */
+    --color-wc-cream: #fbf8ff; /* card white; primary text on dark */
+    --color-wc-cream2: #ece6f6; /* deeper card white */
+    --color-wc-panel-d: #2a2236; /* panel */
+    --color-wc-panel-d2: #1e1828; /* inset well / sidebar */
+    --color-wc-edge: #43375a; /* panel outline */
+    --color-wc-muted: #b5a8cb; /* secondary text on dark */
+    --color-wc-blue: #2b8fff;
+    --color-wc-blue-d: #185ba6;
+    --color-wc-red: #f4504a; /* primary accent / hearts */
+    --color-wc-red-d: #a8302c;
+    --color-wc-orange: #ff9c1f;
+    --color-wc-orange-d: #b5640a;
+    --color-wc-gold: #f5c64f;
+    --color-wc-gold-d: #a8811f;
+    --color-wc-green: #36b981;
+    --color-wc-green-d: #1f7a53;
+    --color-wc-purple: #9a6bff;
+    --color-wc-purple-d: #6440b8;
+    --color-wc-felt: #2c6a55;
+    --color-wc-felt-d: #18402f;
+    --color-wc-accent-ink: #ffffff;
+    --color-wc-ink-soft: #6b5f80; /* secondary text on white cards */
     --color-wc-silver: #cdd2da;
     --color-wc-bronze: #cd8b4f;
-    --color-wc-track: #d6c79c; /* empty progress track on dark */
+    --color-wc-track: #3f354f; /* empty progress track */
 
     /* legacy names, aliased onto the palette above */
-    --color-wc-surface: #12294a;
-    --color-wc-panel: #0e2138;
-    --color-wc-border: #0b1220;
-    --color-wc-edge: #0b1220;
-    --color-wc-text: #f7edd4;
-    --color-wc-heading: #faf2e2;
-    --color-wc-sub: #6f86a8;
-    --color-wc-gold-dim: oklch(from #ffc23d l c h / 0.14);
-    --color-wc-xp: #9b6cf2;
-    --color-wc-xp-dim: oklch(from #9b6cf2 l c h / 0.18);
+    --color-wc-surface: #17111f;
+    --color-wc-panel: #2a2236;
+    --color-wc-border: #43375a;
+    --color-wc-text: #fbf8ff;
+    --color-wc-heading: #ffffff;
+    --color-wc-sub: #8d82a2;
+    --color-wc-gold-dim: oklch(from #f5c64f l c h / 0.14);
+    --color-wc-xp: #9a6bff;
+    --color-wc-xp-dim: oklch(from #9a6bff l c h / 0.18);
 
     --font-pixel: var(--pixel);
 
-    --text-wc-micro: 0.5625rem; /* 9px */
-    --text-wc-label: 0.625rem; /* 10px */
-    --text-wc-tag: 0.6875rem; /* 11px */
-    --tracking-wc-cap: 0.02em;
+    --text-wc-micro: 0.625rem; /* 10px */
+    --text-wc-label: 0.6875rem; /* 11px */
+    --text-wc-tag: 0.75rem; /* 12px */
+    --tracking-wc-cap: 0.06em;
 
-    /* chunkier than Tailwind's defaults */
+    /* rounder than Tailwind's defaults */
     --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 10px;
@@ -52,38 +62,93 @@
     --radius-3xl: 20px;
 
     --radius-wc-panel: 16px;
-    --radius-wc-card: 8px;
-    --radius-wc-btn: 13px;
+    --radius-wc-card: 9px;
+    --radius-wc-btn: 12px;
     --radius-wc-icon: 11px;
 }
 
 /* Raw aliases for inline styles (var(--ink)…). Keep in sync with @theme. */
 :root {
-    --ink: #0b1220;
-    --bg: #12294a;
-    --bg-line: #1c3a63;
-    --cream: #f7edd4;
-    --cream2: #ecdcb4;
-    --panel-d: #0e2138;
-    --panel-d2: #0a1a2e;
-    --muted: #93a8c8;
-    --blue: #3b8cff;
-    --red: #ff4b3b;
-    --gold: #ffc23d;
-    --green: #38cf78;
-    --purple: #9b6cf2;
-    --felt: #10684b;
-    --felt-d: #08402e;
-    --accent: #ff4b3b;
-    --accent-ink: #fff7ee;
-    --ink-soft: #5a5340;
+    --ink: #120d18;
+    --bg: #17111f;
+    --bg-line: #2a2236;
+    --cream: #fbf8ff;
+    --cream2: #ece6f6;
+    --panel-d: #2a2236;
+    --panel-d2: #1e1828;
+    --edge: #43375a;
+    --muted: #b5a8cb;
+    --blue: #2b8fff;
+    --blue-d: #185ba6;
+    --red: #f4504a;
+    --red-d: #a8302c;
+    --orange: #ff9c1f;
+    --orange-d: #b5640a;
+    --gold: #f5c64f;
+    --gold-d: #a8811f;
+    --green: #36b981;
+    --green-d: #1f7a53;
+    --purple: #9a6bff;
+    --purple-d: #6440b8;
+    --felt: #2c6a55;
+    --felt-d: #18402f;
+    --accent: #f4504a;
+    --accent-ink: #ffffff;
+    --ink-soft: #6b5f80;
     --silver: #cdd2da;
     --bronze: #cd8b4f;
-    --track: #d6c79c;
+    --track: #3f354f;
+    --drop: rgba(0, 0, 0, 0.32); /* hard drop shadow under panels */
+    --text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
 
-    --disp: var(--font-display), "Lilita One", system-ui, sans-serif;
-    --pixel: var(--font-silkscreen), "Silkscreen", ui-monospace, monospace;
-    --body: var(--font-body), "Hanken Grotesk", system-ui, sans-serif;
+    --disp:
+        var(--font-display), "Titan One", "Arial Rounded MT Bold", sans-serif;
+    /* Micro labels: Rubik bold caps (the former pixel face). */
+    --pixel: var(--font-body), "Rubik", system-ui, sans-serif;
+    --body: var(--font-body), "Rubik", system-ui, sans-serif;
+}
+
+/* neobrutalism.dev (src/components/ui/base) tokens, mapped onto the Wildcard palette. */
+:root {
+    --border-radius: 12px;
+    --box-shadow-x: 0px;
+    --box-shadow-y: 4px;
+    --reverse-box-shadow-x: 0px;
+    --reverse-box-shadow-y: -4px;
+    --heading-font-weight: 400;
+    --base-font-weight: 700;
+
+    --background: var(--panel-d);
+    --secondary-background: var(--panel-d2);
+    --foreground: var(--cream);
+    --main: var(--gold);
+    --main-foreground: var(--ink);
+    --border: var(--edge);
+    --ring: var(--gold);
+    --overlay: rgba(10, 6, 16, 0.78);
+    --shadow: var(--box-shadow-x) var(--box-shadow-y) 0px 0px var(--drop);
+}
+
+@theme inline {
+    --color-main: var(--main);
+    --color-background: var(--background);
+    --color-secondary-background: var(--secondary-background);
+    --color-foreground: var(--foreground);
+    --color-main-foreground: var(--main-foreground);
+    --color-border: var(--border);
+    --color-overlay: var(--overlay);
+    --color-ring: var(--ring);
+
+    --spacing-boxShadowX: var(--box-shadow-x);
+    --spacing-boxShadowY: var(--box-shadow-y);
+    --spacing-reverseBoxShadowX: var(--reverse-box-shadow-x);
+    --spacing-reverseBoxShadowY: var(--reverse-box-shadow-y);
+
+    --radius-base: var(--border-radius);
+    --shadow-shadow: var(--shadow);
+
+    --font-weight-base: var(--base-font-weight);
+    --font-weight-heading: var(--heading-font-weight);
 }
 
 @layer base {
@@ -93,20 +158,33 @@
 
     body {
         font-family: var(--body);
+        font-weight: 500;
         color: var(--cream);
-        background: var(--bg);
+        background:
+            radial-gradient(
+                1100px 700px at 62% 12%,
+                #3a2450 0%,
+                transparent 65%
+            ),
+            radial-gradient(900px 600px at 0% 100%, #2a1838 0%, transparent 60%),
+            var(--bg);
+        background-attachment: fixed;
         -webkit-font-smoothing: antialiased;
         text-rendering: optimizeLegibility;
-        background-image:
-            radial-gradient(rgba(255, 255, 255, 0.028) 1.4px, transparent 1.5px),
-            radial-gradient(rgba(0, 0, 0, 0.1) 1.4px, transparent 1.5px);
-        background-size:
-            22px 22px,
-            22px 22px;
-        background-position:
-            0 0,
-            11px 11px;
-        background-attachment: fixed;
+    }
+
+    /* Drifting suits behind everything (fixed, decorative). */
+    body::before {
+        content: "";
+        position: fixed;
+        inset: -160px;
+        z-index: -1;
+        pointer-events: none;
+        opacity: 0.07;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' font-family='Arial' font-size='34' fill='white'%3E%3Ctext x='18' y='48'%3E%E2%99%A0%3C/text%3E%3Ctext x='98' y='48'%3E%E2%99%A5%3C/text%3E%3Ctext x='58' y='128'%3E%E2%99%A6%3C/text%3E%3Ctext x='138' y='128'%3E%E2%99%A3%3C/text%3E%3C/svg%3E");
+        background-size: 160px 160px;
+        transform: rotate(-12deg);
+        animation: wc-drift 60s linear infinite;
     }
 
     h1,
@@ -119,42 +197,69 @@
         letter-spacing: 0.01em;
     }
 
+    .font-pixel {
+        font-weight: 700;
+        letter-spacing: 0.06em;
+    }
+
     ::selection {
         background: var(--red);
         color: #fff;
     }
 
     ::-webkit-scrollbar {
-        width: 12px;
-        height: 12px;
+        width: 10px;
+        height: 10px;
     }
     ::-webkit-scrollbar-thumb {
-        background: var(--panel-d);
-        border-radius: 0;
-        border: 3px solid var(--bg);
+        background: var(--edge);
+        border-radius: 10px;
+        border: 2px solid var(--bg);
     }
     ::-webkit-scrollbar-thumb:hover {
-        background: #16304f;
+        background: #56487a;
+    }
+}
+
+@keyframes wc-drift {
+    to {
+        background-position: 160px 160px;
     }
 }
 
 @utility border-nb {
-    border-width: 2.5px;
+    border-width: 2px;
 }
 
+/* Surfaces ------------------------------------------------------------- */
+
 .panel {
-    background: var(--cream);
-    color: var(--ink);
-    border: 2.5px solid var(--ink);
-    border-radius: 16px;
-    box-shadow: 0 6px 0 var(--ink);
-}
-.panel-d {
     background: var(--panel-d);
     color: var(--cream);
-    border: 2.5px solid var(--ink);
+    border: 2px solid var(--edge);
     border-radius: 16px;
-    box-shadow: 0 6px 0 var(--ink);
+    box-shadow: 0 5px 0 var(--drop);
+}
+/* Inset well inside a panel (rows, list items, stat tiles). */
+.panel-d {
+    background: var(--panel-d2);
+    color: var(--cream);
+    border: 2px solid var(--edge);
+    border-radius: 16px;
+    box-shadow: 0 5px 0 var(--drop);
+}
+.well {
+    background: var(--panel-d2);
+    border-radius: 12px;
+}
+/* White playing-card surface (tooltips, rule cards, profile card). */
+.card-surface {
+    background: var(--cream);
+    color: var(--ink);
+    border-radius: 12px;
+    box-shadow:
+        inset 0 0 0 2px #d6cde6,
+        0 5px 0 var(--drop);
 }
 .flat {
     /* biome-ignore lint/complexity/noImportantStyles: must beat the panel/lift shadows */
@@ -162,72 +267,55 @@
 }
 
 .stamp {
-    font-family: var(--pixel);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
+    font-family: var(--body);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
     line-height: 1;
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 5px 8px 4px;
+    padding: 5px 9px;
     border-radius: 7px;
-    border: 2px solid var(--ink);
+    border: 0;
+    box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.22);
     white-space: nowrap;
 }
 
-.wc-btn {
-    font-family: var(--disp);
-    letter-spacing: 0.02em;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    line-height: 1;
-    white-space: nowrap;
-    cursor: pointer;
-    border: 2.5px solid var(--ink);
-    border-radius: 13px;
-    box-shadow: 0 4px 0 var(--ink);
-    transition:
-        transform 0.08s cubic-bezier(0.3, 0.8, 0.3, 1),
-        box-shadow 0.08s,
-        filter 0.12s;
-    -webkit-tap-highlight-color: transparent;
-}
-.wc-btn:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 0 var(--ink);
-    filter: brightness(1.04);
-}
-.wc-btn:active:not(:disabled) {
-    transform: translateY(3px);
-    box-shadow: 0 1px 0 var(--ink);
-}
-.wc-btn:disabled {
-    opacity: 0.5;
-    cursor: default;
-    transform: none;
-    box-shadow: 0 4px 0 var(--ink);
-    filter: none;
-}
-
+/* Chunky press: element sits on its own darker shade (--press, default drop). */
 .lift {
     transition:
-        transform 0.12s cubic-bezier(0.3, 0.8, 0.3, 1),
-        box-shadow 0.12s;
+        transform 0.08s,
+        box-shadow 0.08s,
+        filter 0.15s;
 }
 .lift:hover {
     transform: translateY(-3px);
-    box-shadow: 0 9px 0 var(--ink);
+    box-shadow: 0 8px 0 var(--press, var(--drop));
 }
 .lift:active {
-    transform: translateY(2px);
-    box-shadow: 0 2px 0 var(--ink);
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 var(--press, var(--drop));
+}
+
+.wc-press {
+    box-shadow: 0 4px 0 var(--press, var(--drop));
+    transition:
+        transform 0.06s,
+        box-shadow 0.06s,
+        filter 0.15s;
+}
+.wc-press:hover {
+    filter: brightness(1.08);
+}
+.wc-press:active {
+    transform: translateY(4px);
+    box-shadow: 0 0 0 var(--press, var(--drop));
 }
 
 .wc-friend {
+    border-radius: 10px;
     transition: background 0.12s;
 }
 .wc-friend:hover {
@@ -236,29 +324,23 @@
 .wc-emote,
 .wc-iconbtn,
 .wc-chip {
+    box-shadow: 0 3px 0 var(--press, var(--drop));
     transition:
-        transform 0.1s,
-        box-shadow 0.1s,
+        transform 0.06s,
+        box-shadow 0.06s,
         filter 0.12s,
         background 0.12s;
 }
 .wc-emote:hover,
-.wc-chip:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 0 var(--ink);
+.wc-chip:hover,
+.wc-iconbtn:hover {
+    filter: brightness(1.1);
 }
 .wc-emote:active,
-.wc-chip:active {
-    transform: translateY(2px);
-    box-shadow: 0 1px 0 var(--ink);
-}
-.wc-iconbtn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 0 var(--ink);
-}
+.wc-chip:active,
 .wc-iconbtn:active {
-    transform: translateY(2px);
-    box-shadow: 0 1px 0 var(--ink);
+    transform: translateY(3px);
+    box-shadow: 0 0 0 var(--press, var(--drop));
 }
 
 .wc-link {
@@ -271,115 +353,99 @@
 .h-xl {
     font-family: var(--disp);
     font-size: clamp(30px, 4.2vw, 48px);
-    line-height: 0.98;
+    line-height: 1;
     color: var(--cream);
     margin: 0;
+    text-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
 }
 .h-lg {
     font-family: var(--disp);
     font-size: clamp(22px, 3vw, 30px);
-    line-height: 1;
+    line-height: 1.05;
     margin: 0;
+    text-shadow: var(--text-shadow);
 }
 .sub {
     color: var(--muted);
     font-weight: 500;
 }
-
-.wc-range {
-    -webkit-appearance: none;
-    appearance: none;
-    height: 10px;
-    border-radius: 99px;
-    background: var(--panel-d2);
-    border: 2.5px solid var(--ink);
-    outline: none;
-}
-.wc-range::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    background: var(--gold);
-    border: 2.5px solid var(--ink);
-    cursor: pointer;
-    box-shadow: 0 3px 0 var(--ink);
-}
-.wc-range::-moz-range-thumb {
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    background: var(--gold);
-    border: 2.5px solid var(--ink);
-    cursor: pointer;
+.text-shadow {
+    text-shadow: var(--text-shadow);
 }
 
-.wc-logo-mark {
-    display: grid;
-    place-items: center;
-    background: var(--red);
-    color: #fff;
-    border: 2.5px solid var(--ink);
-    box-shadow: 0 4px 0 var(--ink);
-    font-family: var(--disp);
-    line-height: 1;
-    transform: rotate(-4deg);
+/* Navigation ----------------------------------------------------------- */
+
+.wc-logo-word span {
+    display: inline-block;
+    animation: wc-bob 2.6s ease-in-out infinite;
+    animation-delay: calc(var(--i, 0) * -0.2s);
+}
+@keyframes wc-bob {
+    50% {
+        transform: translateY(-3px);
+    }
 }
 
 .wc-nav {
     display: flex;
     align-items: center;
-    gap: 13px;
+    gap: 12px;
     padding: 11px 13px;
     border-radius: 12px;
-    background: none;
-    border: 2.5px solid transparent;
+    background: var(--panel-d2);
+    border: 0;
     cursor: pointer;
     color: var(--muted);
-    font-family: var(--disp);
-    font-size: 17px;
+    font-family: var(--body);
+    font-weight: 800;
+    font-size: 15px;
     text-align: left;
+    box-shadow: 0 4px 0 #110c17;
     transition:
         color 0.12s,
         background 0.12s,
-        transform 0.08s;
+        transform 0.06s,
+        box-shadow 0.06s;
 }
 .wc-nav:hover {
     color: var(--cream);
-    background: #12243f;
+    filter: brightness(1.15);
+}
+.wc-nav:active {
+    transform: translateY(4px);
+    box-shadow: 0 0 0 #110c17;
 }
 .wc-nav--on {
-    background: var(--cream);
-    color: var(--ink);
-    border-color: var(--ink);
-    box-shadow: 0 4px 0 var(--ink);
+    background: var(--nav-c, var(--red));
+    color: #fff;
+    text-shadow: var(--text-shadow);
+    box-shadow: 0 4px 0 var(--nav-cd, var(--red-d));
 }
 .wc-nav--on:hover {
-    background: var(--cream);
-    color: var(--ink);
+    color: #fff;
 }
 
 .wc-me {
     display: flex;
     align-items: center;
     gap: 11px;
-    padding: 9px;
-    border-radius: 13px;
-    background: #10233f;
-    border: 2.5px solid var(--ink);
+    padding: 10px;
+    border-radius: 14px;
+    background: var(--panel-d);
+    border: 2px solid var(--edge);
     cursor: pointer;
-    box-shadow: 0 4px 0 var(--ink);
+    box-shadow: 0 4px 0 var(--drop);
     transition:
         transform 0.08s,
         box-shadow 0.08s;
 }
 .wc-me:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 0 var(--ink);
+    box-shadow: 0 6px 0 var(--drop);
 }
 .wc-me:active {
     transform: translateY(2px);
-    box-shadow: 0 2px 0 var(--ink);
+    box-shadow: 0 2px 0 var(--drop);
 }
 
 .wc-bnav {
@@ -387,44 +453,50 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
     background: none;
     border: none;
+    border-radius: 10px;
     cursor: pointer;
     color: var(--muted);
-    font-family: var(--disp);
-    font-size: 12px;
+    font-family: var(--body);
+    font-weight: 800;
+    font-size: 11px;
     padding: 6px 0;
-    transition: color 0.12s;
+    transition:
+        color 0.12s,
+        background 0.12s;
 }
 .wc-bnav--on {
-    color: var(--gold);
-}
-
-.btn-game {
-    --btn-depth: 4px;
-    --btn-shadow: var(--ink);
-    box-shadow: 0 var(--btn-depth) 0 0 var(--btn-shadow);
-    transition:
-        transform 80ms ease,
-        box-shadow 80ms ease;
-    cursor: pointer;
-    user-select: none;
-}
-.btn-game:active:not(:disabled):not([aria-disabled="true"]) {
-    transform: translateY(var(--btn-depth));
-    box-shadow: 0 0 0 0 var(--btn-shadow);
-}
-.btn-game:disabled,
-.btn-game[aria-disabled="true"] {
-    opacity: 0.5;
-    cursor: not-allowed;
+    color: #fff;
+    background: var(--nav-c, var(--red));
+    box-shadow: 0 3px 0 var(--nav-cd, var(--red-d));
 }
 
 .wc-block {
     box-shadow:
         inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
-        0 4px 0 0 var(--ink);
+        0 4px 0 0 var(--drop);
+}
+
+/* Cards that idle-sway and tilt toward the cursor (see ui/Tilt). */
+@keyframes wc-sway {
+    0%,
+    100% {
+        transform: translateY(0) rotate(-1deg);
+    }
+    50% {
+        transform: translateY(-4px) rotate(1deg);
+    }
+}
+.wc-sway {
+    animation: wc-sway 4.5s ease-in-out infinite;
+    animation-delay: var(--sway-delay, 0s);
+}
+.wc-tilt {
+    transform: perspective(700px) rotateX(var(--rx, 0deg))
+        rotateY(var(--ry, 0deg));
+    transition: transform 0.12s;
 }
 
 @keyframes wc-pop {
@@ -591,31 +663,6 @@
     animation: wc-banner-in 0.5s cubic-bezier(0.2, 1.3, 0.35, 1) both;
 }
 
-@keyframes wildcard-fade-in {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
-}
-@keyframes wildcard-pop-in {
-    from {
-        opacity: 0;
-        transform: translateY(8px) scale(0.96);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
-}
-.wc-fade-in {
-    animation: wildcard-fade-in 140ms ease-out;
-}
-.wc-pop-in {
-    animation: wildcard-pop-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
 @media (prefers-reduced-motion: reduce) {
     .wc-screen,
     .wc-trick-card,
@@ -626,8 +673,9 @@
     .wc-confetto,
     .wc-spinner,
     .wc-banner-in,
-    .wc-fade-in,
-    .wc-pop-in {
+    .wc-sway,
+    .wc-logo-word span,
+    body::before {
         /* biome-ignore lint/complexity/noImportantStyles: must beat every animation shorthand */
         animation: none !important;
     }
@@ -718,4 +766,131 @@
     pointer-events: none;
     z-index: 15;
     border-radius: inherit;
+}
+
+/* Lobby fan: game cards on an arc (see lobby/GameFan). ------------------ */
+.wc-fan {
+    --gw: clamp(104px, 10vw, 168px);
+    position: relative;
+    height: calc(var(--gw) * 1.4 + 170px);
+}
+.wc-fan-slot {
+    --lift: 0px;
+    --scale: 1;
+    position: absolute;
+    left: 50%;
+    bottom: 78px;
+    width: var(--gw);
+    transform-origin: 50% 270%;
+    transform: translateX(-50%) rotate(var(--rot, 0deg)) translateY(var(--lift))
+        scale(var(--scale));
+    transition: transform 0.3s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+.wc-fan-slot:hover,
+.wc-fan-slot:focus-visible {
+    --lift: -18px;
+    --scale: 1.06;
+    /* biome-ignore lint/complexity/noImportantStyles: beats the inline stacking order */
+    z-index: 20 !important;
+}
+.wc-fan-slot[aria-pressed="true"] {
+    --lift: -36px;
+    /* biome-ignore lint/complexity/noImportantStyles: beats the inline stacking order */
+    z-index: 19 !important;
+}
+.wc-fan-tip {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 12px);
+    width: 220px;
+    transform: translateX(-50%) scale(0.9);
+    opacity: 0;
+    pointer-events: none;
+    transition:
+        opacity 0.12s,
+        transform 0.15s cubic-bezier(0.2, 1.6, 0.4, 1);
+    z-index: 30;
+}
+.wc-fan-slot:hover .wc-fan-tip,
+.wc-fan-slot:focus-visible .wc-fan-tip {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+}
+@media (max-width: 640px) {
+    .wc-fan {
+        --gw: 74px;
+    }
+}
+@media (hover: none), (max-width: 640px) {
+    .wc-fan-tip {
+        display: none;
+    }
+}
+
+/* Code entry: one face-down card per character, flipped as it is typed. */
+.wc-flip {
+    perspective: 500px;
+}
+.wc-flip > span {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.4s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.wc-flip[data-on="true"] > span {
+    transform: rotateY(180deg);
+}
+.wc-flip > span > * {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+}
+.wc-flip > span > :last-child {
+    transform: rotateY(180deg);
+}
+.wc-flip[data-caret="true"] > span {
+    animation: wc-nudge 1s ease-in-out infinite;
+}
+@keyframes wc-nudge {
+    50% {
+        transform: translateY(-4px);
+    }
+}
+
+/* Polychrome sheen for the profile card: a hue wheel centred on the cursor (see ui/Tilt). */
+@property --wc-hue {
+    syntax: "<angle>";
+    inherits: false;
+    initial-value: 0deg;
+}
+.wc-holo::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    mix-blend-mode: multiply;
+    opacity: 0.5;
+    background: conic-gradient(
+        from var(--wc-hue) at var(--mx, 50%) var(--my, 50%),
+        #ff7a9a,
+        #ffd36b,
+        #7dffb5,
+        #6bc2ff,
+        #c58bff,
+        #ff7a9a
+    );
+    animation: wc-hue-turn 6s linear infinite;
+}
+@keyframes wc-hue-turn {
+    to {
+        --wc-hue: 360deg;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .wc-holo::after {
+        animation: none;
+    }
 }

@@ -145,8 +145,24 @@ if (mode === "shoot") {
         preview: "/fr/customize/preview",
         room: `/fr/lobby/${lobbyRoom.code}`,
         game: `/fr/game/${started.gameId}`,
+        studio: "/fr/studio",
+        friends: "/fr/profile/friends",
     };
     const names = opt("routes", Object.keys(ALL));
+
+    // The ECA editor needs a game: create one through the Studio UI (default template).
+    if (names.includes("editor")) {
+        const page = await ctx.newPage();
+        await page.goto(`${BASE}/fr/studio`, { waitUntil: "load" });
+        await page.locator("#studio-create-name").fill("UI test");
+        await page
+            .getByRole("button", { name: /^(Créer|Create)$/ })
+            .first()
+            .click();
+        await page.waitForURL(/\/studio\/[^/]+$/, { timeout: 20000 });
+        ALL.editor = new URL(page.url()).pathname;
+        await page.close();
+    }
 
     const report = [];
     for (const name of names) {
@@ -200,15 +216,31 @@ if (mode === "play") {
     await page.waitForTimeout(1800);
     await page.screenshot({ path: `${SHOTS}play-before.png`, fullPage: true });
 
-    // Turn controls are GameButtons (.wc-btn) rendered by TableControls — a
-    // pass button, or one button per playable combination when leading. Chat
-    // "Envoyer" and "Quitter la partie" are wc-btn too: skip them.
+    // Turn controls are GameButtons ([data-slot=button]) rendered by TableControls.
+    // Following a trick: an enabled pass button. Leading: pass is disabled — select a
+    // hand card (selectable cards are buttons with aria-pressed), then its play
+    // button appears. Chat "Envoyer" and "Quitter la partie" are GameButtons too: skip them.
     const button = page
-        .locator("button.wc-btn:enabled")
+        .locator("button[data-slot=button]:enabled")
         .filter({ hasNotText: /Envoyer|Send|Quitter|Leave/ })
         .first();
+    // The sidebar's FR/EN switches also carry aria-pressed: exclude them.
+    const handCard = page
+        .locator("button[aria-pressed]:enabled")
+        .filter({ hasNotText: /^(fr|en)$/i })
+        .first();
     // Bots lead first and are paced by the client: allow a few bot turns.
-    await button.waitFor({ timeout: 30000 });
+    const deadline = Date.now() + 30000;
+    for (;;) {
+        if (await button.isVisible().catch(() => false)) break;
+        if (await handCard.isVisible().catch(() => false)) {
+            await handCard.click();
+            await button.waitFor({ timeout: 5000 });
+            break;
+        }
+        if (Date.now() > deadline) throw new Error("no playable control within 30s");
+        await page.waitForTimeout(500);
+    }
     await button.click();
     await page.waitForTimeout(2000); // server round-trip + realtime refetch + animation
     await page.screenshot({ path: `${SHOTS}play-after.png`, fullPage: true });
@@ -260,7 +292,7 @@ if (mode === "netwatch") {
         timeout: 45000,
     });
     const button = page
-        .locator("button.wc-btn:enabled")
+        .locator("button[data-slot=button]:enabled")
         .filter({ hasNotText: /Envoyer|Send|Quitter|Leave/ })
         .first();
     let clicks = 0;

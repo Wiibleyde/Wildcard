@@ -1,9 +1,31 @@
-import Image from "next/image";
+import {
+    AvatarFallback,
+    AvatarImage,
+    Avatar as NbAvatar,
+} from "@/components/ui/base/avatar";
+import { cn } from "@/lib/utils";
+
+// Initials sit on a palette colour picked from the name, so a player keeps the same colour everywhere.
+const FALLBACK_COLORS = [
+    "var(--red)",
+    "var(--blue)",
+    "var(--green)",
+    "var(--purple)",
+    "var(--orange)",
+    "var(--gold-d)",
+] as const;
+
+function colorFor(name: string | null): string {
+    let h = 0;
+    for (const ch of name ?? "") h = (h * 31 + ch.charCodeAt(0)) | 0;
+    return FALLBACK_COLORS[Math.abs(h) % FALLBACK_COLORS.length];
+}
 
 function initialSizeClass(size: number): string {
+    if (size >= 96) return "text-5xl";
     if (size >= 64) return "text-3xl";
     if (size >= 40) return "text-lg";
-    if (size >= 34) return "text-sm";
+    if (size >= 28) return "text-sm";
     return "text-xs";
 }
 
@@ -19,31 +41,29 @@ export function Avatar({
     shadow?: boolean;
 }) {
     return (
-        <div
-            className="relative shrink-0 overflow-hidden rounded-full border-nb border-wc-ink"
-            style={{
-                width: size,
-                height: size,
-                boxShadow: shadow ? "0 4px 0 var(--ink)" : undefined,
-            }}
+        <NbAvatar
+            className={cn(
+                "overflow-hidden rounded-[28%] border-0 outline-none",
+                shadow && "shadow-shadow",
+            )}
+            style={{ width: size, height: size, flex: "none" }}
         >
-            {avatarUrl ? (
-                <Image
+            {avatarUrl && (
+                <AvatarImage
                     src={avatarUrl}
                     alt={name ?? ""}
-                    fill
-                    sizes={`${size}px`}
-                    className="object-cover"
-                    loading="eager"
-                    unoptimized
+                    className="rounded-[28%] object-cover"
                 />
-            ) : (
-                <div
-                    className={`flex h-full w-full items-center justify-center bg-wc-gold font-display text-wc-ink ${initialSizeClass(size)}`}
-                >
-                    {name?.[0]?.toUpperCase() ?? "?"}
-                </div>
             )}
-        </div>
+            <AvatarFallback
+                className={cn(
+                    "rounded-[28%] font-display text-white text-shadow shadow-[inset_0_-3px_0_rgba(0,0,0,0.25)]",
+                    initialSizeClass(size),
+                )}
+                style={{ background: colorFor(name) }}
+            >
+                {name?.[0]?.toUpperCase() ?? "?"}
+            </AvatarFallback>
+        </NbAvatar>
     );
 }

@@ -49,7 +49,7 @@ node .claude/skills/run-wildcard/driver.mjs shoot
 node .claude/skills/run-wildcard/driver.mjs shoot --routes=lobby,game --widths=375,1920
 ```
 
-Routes: `home login lobby profile customize preview room game` (`login` = the dev-login page) — `room` and
+Routes: `home login lobby profile history leaderboard customize preview room game studio friends editor` (`login` = the dev-login page; `editor` creates an ECA game through the Studio form) — `room` and
 `game` are real: the driver creates rooms via `POST /api/rooms`
 (`{moduleId: "president"}`), adds bots, and starts a game. Screenshots land in
 `.uitest/shots/<route>-<width>.png` (gitignored). **Read the screenshots** —
@@ -88,9 +88,9 @@ bun run test   # vitest run — engine/game-module unit tests
   directly: `./node_modules/.bin/biome`, `./node_modules/.bin/tsc`.
 - Game modules registered: `bataille` (2 players), `president` (3–6 → use
   `count: 3` bots before `start`).
-- Game action buttons are `GameButton`s with the `wc-btn` class. The chat
-  "Envoyer" and "Quitter la partie" buttons are `wc-btn` too, so filter them
-  out: `locator("button.wc-btn:enabled").filter({ hasNotText: /Envoyer|Quitter/ })`.
+- Game action buttons are `GameButton`s (nb `Button`, `data-slot="button"`). The chat
+  "Envoyer" and "Quitter la partie" buttons are GameButtons too, so filter them
+  out: `locator("button[data-slot=button]:enabled").filter({ hasNotText: /Envoyer|Quitter/ })`.
   When the player leads a trick there is no pass button — the controls are
   one button per playable combination.
 

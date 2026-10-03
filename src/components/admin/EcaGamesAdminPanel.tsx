@@ -95,9 +95,9 @@ export function EcaGamesAdminPanel({ games, canManage }: Props) {
                     {games.map((game) => (
                         <li
                             key={game.id}
-                            className="flex flex-col gap-3 rounded-2xl border-nb border-wc-ink bg-wc-cream p-3 sm:flex-row sm:items-center"
+                            className="well flex flex-col gap-3 p-3 sm:flex-row sm:items-center"
                         >
-                            <div className="relative aspect-video w-full shrink-0 overflow-hidden rounded-xl border-2 border-wc-ink bg-wc-cream2 sm:w-32">
+                            <div className="relative aspect-video w-full shrink-0 overflow-hidden rounded-xl bg-wc-panel-d sm:w-32">
                                 {game.imageUrl ? (
                                     <Image
                                         src={game.imageUrl}
@@ -110,7 +110,7 @@ export function EcaGamesAdminPanel({ games, canManage }: Props) {
                                 ) : (
                                     <div
                                         aria-hidden="true"
-                                        className="flex h-full w-full items-center justify-center text-2xl text-wc-ink-soft opacity-50"
+                                        className="flex h-full w-full items-center justify-center text-2xl text-wc-muted opacity-50"
                                     >
                                         ♠
                                     </div>
@@ -119,7 +119,7 @@ export function EcaGamesAdminPanel({ games, canManage }: Props) {
 
                             <div className="flex min-w-0 flex-1 flex-col gap-1">
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <span className="font-display text-base leading-tight text-wc-ink">
+                                    <span className="font-display text-base leading-tight">
                                         {game.name}
                                     </span>
                                     <span
@@ -128,8 +128,11 @@ export function EcaGamesAdminPanel({ games, canManage }: Props) {
                                             background:
                                                 game.status === "published"
                                                     ? "var(--green)"
-                                                    : "var(--cream2)",
-                                            color: "var(--ink)",
+                                                    : "var(--panel-d)",
+                                            color:
+                                                game.status === "published"
+                                                    ? "#fff"
+                                                    : "var(--muted)",
                                         }}
                                     >
                                         {game.status === "published"
@@ -148,7 +151,7 @@ export function EcaGamesAdminPanel({ games, canManage }: Props) {
                                         </span>
                                     )}
                                 </div>
-                                <p className="text-xs font-semibold text-wc-ink-soft">
+                                <p className="text-xs font-semibold text-wc-muted">
                                     {t("eca_meta", {
                                         name:
                                             game.ownerName ??

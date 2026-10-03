@@ -2,8 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import type { CSSProperties } from "react";
+import type { StudioMessageKey } from "@/lib/eca/studioMessages";
 import type { EcaGameStatus } from "@/lib/models/studio";
-import type { StudioMessageKey } from "./messages";
 
 type Stamp = EcaGameStatus | "locked";
 
@@ -13,15 +13,15 @@ const STAMPS: Record<
 > = {
     draft: {
         key: "status_draft",
-        style: { background: "var(--cream2)", color: "var(--ink)" },
+        style: { background: "var(--panel-d2)", color: "var(--muted)" },
     },
     published: {
         key: "status_published",
-        style: { background: "var(--green)", color: "var(--ink)" },
+        style: { background: "var(--green)", color: "#fff" },
     },
     locked: {
         key: "moderation_locked_badge",
-        style: { background: "var(--red)", color: "var(--accent-ink)" },
+        style: { background: "var(--red)", color: "#fff" },
     },
 };
 

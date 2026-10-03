@@ -1,6 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { dangerIconButtonClass, fieldClass } from "@/components/ui/fields";
+import { SelectField } from "@/components/ui/SelectField";
 import { comparatorsFor, isOneOf, reconcileCondition } from "@/lib/eca/schema";
 import type {
     EcaComparator,
@@ -9,7 +11,6 @@ import type {
     EcaEventType,
     EcaOperand,
 } from "@/lib/eca/types";
-import { dangerButtonStyle, fieldClass, fieldStyle } from "./fields";
 import { OperandField } from "./OperandField";
 import { StudioRow } from "./StudioRow";
 
@@ -66,19 +67,16 @@ export function ConditionRow({
                 deckId={deckId}
                 onChange={(lhs) => handleOperand("lhs", lhs)}
             />
-            <select
+            <SelectField
                 value={condition.op}
-                onChange={(e) => handleComparator(e.target.value)}
+                onChange={handleComparator}
                 className={`${fieldClass} w-full text-center sm:w-16 sm:shrink-0`}
-                style={fieldStyle}
-                aria-label={t("comparator_label")}
-            >
-                {comparators.map((op) => (
-                    <option key={op} value={op}>
-                        {COMPARATOR_SYMBOLS[op]}
-                    </option>
-                ))}
-            </select>
+                ariaLabel={t("comparator_label")}
+                options={comparators.map((op) => ({
+                    value: op,
+                    label: COMPARATOR_SYMBOLS[op],
+                }))}
+            />
             <OperandField
                 operand={condition.rhs}
                 counterpart={condition.lhs}
@@ -90,8 +88,7 @@ export function ConditionRow({
                 type="button"
                 onClick={onRemove}
                 aria-label={t("remove_condition")}
-                className="wc-iconbtn grid h-8 w-8 shrink-0 place-items-center self-end rounded-lg text-sm font-bold sm:self-auto"
-                style={dangerButtonStyle}
+                className={`${dangerIconButtonClass} self-end  sm:self-auto`}
             >
                 ✕
             </button>

@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useMemo } from "react";
 import { GameTable } from "@/components/game/GameTable";
+import { Slider } from "@/components/ui/base/slider";
 import { GameButton } from "@/components/ui/GameButton";
 import { replayBoard } from "@/hooks/game/gamePayload";
 import { usePlayerNames } from "@/hooks/game/usePlayerNames";
@@ -172,13 +173,13 @@ function ReplayPlayer({
                         </span>
                     </div>
 
-                    <input
-                        type="range"
+                    <Slider
                         min={0}
                         max={last}
                         value={index}
-                        onChange={(e) => seek(Number(e.target.value))}
-                        className="w-full accent-wc-gold"
+                        onValueChange={(value) => {
+                            if (typeof value === "number") seek(value);
+                        }}
                         aria-label={t("scrub")}
                     />
                 </div>
