@@ -3,13 +3,7 @@ import type { CSSProperties } from "react";
 /** Studio form skin, on cream panels (hence the deeper cream2 fill). */
 
 export const fieldClass =
-    "rounded-lg px-2.5 py-2 text-sm font-semibold outline-none";
-
-export const fieldStyle: CSSProperties = {
-    background: "var(--cream2)",
-    border: "2.5px solid var(--ink)",
-    color: "var(--ink)",
-};
+    "h-auto rounded-lg border-nb bg-wc-cream2 px-2.5 py-2 text-sm font-semibold text-wc-ink";
 
 /** Secondary text on cream panels. */
 export const mutedTextStyle: CSSProperties = { color: "var(--ink-soft)" };

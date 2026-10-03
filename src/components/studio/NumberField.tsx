@@ -1,4 +1,5 @@
-import { fieldClass, fieldStyle, labelClass, labelStyle } from "./fields";
+import { Input } from "@/components/nb/input";
+import { fieldClass, labelClass, labelStyle } from "./fields";
 
 /** Non-numeric input reads as 0; the validator reports the out-of-range value. */
 function parseCount(raw: string): number {
@@ -30,7 +31,7 @@ export function NumberField({
             >
                 {label}
             </label>
-            <input
+            <Input
                 id={id}
                 type="number"
                 min={min}
@@ -38,7 +39,6 @@ export function NumberField({
                 value={value}
                 onChange={(e) => onChange(parseCount(e.target.value))}
                 className={`${fieldClass} w-full`}
-                style={fieldStyle}
             />
         </div>
     );

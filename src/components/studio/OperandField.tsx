@@ -1,6 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { Input } from "@/components/nb/input";
+import { SelectField } from "@/components/ui/SelectField";
 import { DECKS } from "@/lib/card/decks";
 import type { Suit } from "@/lib/card/types";
 import {
@@ -18,7 +20,7 @@ import type {
     EcaOperand,
     EcaStatSource,
 } from "@/lib/eca/types";
-import { fieldClass, fieldStyle } from "./fields";
+import { fieldClass } from "./fields";
 import type { StudioMessageKey } from "./messages";
 
 /**
@@ -141,58 +143,45 @@ export function OperandField({
 
     return (
         <div className="flex min-w-0 flex-1 items-center gap-2">
-            <select
+            <SelectField
                 value={encode(operand)}
-                onChange={(e) => handleSelect(e.target.value)}
-                aria-label={t("operand_label")}
+                onChange={handleSelect}
+                ariaLabel={t("operand_label")}
                 className={`${fieldClass} min-w-0 flex-1`}
-                style={fieldStyle}
-            >
-                {choices.map((c) => (
-                    <option key={c.id} value={c.id}>
-                        {t(c.labelKey)}
-                    </option>
-                ))}
-            </select>
+                options={choices.map((c) => ({
+                    value: c.id,
+                    label: t(c.labelKey),
+                }))}
+            />
 
             {operand.kind === "literal" && domain === "rank" && (
-                <select
+                <SelectField
                     value={String(operand.value)}
-                    onChange={(e) =>
-                        onChange({ kind: "literal", value: e.target.value })
-                    }
-                    aria-label={t("literal_rank_label")}
+                    onChange={(value) => onChange({ kind: "literal", value })}
+                    ariaLabel={t("literal_rank_label")}
                     className={`${fieldClass} w-18 shrink-0`}
-                    style={fieldStyle}
-                >
-                    {ranks.map((rank) => (
-                        <option key={rank} value={rank}>
-                            {rank}
-                        </option>
-                    ))}
-                </select>
+                    options={ranks.map((rank) => ({
+                        value: rank,
+                        label: rank,
+                    }))}
+                />
             )}
 
             {operand.kind === "literal" && domain === "suit" && (
-                <select
+                <SelectField
                     value={String(operand.value)}
-                    onChange={(e) =>
-                        onChange({ kind: "literal", value: e.target.value })
-                    }
-                    aria-label={t("literal_suit_label")}
+                    onChange={(value) => onChange({ kind: "literal", value })}
+                    ariaLabel={t("literal_suit_label")}
                     className={`${fieldClass} w-28 shrink-0`}
-                    style={fieldStyle}
-                >
-                    {suits.map((suit) => (
-                        <option key={suit} value={suit}>
-                            {t(SUIT_LABELS[suit])}
-                        </option>
-                    ))}
-                </select>
+                    options={suits.map((suit) => ({
+                        value: suit,
+                        label: t(SUIT_LABELS[suit]),
+                    }))}
+                />
             )}
 
             {operand.kind === "literal" && domain === "number" && (
-                <input
+                <Input
                     type="number"
                     value={
                         typeof operand.value === "number" ? operand.value : 0
@@ -200,7 +189,6 @@ export function OperandField({
                     onChange={(e) => handleNumber(e.target.value)}
                     aria-label={t("literal_number_label")}
                     className={`${fieldClass} w-18 shrink-0`}
-                    style={fieldStyle}
                 />
             )}
         </div>

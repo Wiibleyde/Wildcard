@@ -1,7 +1,8 @@
 "use client";
 
 import { useFormatter, useTranslations } from "next-intl";
-import { GameButton } from "@/components/ui/GameButton";
+import { Button } from "@/components/nb/button";
+import { GameButton, gameButtonClass } from "@/components/ui/GameButton";
 import type { MatchHistoryEntry, MatchResult } from "@/lib/models/history";
 
 const RESULT_STYLE: Record<MatchResult, { bg: string; fg: string }> = {
@@ -67,22 +68,20 @@ export function MatchHistoryItem({
             <div className="flex shrink-0 items-center gap-2 self-start sm:self-auto">
                 {/* Pinning exempts the replay from the 15-day sweep: pointless once expired. */}
                 {!entry.expired && (
-                    <button
-                        type="button"
+                    <Button
                         onClick={onTogglePin}
                         disabled={pinBusy}
                         title={pinned ? t("unpin") : t("pin_hint")}
                         aria-pressed={pinned}
-                        className="wc-btn px-3 py-2 text-sm text-wc-ink disabled:opacity-50"
-                        style={{
-                            background: pinned
-                                ? "var(--gold)"
-                                : "var(--cream2)",
-                        }}
+                        className={gameButtonClass(
+                            pinned ? "gold" : "cream",
+                            "sm",
+                            "px-3",
+                        )}
                     >
                         <span aria-hidden="true">📌</span>
                         {pinned ? t("pinned") : t("pin")}
-                    </button>
+                    </Button>
                 )}
 
                 {entry.expired ? (

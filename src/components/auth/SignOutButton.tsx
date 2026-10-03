@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { GameButton } from "@/components/ui/GameButton";
 import { useSignOut } from "@/hooks/auth/useSignOut";
 
 export function SignOutButton() {
@@ -8,13 +9,8 @@ export function SignOutButton() {
     const handleSignOut = useSignOut();
 
     return (
-        <button
-            type="button"
-            onClick={handleSignOut}
-            className="wc-btn px-4 py-2 text-sm"
-            style={{ background: "var(--cream)", color: "var(--ink)" }}
-        >
+        <GameButton variant="cream" size="sm" onClick={handleSignOut}>
             {t("sign_out")}
-        </button>
+        </GameButton>
     );
 }

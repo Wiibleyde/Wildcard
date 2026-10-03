@@ -2,6 +2,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { DecoSuit } from "@/components/brand/DecoSuit";
 import { Avatar } from "@/components/ui/Avatar";
+import { GameButton } from "@/components/ui/GameButton";
 import { PageShell } from "@/components/ui/PageShell";
 import { Link } from "@/i18n/navigation";
 import { levelForXp } from "@/lib/xp/xp";
@@ -158,16 +159,9 @@ export function ProfileView({
                     </div>
                     {manageUrl && (
                         <div className="flex shrink-0 flex-col items-stretch gap-2">
-                            <a
-                                href={manageUrl}
-                                className="wc-btn px-4 py-2 text-center text-sm"
-                                style={{
-                                    background: "var(--gold)",
-                                    color: "var(--ink)",
-                                }}
-                            >
+                            <GameButton href={manageUrl} size="sm">
                                 {t("account_manage")}
-                            </a>
+                            </GameButton>
                             {forgotUrl && (
                                 <a
                                     href={forgotUrl}

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 /* Neobrutalism design system: 2.5px ink outlines, hard offset shadows, cream on cobalt. */
 
@@ -84,6 +85,49 @@
     --disp: var(--font-display), "Lilita One", system-ui, sans-serif;
     --pixel: var(--font-silkscreen), "Silkscreen", ui-monospace, monospace;
     --body: var(--font-body), "Hanken Grotesk", system-ui, sans-serif;
+}
+
+/* neobrutalism.dev (src/components/nb) tokens, mapped onto the Wildcard palette. */
+:root {
+    --border-radius: 10px;
+    --box-shadow-x: 4px;
+    --box-shadow-y: 4px;
+    --reverse-box-shadow-x: -4px;
+    --reverse-box-shadow-y: -4px;
+    --heading-font-weight: 400;
+    --base-font-weight: 600;
+
+    --background: var(--cream);
+    --secondary-background: #fffaf0;
+    --foreground: var(--ink);
+    --main: var(--gold);
+    --main-foreground: var(--ink);
+    --border: var(--ink);
+    --ring: var(--ink);
+    --overlay: rgba(10, 26, 46, 0.8);
+    --shadow: var(--box-shadow-x) var(--box-shadow-y) 0px 0px var(--border);
+}
+
+@theme inline {
+    --color-main: var(--main);
+    --color-background: var(--background);
+    --color-secondary-background: var(--secondary-background);
+    --color-foreground: var(--foreground);
+    --color-main-foreground: var(--main-foreground);
+    --color-border: var(--border);
+    --color-overlay: var(--overlay);
+    --color-ring: var(--ring);
+
+    --spacing-boxShadowX: var(--box-shadow-x);
+    --spacing-boxShadowY: var(--box-shadow-y);
+    --spacing-reverseBoxShadowX: var(--reverse-box-shadow-x);
+    --spacing-reverseBoxShadowY: var(--reverse-box-shadow-y);
+
+    --radius-base: var(--border-radius);
+    --shadow-shadow: var(--shadow);
+
+    --font-weight-base: var(--base-font-weight);
+    --font-weight-heading: var(--heading-font-weight);
 }
 
 @layer base {
@@ -177,42 +221,6 @@
     white-space: nowrap;
 }
 
-.wc-btn {
-    font-family: var(--disp);
-    letter-spacing: 0.02em;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    line-height: 1;
-    white-space: nowrap;
-    cursor: pointer;
-    border: 2.5px solid var(--ink);
-    border-radius: 13px;
-    box-shadow: 0 4px 0 var(--ink);
-    transition:
-        transform 0.08s cubic-bezier(0.3, 0.8, 0.3, 1),
-        box-shadow 0.08s,
-        filter 0.12s;
-    -webkit-tap-highlight-color: transparent;
-}
-.wc-btn:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 0 var(--ink);
-    filter: brightness(1.04);
-}
-.wc-btn:active:not(:disabled) {
-    transform: translateY(3px);
-    box-shadow: 0 1px 0 var(--ink);
-}
-.wc-btn:disabled {
-    opacity: 0.5;
-    cursor: default;
-    transform: none;
-    box-shadow: 0 4px 0 var(--ink);
-    filter: none;
-}
-
 .lift {
     transition:
         transform 0.12s cubic-bezier(0.3, 0.8, 0.3, 1),
@@ -284,34 +292,6 @@
 .sub {
     color: var(--muted);
     font-weight: 500;
-}
-
-.wc-range {
-    -webkit-appearance: none;
-    appearance: none;
-    height: 10px;
-    border-radius: 99px;
-    background: var(--panel-d2);
-    border: 2.5px solid var(--ink);
-    outline: none;
-}
-.wc-range::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    background: var(--gold);
-    border: 2.5px solid var(--ink);
-    cursor: pointer;
-    box-shadow: 0 3px 0 var(--ink);
-}
-.wc-range::-moz-range-thumb {
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    background: var(--gold);
-    border: 2.5px solid var(--ink);
-    cursor: pointer;
 }
 
 .wc-logo-mark {
@@ -399,26 +379,6 @@
 }
 .wc-bnav--on {
     color: var(--gold);
-}
-
-.btn-game {
-    --btn-depth: 4px;
-    --btn-shadow: var(--ink);
-    box-shadow: 0 var(--btn-depth) 0 0 var(--btn-shadow);
-    transition:
-        transform 80ms ease,
-        box-shadow 80ms ease;
-    cursor: pointer;
-    user-select: none;
-}
-.btn-game:active:not(:disabled):not([aria-disabled="true"]) {
-    transform: translateY(var(--btn-depth));
-    box-shadow: 0 0 0 0 var(--btn-shadow);
-}
-.btn-game:disabled,
-.btn-game[aria-disabled="true"] {
-    opacity: 0.5;
-    cursor: not-allowed;
 }
 
 .wc-block {
@@ -591,31 +551,6 @@
     animation: wc-banner-in 0.5s cubic-bezier(0.2, 1.3, 0.35, 1) both;
 }
 
-@keyframes wildcard-fade-in {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
-}
-@keyframes wildcard-pop-in {
-    from {
-        opacity: 0;
-        transform: translateY(8px) scale(0.96);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
-}
-.wc-fade-in {
-    animation: wildcard-fade-in 140ms ease-out;
-}
-.wc-pop-in {
-    animation: wildcard-pop-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
 @media (prefers-reduced-motion: reduce) {
     .wc-screen,
     .wc-trick-card,
@@ -625,9 +560,7 @@
     .wc-bump,
     .wc-confetto,
     .wc-spinner,
-    .wc-banner-in,
-    .wc-fade-in,
-    .wc-pop-in {
+    .wc-banner-in {
         /* biome-ignore lint/complexity/noImportantStyles: must beat every animation shorthand */
         animation: none !important;
     }

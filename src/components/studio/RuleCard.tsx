@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import type { CSSProperties } from "react";
+import { Input } from "@/components/nb/input";
+import { SelectField } from "@/components/ui/SelectField";
 import { ECA_EFFECT_SPECS, ECA_EVENT_TYPES, isOneOf } from "@/lib/eca/schema";
 import type {
     EcaCondition,
@@ -17,7 +19,6 @@ import { EffectRow } from "./EffectRow";
 import {
     dangerButtonStyle,
     fieldClass,
-    fieldStyle,
     labelClass,
     labelStyle,
     mutedTextStyle,
@@ -177,7 +178,7 @@ export function RuleCard({
                 >
                     #{index + 1}
                 </span>
-                <input
+                <Input
                     value={rule.name}
                     onChange={(e) =>
                         onChange({ ...rule, name: e.target.value })
@@ -186,7 +187,6 @@ export function RuleCard({
                     aria-label={t("rule_name_label")}
                     placeholder={t("rule_default_name")}
                     className={`${fieldClass} min-w-36 flex-1`}
-                    style={fieldStyle}
                 />
                 <span className="stamp" style={EVENTS[rule.event].stamp}>
                     {t(EVENTS[rule.event].short)}
@@ -228,19 +228,16 @@ export function RuleCard({
                 <p className={labelClass} style={labelStyle}>
                     {t("when_title")}
                 </p>
-                <select
+                <SelectField
                     value={rule.event}
-                    onChange={(e) => switchEvent(e.target.value)}
-                    aria-label={t("when_title")}
+                    onChange={switchEvent}
+                    ariaLabel={t("when_title")}
                     className={fieldClass}
-                    style={fieldStyle}
-                >
-                    {ECA_EVENT_TYPES.map((event) => (
-                        <option key={event} value={event}>
-                            {t(EVENTS[event].label)}
-                        </option>
-                    ))}
-                </select>
+                    options={ECA_EVENT_TYPES.map((event) => ({
+                        value: event,
+                        label: t(EVENTS[event].label),
+                    }))}
+                />
             </section>
 
             <section className="flex flex-col gap-2">

@@ -218,7 +218,7 @@ const handCard = p1
     )
     .first();
 const control = p1
-    .locator("button.wc-btn:enabled")
+    .locator("button[data-slot=button]:enabled")
     .filter({ hasNotText: /Envoyer|Send|Quitter|Leave/ })
     .first();
 if (await handCard.count()) {

@@ -1,26 +1,31 @@
+import { Button } from "@/components/nb/button";
 import { Link } from "@/i18n/navigation";
+import { cn } from "@/lib/utils";
 
-export type GameButtonVariant = "gold" | "green" | "red" | "teal" | "ghost";
+export type GameButtonVariant =
+    | "gold"
+    | "green"
+    | "red"
+    | "teal"
+    | "purple"
+    | "cream"
+    | "ghost";
 export type GameButtonSize = "sm" | "md" | "lg";
 
-type VariantConfig = {
-    bg: string;
-    text: string;
-    ghost?: boolean;
-};
-
-const VARIANTS: Record<GameButtonVariant, VariantConfig> = {
-    gold: { bg: "var(--gold)", text: "var(--ink)" },
-    green: { bg: "var(--green)", text: "var(--ink)" },
-    red: { bg: "var(--red)", text: "var(--accent-ink)" },
-    teal: { bg: "var(--blue)", text: "var(--accent-ink)" },
-    ghost: { bg: "transparent", text: "var(--cream)", ghost: true },
+const VARIANTS: Record<GameButtonVariant, string> = {
+    gold: "bg-wc-gold text-wc-ink",
+    green: "bg-wc-green text-wc-ink",
+    red: "bg-wc-red text-wc-accent-ink",
+    teal: "bg-wc-blue text-wc-accent-ink",
+    purple: "bg-wc-purple text-wc-accent-ink",
+    cream: "bg-wc-cream text-wc-ink",
+    ghost: "border-transparent bg-transparent text-wc-cream shadow-none hover:translate-x-0 hover:translate-y-0 hover:bg-white/5",
 };
 
 const SIZES: Record<GameButtonSize, string> = {
-    sm: "px-3.5 py-2 text-sm",
-    md: "px-4.5 py-2.75 text-base",
-    lg: "px-6 py-3.5 text-xl",
+    sm: "h-auto px-3.5 py-2 text-sm",
+    md: "h-auto px-4.5 py-2.75 text-base",
+    lg: "h-auto px-6 py-3.5 text-xl",
 };
 
 type BaseProps = {
@@ -48,65 +53,66 @@ type AsLink = BaseProps & {
 
 type GameButtonProps = AsButton | AsLink;
 
+export function gameButtonClass(
+    variant: GameButtonVariant = "gold",
+    size: GameButtonSize = "md",
+    className?: string,
+): string {
+    return cn(
+        "border-nb font-display font-normal tracking-wc-cap leading-none",
+        VARIANTS[variant],
+        SIZES[size],
+        className,
+    );
+}
+
 export function GameButton({
     variant = "gold",
     size = "md",
     children,
-    className = "",
+    className,
     disabled = false,
     ariaLabel,
     ...rest
 }: GameButtonProps) {
-    const v = VARIANTS[variant];
-
-    const style = {
-        background: v.bg,
-        color: v.text,
-        ...(v.ghost ? { boxShadow: "none", borderColor: "transparent" } : null),
-    } as React.CSSProperties;
-
-    const baseClass = `wc-btn ${SIZES[size]} ${className}`;
+    const classes = gameButtonClass(variant, size, className);
+    const buttonVariant = variant === "ghost" ? "noShadow" : "default";
 
     // A disabled link renders as a disabled <button>: not navigable, not focusable.
     if ("href" in rest && rest.href !== undefined && !disabled) {
         // Off-site targets (the portal) bypass the locale-prefixing i18n Link.
-        if (/^https?:\/\//.test(rest.href)) {
-            return (
-                <a
-                    href={rest.href}
-                    className={baseClass}
-                    style={style}
-                    aria-label={ariaLabel}
-                >
-                    {children}
-                </a>
-            );
-        }
+        const link = /^https?:\/\//.test(rest.href) ? (
+            // biome-ignore lint/a11y/useAnchorContent: content is injected by Button's render prop
+            <a href={rest.href} />
+        ) : (
+            <Link href={rest.href} />
+        );
         return (
-            <Link
-                href={rest.href}
-                className={baseClass}
-                style={style}
+            <Button
+                variant={buttonVariant}
+                className={classes}
                 aria-label={ariaLabel}
+                nativeButton={false}
+                render={link}
             >
                 {children}
-            </Link>
+            </Button>
         );
     }
 
     const { type = "button", onClick, form } = rest as AsButton;
 
     return (
-        <button
+        <Button
+            variant={buttonVariant}
             type={type}
-            className={baseClass}
-            style={style}
+            className={classes}
             disabled={disabled}
             aria-label={ariaLabel}
             onClick={onClick}
             form={form}
         >
             {children}
-        </button>
+        </Button>
     );
 }

@@ -88,9 +88,9 @@ bun run test   # vitest run — engine/game-module unit tests
   directly: `./node_modules/.bin/biome`, `./node_modules/.bin/tsc`.
 - Game modules registered: `bataille` (2 players), `president` (3–6 → use
   `count: 3` bots before `start`).
-- Game action buttons are `GameButton`s with the `wc-btn` class. The chat
-  "Envoyer" and "Quitter la partie" buttons are `wc-btn` too, so filter them
-  out: `locator("button.wc-btn:enabled").filter({ hasNotText: /Envoyer|Quitter/ })`.
+- Game action buttons are `GameButton`s (nb `Button`, `data-slot="button"`). The chat
+  "Envoyer" and "Quitter la partie" buttons are GameButtons too, so filter them
+  out: `locator("button[data-slot=button]:enabled").filter({ hasNotText: /Envoyer|Quitter/ })`.
   When the player leads a trick there is no pass button — the controls are
   one button per playable combination.
 

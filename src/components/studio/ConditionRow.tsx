@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { SelectField } from "@/components/ui/SelectField";
 import { comparatorsFor, isOneOf, reconcileCondition } from "@/lib/eca/schema";
 import type {
     EcaComparator,
@@ -9,7 +10,7 @@ import type {
     EcaEventType,
     EcaOperand,
 } from "@/lib/eca/types";
-import { dangerButtonStyle, fieldClass, fieldStyle } from "./fields";
+import { dangerButtonStyle, fieldClass } from "./fields";
 import { OperandField } from "./OperandField";
 import { StudioRow } from "./StudioRow";
 
@@ -66,19 +67,16 @@ export function ConditionRow({
                 deckId={deckId}
                 onChange={(lhs) => handleOperand("lhs", lhs)}
             />
-            <select
+            <SelectField
                 value={condition.op}
-                onChange={(e) => handleComparator(e.target.value)}
+                onChange={handleComparator}
                 className={`${fieldClass} w-full text-center sm:w-16 sm:shrink-0`}
-                style={fieldStyle}
-                aria-label={t("comparator_label")}
-            >
-                {comparators.map((op) => (
-                    <option key={op} value={op}>
-                        {COMPARATOR_SYMBOLS[op]}
-                    </option>
-                ))}
-            </select>
+                ariaLabel={t("comparator_label")}
+                options={comparators.map((op) => ({
+                    value: op,
+                    label: COMPARATOR_SYMBOLS[op],
+                }))}
+            />
             <OperandField
                 operand={condition.rhs}
                 counterpart={condition.lhs}

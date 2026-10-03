@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { type SyntheticEvent, useId, useState } from "react";
+import { Input } from "@/components/nb/input";
 import { GameButton } from "@/components/ui/GameButton";
 import { useAutoScroll } from "@/hooks/game/useAutoScroll";
 import { usePlayerNames } from "@/hooks/game/usePlayerNames";
@@ -103,7 +104,7 @@ export function GameChat({
             </ol>
 
             <form onSubmit={onSubmit} className="mt-2 flex gap-2">
-                <input
+                <Input
                     type="text"
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
@@ -112,10 +113,7 @@ export function GameChat({
                     aria-label={t("placeholder")}
                     aria-invalid={notice !== null}
                     aria-describedby={noticeId}
-                    className="min-w-0 flex-1 rounded-wc-icon border-nb bg-wc-cream px-3 py-2 text-xs text-wc-ink outline-none placeholder:text-wc-ink/50 xl:text-sm"
-                    style={{
-                        borderColor: notice ? "var(--red)" : "var(--ink)",
-                    }}
+                    className="h-auto min-w-0 flex-1 rounded-wc-icon border-nb bg-wc-cream px-3 py-2 text-xs text-wc-ink aria-invalid:border-wc-red xl:text-sm"
                 />
                 <GameButton
                     type="submit"

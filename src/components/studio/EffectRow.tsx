@@ -1,6 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { Input } from "@/components/nb/input";
+import { SelectField } from "@/components/ui/SelectField";
 import {
     ECA_DRAW_TARGETS,
     ECA_EFFECT_SPECS,
@@ -13,7 +15,6 @@ import { ECA_DRAW_COUNT_MAX, ECA_DRAW_COUNT_MIN } from "@/lib/eca/validate";
 import {
     dangerButtonStyle,
     fieldClass,
-    fieldStyle,
     labelClass,
     labelStyle,
 } from "./fields";
@@ -80,23 +81,20 @@ export function EffectRow({
 
     return (
         <StudioRow>
-            <select
+            <SelectField
                 value={effect.type}
-                onChange={(e) => handleType(e.target.value)}
-                aria-label={t("effect_type_label")}
+                onChange={handleType}
+                ariaLabel={t("effect_type_label")}
                 className={`${fieldClass} min-w-0 flex-1`}
-                style={fieldStyle}
-            >
-                {types.map((type) => (
-                    <option key={type} value={type}>
-                        {t(EFFECT_LABELS[type])}
-                    </option>
-                ))}
-            </select>
+                options={types.map((type) => ({
+                    value: type,
+                    label: t(EFFECT_LABELS[type]),
+                }))}
+            />
 
             {effect.type === "drawCards" && (
                 <div className="flex items-center gap-2">
-                    <input
+                    <Input
                         type="number"
                         min={ECA_DRAW_COUNT_MIN}
                         max={ECA_DRAW_COUNT_MAX}
@@ -104,24 +102,20 @@ export function EffectRow({
                         onChange={(e) => handleCount(e.target.value)}
                         aria-label={t("effect_count_aria")}
                         className={`${fieldClass} w-16 shrink-0`}
-                        style={fieldStyle}
                     />
                     <span className={labelClass} style={labelStyle}>
                         {t("effect_count_label")} →
                     </span>
-                    <select
+                    <SelectField
                         value={effect.target}
-                        onChange={(e) => handleTarget(e.target.value)}
-                        aria-label={t("effect_target_label")}
+                        onChange={handleTarget}
+                        ariaLabel={t("effect_target_label")}
                         className={`${fieldClass} shrink-0`}
-                        style={fieldStyle}
-                    >
-                        {ECA_DRAW_TARGETS.map((target) => (
-                            <option key={target} value={target}>
-                                {t(TARGET_LABELS[target])}
-                            </option>
-                        ))}
-                    </select>
+                        options={ECA_DRAW_TARGETS.map((target) => ({
+                            value: target,
+                            label: t(TARGET_LABELS[target]),
+                        }))}
+                    />
                 </div>
             )}
 

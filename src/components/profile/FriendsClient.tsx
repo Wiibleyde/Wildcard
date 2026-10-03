@@ -2,13 +2,10 @@
 
 import { useTranslations } from "next-intl";
 import { type FormEvent, type ReactNode, useState } from "react";
+import { Input } from "@/components/nb/input";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
-import {
-    fieldClass,
-    fieldLabelClass,
-    fieldStyle,
-} from "@/components/ui/fields";
+import { fieldClass, fieldLabelClass } from "@/components/ui/fields";
 import { GameButton } from "@/components/ui/GameButton";
 import { useFriends } from "@/hooks/profile/useFriends";
 import { PSEUDO_PATTERN } from "@/lib/portal/api";
@@ -145,7 +142,7 @@ export function FriendsClient() {
                             {t("add_label")}
                         </label>
                         <div className="flex gap-2">
-                            <input
+                            <Input
                                 id="friend-pseudo"
                                 value={pseudo}
                                 onChange={(e) => {
@@ -159,7 +156,6 @@ export function FriendsClient() {
                                 aria-invalid={invalidPseudo}
                                 aria-describedby="friend-pseudo-hint"
                                 className={`min-w-0 flex-1 ${fieldClass}`}
-                                style={fieldStyle}
                             />
                             <GameButton
                                 type="submit"

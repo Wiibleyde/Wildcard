@@ -1,4 +1,9 @@
-import Image from "next/image";
+import {
+    AvatarFallback,
+    AvatarImage,
+    Avatar as NbAvatar,
+} from "@/components/nb/avatar";
+import { cn } from "@/lib/utils";
 
 function initialSizeClass(size: number): string {
     if (size >= 64) return "text-3xl";
@@ -19,31 +24,28 @@ export function Avatar({
     shadow?: boolean;
 }) {
     return (
-        <div
-            className="relative shrink-0 overflow-hidden rounded-full border-nb border-wc-ink"
-            style={{
-                width: size,
-                height: size,
-                boxShadow: shadow ? "0 4px 0 var(--ink)" : undefined,
-            }}
+        <NbAvatar
+            className={cn(
+                "overflow-hidden border-nb border-wc-ink outline-none",
+                shadow && "shadow-shadow",
+            )}
+            style={{ width: size, height: size }}
         >
-            {avatarUrl ? (
-                <Image
+            {avatarUrl && (
+                <AvatarImage
                     src={avatarUrl}
                     alt={name ?? ""}
-                    fill
-                    sizes={`${size}px`}
                     className="object-cover"
-                    loading="eager"
-                    unoptimized
                 />
-            ) : (
-                <div
-                    className={`flex h-full w-full items-center justify-center bg-wc-gold font-display text-wc-ink ${initialSizeClass(size)}`}
-                >
-                    {name?.[0]?.toUpperCase() ?? "?"}
-                </div>
             )}
-        </div>
+            <AvatarFallback
+                className={cn(
+                    "bg-wc-gold font-display text-wc-ink",
+                    initialSizeClass(size),
+                )}
+            >
+                {name?.[0]?.toUpperCase() ?? "?"}
+            </AvatarFallback>
+        </NbAvatar>
     );
 }

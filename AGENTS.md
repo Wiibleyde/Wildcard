@@ -27,6 +27,13 @@ technique fullstack et une architecture solide, présentable devant un jury.
 - **TypeScript strict** — aucun `any` toléré
 - **Tailwind CSS**
 - **GSAP** — animations des cartes
+- **neobrutalism.dev** (registry shadcn, primitives **Base UI**) — composants
+  vendorisés dans `src/components/nb/` (fichiers registry, ajout via
+  `https://www.neobrutalism.dev/r/<nom>.json`). Tokens (`--main`, `--border`,
+  `--shadow`…) mappés sur la palette Wildcard dans `globals.css`. Les wrappers
+  applicatifs (`GameButton`, `Modal`, `ConfirmDialog`, `Switch`, `SelectField`,
+  `Avatar`, `ErrorBanner`) vivent dans `src/components/ui/` — les utiliser en
+  priorité ; `cn()` dans `src/lib/utils.ts`
 
 ### Backend / API
 - **Next.js API Routes** — logique de jeu principale

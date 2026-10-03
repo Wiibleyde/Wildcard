@@ -2,13 +2,11 @@
 
 import { useFormatter, useTranslations } from "next-intl";
 import type { ReactNode } from "react";
+import { Input } from "@/components/nb/input";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
-import {
-    fieldClass,
-    fieldLabelClass,
-    fieldStyle,
-} from "@/components/ui/fields";
+import { fieldClass, fieldLabelClass } from "@/components/ui/fields";
 import { GameButton } from "@/components/ui/GameButton";
+import { SelectField } from "@/components/ui/SelectField";
 import { useFilteredHistory } from "@/hooks/profile/useFilteredHistory";
 import { useGamePinning } from "@/hooks/profile/useGamePinning";
 import { useHydrated } from "@/hooks/useHydrated";
@@ -56,43 +54,40 @@ export function MatchHistoryClient({
         <div className="flex flex-col gap-5">
             <div className="panel-d flex flex-col gap-4 p-4 sm:flex-row sm:flex-wrap sm:items-end xl:p-5">
                 <FilterField id="history-game" label={t("filter_game")}>
-                    <select
+                    <SelectField
                         id="history-game"
                         value={filter.game}
-                        onChange={(e) => filter.setGame(e.target.value)}
+                        onChange={filter.setGame}
                         className={fieldClass}
-                        style={fieldStyle}
-                    >
-                        <option value="all">{t("all_games")}</option>
-                        {filter.games.map((g) => (
-                            <option key={g.id} value={g.id}>
-                                {g.name}
-                            </option>
-                        ))}
-                    </select>
+                        options={[
+                            { value: "all", label: t("all_games") },
+                            ...filter.games.map((g) => ({
+                                value: g.id,
+                                label: g.name,
+                            })),
+                        ]}
+                    />
                 </FilterField>
 
                 <FilterField id="history-from" label={t("filter_from")}>
-                    <input
+                    <Input
                         id="history-from"
                         type="date"
                         value={filter.from}
                         max={filter.to || undefined}
                         onChange={(e) => filter.setFrom(e.target.value)}
                         className={fieldClass}
-                        style={fieldStyle}
                     />
                 </FilterField>
 
                 <FilterField id="history-to" label={t("filter_to")}>
-                    <input
+                    <Input
                         id="history-to"
                         type="date"
                         value={filter.to}
                         min={filter.from || undefined}
                         onChange={(e) => filter.setTo(e.target.value)}
                         className={fieldClass}
-                        style={fieldStyle}
                     />
                 </FilterField>
 

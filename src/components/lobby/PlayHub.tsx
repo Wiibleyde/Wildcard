@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { Input } from "@/components/nb/input";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { GameButton } from "@/components/ui/GameButton";
 import { useMatchmaking } from "@/hooks/lobby/useMatchmaking";
@@ -73,17 +74,14 @@ export function PlayHub({ userId, games, community }: Props) {
                     </div>
                 </div>
                 <div className="flex gap-3">
-                    <input
+                    <Input
                         value={code}
                         onChange={(e) => setCode(e.target.value.toUpperCase())}
                         placeholder={t("code_placeholder")}
                         aria-label={t("code_label")}
                         autoComplete="off"
                         maxLength={CODE_LENGTH}
-                        className="min-w-0 flex-1 rounded-xl border-nb border-wc-ink bg-wc-cream2 px-4 py-3 text-center font-pixel text-[15px] tracking-[0.3em] text-wc-ink outline-none lg:w-44"
-                        style={{
-                            boxShadow: "inset 0 2px 0 rgba(11,18,32,0.12)",
-                        }}
+                        className="h-auto min-w-0 flex-1 rounded-xl border-nb bg-wc-cream2 px-4 py-3 text-center font-pixel text-[15px] tracking-[0.3em] text-wc-ink lg:w-44"
                     />
                     <GameButton
                         variant="red"

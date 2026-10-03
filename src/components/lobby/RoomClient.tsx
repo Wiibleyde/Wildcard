@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { ReconnectingBanner } from "@/components/realtime/ReconnectingBanner";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
+import { GameButton } from "@/components/ui/GameButton";
 import { useRoomRefresh } from "@/hooks/lobby/useRoomRefresh";
 import { useApiErrorLabel } from "@/hooks/useApiErrorLabel";
 import { useRouter } from "@/i18n/navigation";
@@ -378,22 +379,19 @@ export function RoomClient({
 
             {error && <ErrorBanner>{error}</ErrorBanner>}
 
-            <button
-                type="button"
+            <GameButton
+                variant={isSpectator ? "gold" : "purple"}
+                size="sm"
                 onClick={toggleRole}
                 disabled={busy || (isSpectator && roomFull)}
-                className="wc-btn py-3 text-sm"
-                style={{
-                    background: isSpectator ? "var(--gold)" : "var(--purple)",
-                    color: isSpectator ? "var(--ink)" : "var(--accent-ink)",
-                }}
+                className="py-3"
             >
                 {isSpectator
                     ? roomFull
                         ? t("room_full_short")
                         : t("join_as_player")
                     : t("spectate")}
-            </button>
+            </GameButton>
 
             <RoomActions
                 isHost={isHost}

@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useState } from "react";
+import { Input } from "@/components/nb/input";
 import { GameButton } from "@/components/ui/GameButton";
 import { postJson } from "@/hooks/studio/postJson";
 import { useRouter } from "@/i18n/navigation";
@@ -11,13 +12,7 @@ import {
     ecaTemplate,
 } from "@/lib/eca/templates";
 import { ECA_NAME_MAX } from "@/lib/eca/validate";
-import {
-    fieldClass,
-    fieldStyle,
-    labelClass,
-    labelStyle,
-    mutedTextStyle,
-} from "./fields";
+import { fieldClass, labelClass, labelStyle, mutedTextStyle } from "./fields";
 import type { StudioMessageKey } from "./messages";
 import { PanelTitle } from "./PanelTitle";
 
@@ -114,14 +109,13 @@ export function CreateGamePanel({
                     >
                         {t("create_name_label")}
                     </label>
-                    <input
+                    <Input
                         id="studio-create-name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         maxLength={ECA_NAME_MAX}
                         placeholder={t("create_name_placeholder")}
                         className={`${fieldClass} w-full`}
-                        style={fieldStyle}
                     />
                 </div>
                 <GameButton

@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { Locale } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
+import { Input } from "@/components/nb/input";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
-import { fieldClass, fieldStyle } from "@/components/ui/fields";
+import { fieldClass } from "@/components/ui/fields";
+import { GameButton } from "@/components/ui/GameButton";
 import { devSignIn } from "./actions";
 
 /** Accounts created by supabase/seed.sql (password: password123). */
@@ -67,16 +69,14 @@ export default async function Page({
                                 name="password"
                                 value="password123"
                             />
-                            <button
+                            <GameButton
                                 type="submit"
-                                className="wc-btn w-full px-4 py-2 text-sm"
-                                style={{
-                                    background: "var(--cream)",
-                                    color: "var(--ink)",
-                                }}
+                                variant="cream"
+                                size="sm"
+                                className="w-full"
                             >
                                 {account.label}
-                            </button>
+                            </GameButton>
                         </form>
                     ))}
                 </div>
@@ -84,32 +84,23 @@ export default async function Page({
                 <form action={devSignIn} className="flex flex-col gap-2">
                     <input type="hidden" name="lang" value={lang} />
                     <input type="hidden" name="next" value={next} />
-                    <input
+                    <Input
                         name="email"
                         type="email"
                         required
                         placeholder="email"
                         className={fieldClass}
-                        style={fieldStyle}
                     />
-                    <input
+                    <Input
                         name="password"
                         type="password"
                         required
                         placeholder="mot de passe"
                         className={fieldClass}
-                        style={fieldStyle}
                     />
-                    <button
-                        type="submit"
-                        className="wc-btn px-4 py-2 text-sm"
-                        style={{
-                            background: "var(--gold)",
-                            color: "var(--ink)",
-                        }}
-                    >
+                    <GameButton type="submit" size="sm">
                         Se connecter
-                    </button>
+                    </GameButton>
                 </form>
             </div>
         </div>

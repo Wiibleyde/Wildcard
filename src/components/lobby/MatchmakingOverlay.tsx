@@ -59,10 +59,9 @@ export function MatchmakingOverlay({
         <Modal
             open
             onClose={onCancel}
-            closeLabel={tCommon("cancel")}
             labelledBy={titleId}
             dismissible={!matched || stuck}
-            className="panel-d flex max-w-md flex-col items-center gap-6 px-8 py-10 text-center"
+            className="flex max-w-md flex-col items-center gap-6 bg-wc-panel-d px-8 py-10 text-center text-wc-cream sm:max-w-md"
         >
             <div className="relative flex h-24 w-24 items-center justify-center">
                 {!matched && (

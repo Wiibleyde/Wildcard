@@ -200,11 +200,11 @@ if (mode === "play") {
     await page.waitForTimeout(1800);
     await page.screenshot({ path: `${SHOTS}play-before.png`, fullPage: true });
 
-    // Turn controls are GameButtons (.wc-btn) rendered by TableControls — a
+    // Turn controls are GameButtons ([data-slot=button]) rendered by TableControls — a
     // pass button, or one button per playable combination when leading. Chat
-    // "Envoyer" and "Quitter la partie" are wc-btn too: skip them.
+    // "Envoyer" and "Quitter la partie" are GameButtons too: skip them.
     const button = page
-        .locator("button.wc-btn:enabled")
+        .locator("button[data-slot=button]:enabled")
         .filter({ hasNotText: /Envoyer|Send|Quitter|Leave/ })
         .first();
     // Bots lead first and are paced by the client: allow a few bot turns.
@@ -260,7 +260,7 @@ if (mode === "netwatch") {
         timeout: 45000,
     });
     const button = page
-        .locator("button.wc-btn:enabled")
+        .locator("button[data-slot=button]:enabled")
         .filter({ hasNotText: /Envoyer|Send|Quitter|Leave/ })
         .first();
     let clicks = 0;
